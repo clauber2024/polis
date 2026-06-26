@@ -4,3 +4,4 @@ backend/.env
 backend/.env
 *.zip
 BR_Municipios_2025/
+backend/src/etl/venv/
