@@ -121,6 +121,16 @@ def agregar_por_municipio(df: pd.DataFrame) -> pd.DataFrame:
               f"Essas linhas não podem ser agregadas territorialmente e serão DESCARTADAS.")
         df = df[df["CodMunicipioIbge"].notna()].copy()
 
+    # Filtra linhas com potência zero ou negativa — não têm sentido físico real
+    # (confirmado em teste com dados reais: 41 de 4.523.689 linhas, 0,0009% do
+    # total — provavelmente erro de cadastro na fonte). Descartamos explicitamente
+    # em vez de deixá-las distorcer a soma silenciosamente.
+    n_potencia_invalida = (df["MdaPotenciaInstaladaKW"] <= 0).sum()
+    if n_potencia_invalida > 0:
+        print(f"      [AVISO] {n_potencia_invalida} linha(s) com potência instalada <= 0 — "
+              f"sem sentido físico, serão DESCARTADAS da agregação.")
+        df = df[df["MdaPotenciaInstaladaKW"] > 0].copy()
+
     # Garante código IBGE como string de 7 caracteres, mesma convenção do
     # seed de municípios (alguns sistemas podem trazer como número, perdendo
     # zeros à esquerda — nenhum município brasileiro começa com 0, mas
@@ -140,15 +150,57 @@ def agregar_por_municipio(df: pd.DataFrame) -> pd.DataFrame:
     return agregado
 
 
+def filtrar_municipios_existentes(engine, agregado: pd.DataFrame) -> pd.DataFrame:
+    """
+    Verifica quais códigos IBGE do arquivo da ANEEL realmente existem na base
+    territorial (unidades_espaciais), ANTES de tentar o upsert.
+    --------------------------------------------------------------------------
+    Por quê fazer isso antes, em vez de só deixar a foreign key rejeitar?
+    Porque a fonte da ANEEL pode trazer códigos espúrios (ex: '0431780' — não
+    é um código IBGE real de 7 dígitos de município brasileiro, provavelmente
+    erro de cadastro ou um valor de teste na própria base da ANEEL). Filtrar
+    antes permite reportar isso de forma clara e separada dos municípios
+    válidos, em vez de só um erro de banco genérico.
+    """
+    print("      Verificando quais códigos IBGE existem na base territorial...")
+
+    with engine.connect() as conexao:
+        resultado = conexao.execute(text(
+            "SELECT codigo_ibge FROM municipios"
+        ))
+        codigos_validos = {linha[0] for linha in resultado}
+
+    agregado = agregado.copy()
+    mascara_valida = agregado["codigo_ibge"].isin(codigos_validos)
+    invalidos = agregado[~mascara_valida]
+
+    if len(invalidos) > 0:
+        print(f"      [AVISO] {len(invalidos)} código(s) IBGE do arquivo da ANEEL não existem na "
+              f"base territorial (provavelmente erro de cadastro na fonte) — serão IGNORADOS:")
+        for codigo in invalidos["codigo_ibge"].tolist()[:10]:
+            print(f"        - {codigo}")
+        if len(invalidos) > 10:
+            print(f"        ... e mais {len(invalidos) - 10}.")
+
+    return agregado[mascara_valida].copy()
+
+
 def executar_upsert_mmgd(engine, agregado: pd.DataFrame, periodo_referencia: str):
     """
     Faz upsert em mmgd_indicadores, referenciando o ESPELHO de município em
     unidades_espaciais (id = 'municipio:CODIGO_IBGE'), não municipios
     diretamente — mesma lógica de granularidade flexível do seed territorial.
 
-    Se a unidade_espacial_id não existir (município sem espelho cadastrado),
-    a foreign key vai rejeitar a linha — nesse caso reportamos quais códigos
-    falharam, em vez de deixar o erro do banco interromper tudo sem contexto.
+    POR QUE UMA TRANSAÇÃO POR MUNICÍPIO, NÃO UMA TRANSAÇÃO ÚNICA PARA TUDO:
+    --------------------------------------------------------------------------
+    Detectado em produção: ao usar uma única transação (engine.begin() em
+    volta do loop inteiro), o primeiro erro de foreign key (município com
+    código inválido) marcava a transação inteira como abortada, e TODOS os
+    upserts seguintes falhavam em cascata com "current transaction is
+    aborted" — mesmo sendo dados perfeitamente válidos. O resultado era
+    "0 município(s) inseridos" mesmo com 5.568 de 5.569 linhas corretas.
+    A correção: cada município abre e fecha (commita) sua própria transação,
+    então uma falha isolada não contamina as demais.
     """
     print(f"[4/4] Inserindo/atualizando `mmgd_indicadores` para período {periodo_referencia}...")
 
@@ -168,22 +220,22 @@ def executar_upsert_mmgd(engine, agregado: pd.DataFrame, periodo_referencia: str
     falhas = []
     inseridos = 0
 
-    with engine.begin() as conexao:
-        for i, linha in agregado.iterrows():
-            unidade_espacial_id = f"municipio:{linha['codigo_ibge']}"
-            try:
+    for i, linha in agregado.iterrows():
+        unidade_espacial_id = f"municipio:{linha['codigo_ibge']}"
+        try:
+            with engine.begin() as conexao:
                 conexao.execute(sql_upsert, {
                     "unidade_espacial_id": unidade_espacial_id,
                     "periodo_referencia": periodo_referencia,
                     "potencia_instalada_kw": float(linha["potencia_instalada_kw"]),
                     "numero_ucs_com_mmgd": int(linha["numero_ucs_com_mmgd"]),
                 })
-                inseridos += 1
-            except Exception as e:
-                falhas.append((linha["codigo_ibge"], str(e)))
+            inseridos += 1
+        except Exception as e:
+            falhas.append((linha["codigo_ibge"], str(e)))
 
-            if (i + 1) % 1000 == 0 or (i + 1) == total:
-                print(f"      ... {i + 1}/{total} municípios processados")
+        if (i + 1) % 1000 == 0 or (i + 1) == total:
+            print(f"      ... {i + 1}/{total} municípios processados")
 
     print(f"      {inseridos} município(s) inseridos/atualizados com sucesso.")
     if falhas:
@@ -208,9 +260,10 @@ def main():
     print(f"\nConectando ao banco: {DATABASE_URL.split('@')[-1]}")
     engine = create_engine(DATABASE_URL)
 
-    executar_upsert_mmgd(engine, agregado, periodo_referencia)
+    agregado_valido = filtrar_municipios_existentes(engine, agregado)
+    executar_upsert_mmgd(engine, agregado_valido, periodo_referencia)
 
-    print("\n✅ Extração de MMGD concluída com sucesso.")
+    print("\n✅ Extração de MMGD concluída.")
 
 
 if __name__ == "__main__":
