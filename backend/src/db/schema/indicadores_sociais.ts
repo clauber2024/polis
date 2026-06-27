@@ -40,6 +40,25 @@ export const indicadoresSociais = pgTable(
     percentualCadunico: doublePrecision('percentual_cadunico'),
     percentualTarifaSocial: doublePrecision('percentual_tarifa_social'),
 
+    // --- Dimensão Infraestrutura Urbana (inspirada no IVS/IPEA, construída
+    // a partir do Censo 2022 via SIDRA — ver nota metodológica no DRF/CLAUDE.md
+    // sobre esta NÃO ser o IVS oficial, que só existe em nível municipal até 2010) ---
+
+    /** % da população residente em domicílios rurais (Tabela SIDRA 9923) */
+    percentualPopulacaoRural: doublePrecision('percentual_populacao_rural'),
+
+    /** % de domicílios sem ligação à rede geral de distribuição de água (Tabela SIDRA 6803) */
+    percentualAguaInadequada: doublePrecision('percentual_agua_inadequada'),
+
+    /** % de domicílios sem esgotamento por rede geral/pluvial/fossa ligada à rede (Tabela SIDRA 6805) */
+    percentualEsgotoInadequado: doublePrecision('percentual_esgoto_inadequado'),
+
+    /** % de domicílios sem coleta de lixo direta ou indireta (Tabela SIDRA 6892) */
+    percentualLixoInadequado: doublePrecision('percentual_lixo_inadequado'),
+
+    /** Habitantes por km², calculado a partir da população do Censo 2022 e municipios.area_km2 */
+    densidadePopulacional: doublePrecision('densidade_populacional'),
+
     criadoEm: timestamp('criado_em', { withTimezone: true }).defaultNow().notNull(),
   },
   (tabela) => ({
