@@ -97,28 +97,65 @@ em duas capitais nesta sessão:**
   confirma que AEIS/ZEIS é categoria mais ampla que "favela" isolada
   (reforça o Eixo 5).
 
-- **Recife (PREZEIS)**: NÃO INVESTIGADO tecnicamente ainda (qual portal/
-  formato de dado), mas CONFIRMADO historicamente como pioneira nacional —
-  primeira experiência de ZEIS do Brasil, início nos anos 1980, através do
-  PREZEIS (Plano de Regularização das Zonas Especiais de Interesse Social),
-  com Comissões de Urbanização e Legalização da Posse da Terra (COMUL) e
-  fundo próprio (1,2% da arrecadação tributária municipal desde 1993). Alta
-  probabilidade de ter dado estruturado dado o histórico institucional,
-  mas fonte técnica específica (shapefile/portal) ainda não confirmada.
+- **Recife (ZEIS, via PREZEIS historicamente)**: PARCIALMENTE CONFIRMADO,
+  com ressalva importante. O dataset "Zoneamento - Plano Diretor" no Portal
+  de Dados Abertos do Recife (`dados.recife.pe.gov.br`, ID do dataset
+  `bcfc3a28-db91-424f-b1ea-7dd6626a100c`) está ATIVO — confirmado pois
+  outro recurso do mesmo dataset (Área de Reestruturação Urbana - ARU)
+  respondeu com sucesso. ⚠️ TESTADO NESTA SESSÃO: a URL de download direto
+  do recurso específico de ZEIS encontrada na indexação (`pd2021_zeisv15.geojson`,
+  resource_id `e2654c4a-...`) retornou **404** — esse recurso específico
+  parece ter sido descontinuado/substituído, mas o dataset-pai continua
+  ativo. **Próximo passo necessário:** acessar manualmente
+  `dados.recife.pe.gov.br/dataset/zoneamento` no navegador para achar o
+  resource_id atual de ZEIS (não automatizável só com as ferramentas desta
+  sessão, que não conseguiram fetch da página de listagem).
 
-- **Padrão confirmado**: cada capital usa portal E NOMENCLATURA própria e
-  DIFERENTE (GeoSampa/ZEIS ≠ DATA.RIO/AEIS ≠ Recife/PREZEIS). NÃO existe um
-  extractor genérico reaproveitável como o que fizemos para SIDRA/IBGE —
-  cada capital exigirá investigação e extractor individual, incluindo
-  descobrir o nome local do instrumento antes de buscar a fonte de dado.
+  **Achado extra relevante**: o mesmo portal tem outro dataset, com
+  "Códigos identificadores; tipo de aglomerado (favela, cortiço,
+  loteamento); área; nome do aglomerado; nome popular do local; endereço
+  completo e coordenadas" — isto é uma camada de TIPOLOGIAS POPULARES
+  (Eixo 5) já pronta e separada do ZEIS, com nome próprio por aglomerado
+  (como o Censo 2022 Favelas e Comunidades Urbanas, mas em escala
+  municipal/mais granular). Nome exato do dataset e resource_id ainda não
+  identificados — mesma ressalva de navegação manual necessária.
 
-**Recomendação:** tratar como projeto de pesquisa município por município.
-Próximos passos técnicos imediatos: (1) confirmar se o endpoint ArcGIS Hub
-do Rio permite download direto via requests/geopandas sem CAPTCHA — testar
-antes de assumir; (2) pesquisar a fonte técnica específica de Recife/
-PREZEIS; (3) ao expandir para mais capitais, primeiro buscar "[cidade]
-plano diretor zonas especiais interesse social" para descobrir a
-nomenclatura local antes de procurar o portal de dados.
+  Confirma também o histórico: primeira experiência nacional de ZEIS,
+  iniciada nos anos 1980 via PREZEIS (Plano de Regularização das Zonas
+  Especiais de Interesse Social), com Comissões de Urbanização e
+  Legalização da Posse da Terra (COMUL) — uma busca trouxe até um decreto
+  municipal real (2006) nomeando representantes comunitários da COMUL da
+  ZEIS Mustardinha, evidenciando que o instrumento tem institucionalidade
+  viva e contínua, não apenas histórica.
+
+- **Belo Horizonte (achado extra, não buscado deliberadamente)**: portal
+  `dados.pbh.gov.br` tem pelo menos 2 datasets relevantes — "Áreas de
+  Especial Interesse Social - AEIS - Lei 7166/96" (com EPSG 31983
+  informado) e "Conjunto Habitacionais Regularizados" (cruza AEIS-1/ZEIS-1
+  com unidades habitacionais regularizadas, série 2005-2021, CSV). BH usa
+  tanto "AEIS" quanto "ZEIS" no mesmo município (terminologia mista) —
+  outro padrão de nomenclatura a documentar. NÃO investigado em
+  profundidade ainda, mas portal e dataset já localizados.
+
+- **Padrão confirmado, agora com 3 capitais**: cada capital usa portal E
+  NOMENCLATURA própria (GeoSampa/ZEIS, shapefile+CAPTCHA ≠ DATA.RIO/AEIS,
+  ArcGIS Hub ≠ dados.recife/ZEIS, GeoJSON direto ≠ dados.pbh/AEIS+ZEIS
+  mistos, CSV+SHP). NÃO existe um extractor genérico reaproveitável como o
+  que fizemos para SIDRA/IBGE — cada capital exigirá investigação e
+  extractor individual, incluindo descobrir o nome local do instrumento
+  antes de buscar a fonte de dado.
+
+**Recomendação:** tratar como projeto de pesquisa município por município,
+com navegação manual do portal em cada caso (links indexados por buscadores
+frequentemente ficam desatualizados — confirmado nesta sessão com Recife).
+Das 3 capitais mapeadas, nenhuma tem ainda um link de download 100%
+validado de ponta a ponta — todas precisam de uma sessão de navegação
+manual do portal correspondente antes de escrever o extractor:
+- São Paulo: portal certo (GeoSampa), mas tem CAPTCHA
+- Rio de Janeiro: portal certo (DATA.RIO/ArcGIS Hub), link de visualização
+  confirmado mas download programático ainda não testado
+- Recife: dataset confirmado ativo, mas resource_id específico de ZEIS
+  mudou e precisa ser re-localizado manualmente
 
 ### Eixo 2 — Habitação de interesse social e programas habitacionais
 **Indicador:** `HIS_sem_solar` = municípios com alto volume de habitação
