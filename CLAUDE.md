@@ -1,6 +1,13 @@
 # 🚀 Project Standard — Atlas Solar Justo
 ### Exceção documentada ao Official Project Standard da empresa
 
+> Revisado em 29/06/2026. Esta versão corrige divergências entre o padrão
+> originalmente escrito e a prática real do projeto, identificadas após
+> várias sessões de implementação da camada de dados. Onde o padrão
+> original descrevia algo nunca implementado (Makefile, deploy completo),
+> isso foi marcado como **PLANEJADO**, não removido — mantém-se a intenção
+> para quando o projeto avançar ao backend/frontend.
+
 ---
 
 ## 0️⃣ Justificativa da Exceção
@@ -11,209 +18,271 @@ um WebGIS analítico que depende de:
 
 - **Dados geoespaciais nativos** (geometrias, índices GiST, projeção SIRGAS 2000 / EPSG:4674)
   — recurso central do PostGIS, sem equivalente robusto no MySQL.
-- **ETL Python** já em produção para extração ANEEL/IBGE/CadÚnico/INPE, com logging via loguru.
-- **Backend Node.js/Express + Drizzle ORM (TypeScript)**, já implementado e funcional.
+- **ETL Python** para extração de fontes governamentais (ANEEL, IBGE/SIDRA, RAIS via
+  BigQuery), com scripts isolados por fonte.
+- **Backend Node.js/Express + Drizzle ORM (TypeScript)** — schema e migrations já
+  implementados; rotas/controllers ainda **NÃO implementados** (ver Estado Real do
+  Projeto, abaixo).
 
 Por isso, esta é uma exceção justificada e documentada, nos termos previstos pelo próprio
 Official Project Standard ("seguido em todos os projetos, salvo exceção justificada e
 documentada"). Tudo que é **agnóstico de stack** no padrão oficial (CLAUDE.md, padrão de Git,
 checklist de produção, regra de timezone, idempotência, tratamento de erro/modal) é mantido
-sem alteração. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
+como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
+
+---
+
+## 📍 Estado Real do Projeto (atualizado em 29/06/2026)
+
+**Implementado e validado com dados reais:**
+- Schema do banco completo (`municipios`, `unidades_espaciais`, `mmgd_indicadores`,
+  `indicadores_sociais`, `irradiacao_solar`) — ver `backend/src/db/schema/`
+- Migrations incrementais (0000 a 0005) — ver `backend/src/db/migrations/`
+- 6 extractors Python funcionais, em `backend/src/etl/loaders/`:
+  território (seed de municípios), MMGD/ANEEL, Infraestrutura Urbana/Censo,
+  Renda e Trabalho/RAIS (BigQuery), Alfabetização/Censo, Moradia/Censo
+- Banco PostgreSQL+PostGIS local via `docker-compose.yml`, sem variante de produção ainda
+
+**NÃO implementado ainda** (apesar de descrito em seções deste documento como padrão):
+- Backend Node/Express (rotas, controllers, services, autenticação JWT) — só o schema existe
+- Frontend React — não iniciado
+- Makefile — não existe; todos os comandos deste documento (`make up`, `make etl`, etc.)
+  são **especificação para quando o backend for construído**, não comandos reais hoje
+- Deploy/produção (Nginx, certbot, scheduler, `docker-compose.prod.yml`) — arquitetura
+  especificada mas nunca implementada nem testada
+- Autenticação, 6 personas, RBAC — existem só no DRF como requisito, sem código
+
+**Como rodar o que existe hoje:** ver `README.md`, seção "Como rodar localmente" — é
+execução direta de scripts Python (`python3 backend/src/etl/loaders/extrair_X.py`), não via
+Makefile.
 
 ---
 
 ## 1️⃣ Stack Oficial do Projeto
 
-### 🔹 Backend
+### 🔹 Backend (schema implementado; rotas/controllers PLANEJADOS)
 - Node.js 20+ (LTS)
 - TypeScript 5+
 - Express
 - Drizzle ORM
 - PostgreSQL 16 + PostGIS 3.4
-- JWT (autenticação)
-- REST JSON API
+- JWT (autenticação) — PLANEJADO, não implementado
+- REST JSON API — PLANEJADO, não implementado
 
-### 🔹 ETL
+### 🔹 ETL (implementado)
 - Python 3.12+
-- pip + requirements.txt (ambiente isolado em container próprio)
-- loguru (logging estruturado)
-- Execução em container Docker dedicado (`etl`), não acoplado ao runtime Node
+- Ambiente isolado via `venv` (`backend/src/etl/venv/`) — **não usar Anaconda/conda
+  neste projeto**: já causou conflitos sérios de NumPy 1.x/2.x em sessões anteriores
+- Bibliotecas reais em uso: `pandas`, `geopandas`, `sqlalchemy`, `psycopg2-binary`,
+  `requests`, `google-cloud-bigquery`, `db-dtypes`
+- Execução direta via `python3 backend/src/etl/loaders/<script>.py` (sem container
+  dedicado ainda — PLANEJADO ter um serviço `etl` no Docker Compose quando o projeto
+  amadurecer)
+- Logging via `print()` estruturado nos scripts atuais — `loguru` é a meta declarada,
+  ainda não adotada na prática
 
-### 🔹 Frontend
+### 🔹 Frontend (não iniciado)
 - React 19
 - TypeScript 5+
 - Vite
 - Tailwind CSS
 - React Router
-- Biblioteca de mapas WebGIS (Leaflet ou MapLibre GL — a definir conforme necessidade de
-  choropleth + heatmap de densidade simultâneos)
+- **MapLibre GL JS** — decisão já tomada (não Leaflet): WebGL lida melhor com os ~5.570
+  municípios simultâneos e com a sobreposição choropleth+heatmap exigida pelo DRF
+  (RF-017, RF-022, RF-024)
 
 ### 🔹 Infraestrutura
-- Docker + Docker Compose
-- Nginx como reverse proxy
-- Cloudflare (quando aplicável)
-- Git
-- Makefile obrigatório
+- Docker + Docker Compose (implementado: `postgres` local)
+- Google Cloud + BigQuery (implementado: autenticação via `gcloud auth
+  application-default login`, usado pelo extractor de RAIS)
+- Nginx, Cloudflare, certbot — PLANEJADOS, parte da arquitetura de deploy ainda não
+  construída
+- Git (implementado)
+- Makefile — PLANEJADO, não existe ainda
 
 ---
 
-## 2️⃣ Estrutura Oficial do Projeto
+## 2️⃣ Estrutura Real do Projeto
 
 ```
 /
 ├── backend/
-│   ├── src/
-│   │   ├── routes/
-│   │   ├── controllers/
-│   │   ├── services/
-│   │   ├── middlewares/
-│   │   └── db/
-│   │       ├── schema/          (Drizzle schema)
-│   │       └── migrations/
-│   └── package.json
-├── etl/
-│   ├── extractors/               (ANEEL, IBGE, CadÚnico, TSEE, IVS/IPEA, INPE)
-│   ├── transformers/
-│   ├── loaders/
-│   ├── requirements.txt
-│   └── main.py
-├── frontend/
+│   └── src/
+│       ├── db/
+│       │   ├── schema/            (Drizzle schema — IMPLEMENTADO)
+│       │   │   ├── municipios.ts
+│       │   │   ├── unidades_espaciais.ts
+│       │   │   ├── mmgd_indicadores.ts
+│       │   │   ├── indicadores_sociais.ts
+│       │   │   ├── irradiacao_solar.ts
+│       │   │   └── index.ts
+│       │   └── migrations/        (SQL incremental — IMPLEMENTADO)
+│       │       ├── 0000_criacao_tabelas.sql
+│       │       ├── 0001_extensoes_e_indices_espaciais.sql
+│       │       ├── 0002_indicadores_sociais_infraestrutura.sql
+│       │       ├── 0003_indicadores_sociais_renda_trabalho.sql
+│       │       ├── 0004_indicadores_sociais_capital_humano.sql
+│       │       └── 0005_indicadores_sociais_moradia.sql
+│       └── etl/
+│           ├── venv/               (ambiente Python isolado — não versionado)
+│           ├── data/raw/           (shapefiles/parquet baixados — não versionado)
+│           └── loaders/            (extractors — IMPLEMENTADO)
+│               ├── seed_municipios.py
+│               ├── extrair_mmgd_aneel.py
+│               ├── extrair_infraestrutura_censo.py
+│               ├── extrair_renda_trabalho_rais.py
+│               ├── extrair_alfabetizacao_censo.py
+│               └── extrair_moradia_censo.py
+├── frontend/                       (estrutura de pastas existe, vazia — NÃO INICIADO)
 │   ├── pages/
 │   ├── components/
 │   ├── services/
 │   ├── hooks/
 │   └── utils/
-├── docker/
-│   ├── Dockerfile.backend
-│   ├── Dockerfile.backend.prod
-│   ├── Dockerfile.etl
-│   ├── Dockerfile.frontend
-│   └── nginx/
-│       ├── initial.conf
-│       └── production.conf
+├── docker/                         (PLANEJADO — Dockerfiles de produção não existem)
+├── docs/
+│   ├── DRF.md
+│   ├── PLANO_MORADIA_TERRITORIO_POPULAR.md
+│   └── PLANO_QUALIDADE_FORNECIMENTO_BDGD.md
 ├── CLAUDE.md
 ├── README.md
-├── Makefile
-├── docker-compose.yml
-├── docker-compose.prod.yml
-└── package.json
+├── docker-compose.yml               (só serviço `postgres` — IMPLEMENTADO)
+└── .gitignore
 ```
+
+A estrutura `etl/extractors/transformers/loaders/` do padrão original (com pastas
+separadas por etapa) **não foi adotada** — cada script de `backend/src/etl/loaders/`
+contém extração + transformação + carga juntas, por arquivo de fonte. Reavaliar essa
+divisão se o número de extractors crescer muito e a duplicação de lógica entre eles
+justificar uma camada compartilhada.
 
 ---
 
 ## 3️⃣ CLAUDE.md (Obrigatório)
 
-Todo projeto deve incluir um `CLAUDE.md` contendo:
-
-- Regra proibindo commits automáticos
-- Padrão de idioma (acentuação correta em português obrigatória)
-- Stack tecnológica (Node/Express/Drizzle/PostgreSQL+PostGIS/Python ETL/React)
-- Estrutura de pastas
-- Comandos do Makefile
-- Convenções de código
-- Padrões de UI
-- Regras de modal, toast e tratamento de erro: ao clicar fora do modal ou pressionar ESC,
-  o modal deve fechar
-- Tratamento de erro com mensagem clara ao usuário — nunca um simples "Error 500"
-- Convenção de unidade espacial: granularidade (município, setor censitário, CEP, bairro)
-  é sempre atributo do dado, nunca hardcoded em schema ou componente
-
-Isso garante consistência ao usar IA durante o desenvolvimento.
+Mantido como item do padrão: regra contra commits automáticos, acentuação em português,
+stack tecnológica, estrutura de pastas, convenções de código, tratamento de erro/modal
+(quando o frontend existir), e a convenção central de granularidade espacial — ver Seção
+5 para como isso foi implementado na prática (`unidades_espaciais`).
 
 ---
 
 ## 4️⃣ Padrões de Código
 
-### 🔹 React
-- Apenas componentes funcionais
-- Hooks obrigatórios
-- Props tipadas via `interface`
-- Services isolados em `/services`
-- Nenhuma chamada `fetch` direta dentro de componentes
-- Componentes de mapa isolados de lógica de negócio (camada de visualização separada de
-  camada de dados)
+### 🔹 React — PLANEJADO (frontend não iniciado)
+- Apenas componentes funcionais, hooks, props tipadas via `interface`
+- Services isolados em `/services`, nenhuma chamada `fetch` direta em componentes
+- Componentes de mapa isolados de lógica de negócio
 
-### 🔹 Backend (Node/Express)
-- Controllers devem retornar JSON consistente (mesmo formato de envelope em sucesso e erro)
-- Validação de entrada via middleware dedicado (ex: zod) antes do controller
-- Lógica de negócio deve viver em Services, nunca no controller
-- Camada de acesso a dados isolada via Drizzle (sem SQL solto em controllers/services)
+### 🔹 Backend (Node/Express) — PLANEJADO (schema existe, rotas não)
+- Controllers devem retornar JSON consistente
+- Validação via middleware dedicado (ex: zod)
+- Lógica de negócio em Services, nunca no controller
+- Acesso a dados isolado via Drizzle
 
-### 🔹 ETL (Python)
-- Cada fonte primária (ANEEL, IBGE, CadÚnico, TSEE, IVS/IPEA, INPE) tem extractor próprio,
-  isolado em `etl/extractors/`
-- Logging estruturado via loguru em todas as etapas (extração, transformação, carga)
-- Nenhum extractor deve gravar diretamente no banco sem passar por `loaders/`
-- Scripts de ETL devem ser idempotentes (reexecutar não deve duplicar dados)
+### 🔹 ETL (Python) — IMPLEMENTADO, com padrão real observado nesta fase
+- Cada fonte primária tem extractor próprio em `backend/src/etl/loaders/`
+- Todo extractor segue o mesmo formato de saída no terminal: etapas numeradas
+  (`[1/N] ...`), avisos explícitos (`[AVISO]`) para dados nulos/inválidos/descartados,
+  contagem final de sucesso/falha
+- **Transação por linha/município no upsert**, nunca uma transação única para todo o
+  lote — bug real encontrado e corrigido no extractor de MMGD: uma única transação fazia
+  qualquer erro de FK cancelar TODOS os upserts seguintes (`InFailedSqlTransaction` em
+  cascata)
+- Geometrias grandes devem ser transportadas como **WKB binário** (`geometry.wkb`), nunca
+  WKT textual — bug real encontrado: municípios com geometria muito detalhada (ex:
+  Jutaí/AM) geravam WKT de ~3 milhões de caracteres e derrubavam a conexão com o banco
+- Todo extractor deve pré-filtrar códigos IBGE inexistentes na base territorial antes do
+  upsert, reportando-os separadamente (não deixar a FK rejeitar silenciosamente)
+- Scripts devem ser idempotentes via `ON CONFLICT ... DO UPDATE`, nunca `INSERT` puro
+- Nunca usar Anaconda/conda como interpretador Python deste projeto — usar sempre o
+  `venv` em `backend/src/etl/venv/`
 
 ---
 
-## 5️⃣ Padrão de Banco de Dados
+## 5️⃣ Padrão de Banco de Dados (como implementado de fato)
 
-Toda tabela deve incluir:
-
-```typescript
-id: serial('id').primaryKey(),
-createdAt: timestamp('created_at').defaultNow().notNull(),
-updatedAt: timestamp('updated_at').defaultNow().notNull(),
-deletedAt: timestamp('deleted_at'), // soft delete
-```
-
-Relacionamentos:
+⚠️ **Esta seção foi corrigida** — o padrão originalmente escrito aqui (camelCase,
+`createdAt`/`updatedAt`/soft delete) não é o que foi implementado. O padrão real:
 
 ```typescript
-userId: integer('user_id')
-  .references(() => users.id, { onDelete: 'cascade' })
-  .notNull(),
+id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
+criadoEm: timestamp('criado_em', { withTimezone: true }).defaultNow().notNull(),
 ```
 
-Tabelas com geometria devem declarar projeção explicitamente:
+- Nomes de coluna em **snake_case em português** (`codigo_ibge`, `periodo_referencia`),
+  não em inglês/camelCase
+- **Sem soft delete** nas tabelas implementadas até agora (`deletedAt`) — todas usam
+  `ON DELETE CASCADE` nas foreign keys
+- **Sem `updatedAt`** na maioria das tabelas — `criadoEm` é o único timestamp padrão;
+  adicionar `atualizadoEm` quando a tabela específica precisar (ex: `municipios` tem
+  `atualizadoEm`, atualizado a cada upsert)
 
+Relacionamentos (como implementado):
 ```typescript
-geom: geometry('geom', { type: 'MultiPolygon', srid: 4674 }), // SIRGAS 2000
+codigoIbge: char('codigo_ibge', { length: 7 })
+  .notNull()
+  .references(() => municipios.codigoIbge, { onDelete: 'cascade' }),
 ```
 
-Índices espaciais obrigatórios em colunas de geometria:
+Tabelas com geometria — usar `customType`, não o helper `geometry()` nativo do Drizzle
+(testado: o helper nativo não respeita corretamente tipo + SRID combinados):
+```typescript
+const geometriaMultiPolygon = customType<{ data: string }>({
+  dataType() {
+    return 'geometry(MultiPolygon, 4674)'; // SIRGAS 2000
+  },
+});
+```
 
+Índices espaciais (GiST) **não são gerados pelo drizzle-kit** — sempre criar via migration
+SQL manual, separada da migration gerada automaticamente:
 ```sql
 CREATE INDEX idx_municipios_geom ON municipios USING GIST (geom);
 ```
 
-Seeders devem usar upsert (equivalente ao `updateOrCreate` do Laravel):
+**Granularidade espacial variável (implementado):** em vez de cada tabela de indicador
+referenciar `municipios` diretamente, todas referenciam `unidades_espaciais.id`
+(formato `tipo:codigo`, ex: `municipio:3550308`). Isso permite que o mesmo indicador
+exista em diferentes granularidades (município hoje; setor censitário, favela/comunidade
+urbana, CEP no futuro) sem alterar o schema das tabelas de indicador — só inserir novos
+registros em `unidades_espaciais` com `tipo` diferente.
 
+Seeders/extractors devem usar upsert:
 ```typescript
 await db.insert(table)
   .values(data)
   .onConflictDoUpdate({ target: table.id, set: data });
 ```
-
-Usuário e senha de demonstração devem seguir o padrão das 6 personas já definidas no DRF
-(ex.: `admin@atlassolarjusto.com.br` / `123456`), nunca usar credenciais genéricas como
-`admin@admin.com`.
+(equivalente Python/SQL usado nos extractors: `INSERT ... ON CONFLICT (...) DO UPDATE SET ...`)
 
 Nunca usar inserts estáticos que quebrem idempotência.
 
 ---
 
-## 6️⃣ Padrão de Git
+## 6️⃣ Padrão de Git (implementado e seguido)
 
 ### Branches
-- `main` → Produção
-- `develop` → Desenvolvimento (opcional)
-- `feature/xxx`
-- `fix/xxx`
+- `main` → único branch usado até agora (projeto em fase de dados, sem necessidade de
+  `develop`/`feature` ainda)
 
 ### Commits
-- Mensagens descritivas
+- Mensagens descritivas em português, multi-linha, explicando o quê E por quê (ver
+  histórico do projeto para exemplos — commits documentam bugs encontrados e corrigidos,
+  não só "o que foi adicionado")
 - Não misturar funcionalidades não relacionadas
-- Padrão de idioma único por projeto (português, dado o domínio do projeto)
-- Criar `.gitignore` com boas práticas para Node, Python e React
+- `.gitignore` cobrindo Node, Python e dados brutos (`backend/src/etl/venv/`,
+  `backend/src/etl/data/`) — dados baixados de fontes externas NUNCA são versionados,
+  só os scripts que os baixam/processam
 
 ---
 
-## 7️⃣ Makefile Obrigatório
+## 7️⃣ Makefile — PLANEJADO, NÃO IMPLEMENTADO
 
-Comandos mínimos exigidos:
+⚠️ Nenhum dos comandos abaixo existe hoje. Esta seção registra a **especificação
+desejada** para quando o backend Node/Express for construído — até então, todo comando
+de ETL é executado diretamente via `python3 backend/src/etl/loaders/<script>.py`, e
+todo comando de banco via `docker compose exec -T postgres psql ...` (ver README.md).
 
 ```
 make up            # ambiente de desenvolvimento (hot reload)
@@ -233,143 +302,38 @@ make shell           # abre shell no container do backend
 make lint
 ```
 
-⚠️ Nunca usar `node`, `npx drizzle-kit` ou `python` diretamente fora do Makefile.
+---
+
+## 8️⃣ Padrão de Deploy — PLANEJADO, NÃO IMPLEMENTADO
+
+⚠️ Toda esta seção é arquitetura especificada para uma fase futura do projeto
+(quando existir backend/frontend para deployar). Nada aqui foi construído ou testado.
+Mantida como referência de design.
+
+### Arquitetura (planejada)
+
+Produção rodaria em Docker Compose (`docker-compose.prod.yml`), separado do compose de
+desenvolvimento local (hoje só `postgres`). Serviços planejados:
+- **backend** — Node/Express, buildado a partir de `Dockerfile.backend.prod`
+- **frontend** — build estático (Vite) servido pelo Nginx
+- **etl** — container dedicado, acionado por `make etl` ou scheduler
+- **scheduler** — loop de jobs periódicos (ex.: atualização mensal ANEEL/MMGD)
+- **postgres** — já implementado localmente, replicar para produção
+- **nginx**, **certbot** — reverse proxy + SSL
+
+(Demais detalhes de configuração Nginx, fluxo `make send`/`make deploy`, variantes de
+deploy — mantidos como na especificação original deste documento, sem alteração, por
+serem desenho válido para quando esta fase começar.)
 
 ---
 
-## 8️⃣ Padrão de Deploy
+## 9️⃣ Checklist Pré-Produção — PLANEJADO
 
-### Arquitetura
-
-Produção roda inteiramente em Docker Compose (`docker-compose.prod.yml`), separado do
-compose de desenvolvimento local. Serviços:
-
-- **backend** — Node/Express, buildado a partir de `Dockerfile.backend.prod` (build TypeScript
-  compilado para JS, sem `ts-node` em produção).
-- **frontend** — build estático (Vite) servido pelo Nginx.
-- **etl** — container dedicado, não fica em execução contínua; é acionado por `make etl` ou
-  por scheduler (cron container) conforme periodicidade das fontes primárias.
-- **scheduler** — roda o loop de jobs periódicos (ex.: atualização mensal ANEEL/MMGD).
-- **postgres** — PostgreSQL + extensão PostGIS habilitada, com healthcheck.
-- **nginx** (`nginx:alpine`) — reverse proxy / servidor web, portas 80 + 443.
-- **certbot** — emissão/renovação Let's Encrypt.
-
-Todos os containers de app compartilham o mesmo `Dockerfile.backend.prod` (ou variante) e
-montam o código via volume quando aplicável em dev.
-
-### Configuração Nginx (`production.conf`)
-
-Deve incluir:
-- Redirecionamento HTTP → HTTPS (porta 80 → 301 para 443), com `/.well-known/acme-challenge/`
-  aberto para o certbot.
-- SSL/TLS: TLSv1.2 + TLSv1.3, cifras modernas, cache de sessão, HSTS.
-- Headers de segurança: X-Frame-Options, X-Content-Type-Options, X-XSS-Protection,
-  Referrer-Policy.
-- Gzip habilitado: `gzip on`, `gzip_vary on`, nível de compressão 6, cobrindo
-  text/css/js/json/svg/xml.
-- Fallback de SPA: `location / { try_files $uri $uri/ /index.html; }`.
-- Cache longo para assets estáticos com fingerprint: `expires 1y`, `Cache-Control "public,
-  immutable"`, em `/assets/` e extensões `*.(js|css|png|woff2|...)`, com `access_log off`.
-- Bloqueio de dotfiles: `/.ht` e `/.env`.
-- `client_max_body_size` alinhado ao limite de upload da aplicação (relevante para upload de
-  bases de dados no Painel Administrativo).
-
-Manter bootstrap em duas configurações para o primeiro deploy: `initial.conf` (somente HTTP,
-sem bloco SSL) copiado para `active.conf` para o Nginx subir antes de existirem certificados;
-o certbot emite o certificado; depois troca-se para o `production.conf` completo com SSL.
-
-### Fluxo em duas fases
-
-**Fase 1 — `make send` (código → main)**
-Um único comando do diretório de trabalho até o merge em main:
-1. Executa `make lint` primeiro.
-2. Pergunta a mensagem de commit.
-3. Cria branch com timestamp `auto/AAAAMMDD-HHMMSS`, `add -A`, commit (encerra de forma limpa
-   se não houver nada para commitar).
-4. Faz push e abre MR/PR via CLI (`gh`).
-5. Auto-merge em main com remoção da branch de origem, depois `checkout main && pull` e remove
-   a branch local.
-
-**Fase 2 — `make deploy` (main → produção)**
-
-`git stash` + `git pull`, depois chama `deploy-full`.
-
-`deploy-full` — núcleo do deploy (passos com cronometragem):
-
-Saída colorida e numerada. Acompanha tempo total e downtime de manutenção separadamente.
-
-1. **Preparar ambiente** — corrige permissões, garante que `active.conf` do Nginx existe.
-2. **Instalar dependências do backend** — `npm ci --omit=dev` dentro do container do backend.
-3. **Build isolado do frontend** — `docker compose run --rm frontend sh -c "npm ci && npm run
-   build"`. Aborta todo o deploy se o build falhar (não tira a aplicação do ar por causa de um
-   build quebrado).
-4. **Modo de manutenção** — exibe página de manutenção via flag no Nginx (ou middleware Express
-   com bypass por secret, equivalente ao `artisan down --secret`). Inicia o cronômetro de
-   downtime aqui.
-5. **Migrations + restart**:
-   - `npx drizzle-kit migrate`
-   - executa pipeline ETL se houver atualização de fonte primária pendente
-   - sobe infraestrutura (`up -d postgres nginx ...`) e `up -d --force-recreate backend etl
-     scheduler`
-   - recarrega Nginx (`nginx -s reload`)
-6. **Sair do modo de manutenção** — remove a flag de manutenção. Para os cronômetros, grava
-   `frontend/public/version.json` com `{ git short hash, commit date }`, imprime tempo total +
-   downtime.
-
-**Variantes de deploy**
-- `make deploy` — caminho normal: `git pull` + `deploy-full`, sem rebuild de imagem.
-- `make deploy-rebuild` — quando `Dockerfile.backend.prod` ou pacotes Node/Python mudaram:
-  `compose build` → `up -d backend etl` → `deploy-full`.
-- `make deploy-first` — subida inicial do servidor: Nginx `initial.conf`, `compose build`,
-  geração de `.env` de produção, `deploy-full`.
-
-**Desenvolvimento (hot reload, sem ciclo down/up)**
-- Código montado via volume — alterações no backend são refletidas ao vivo, sem rebuild
-  para edições normais.
-- Frontend roda com Vite dev server em container próprio, com porta exposta e HMR ativo;
-  `make up` inicia tudo e você edita-e-salva sem `make down`/`make up`.
-- `make up` deve se auto-curar: `compose down --remove-orphans` seguido de `up -d`, para que
-  containers obsoletos nunca bloqueiem um restart.
-
----
-
-## 9️⃣ Checklist Obrigatório Pré-Produção
-
-- ✅ `.env` configurado
-- ✅ Conexão PostgreSQL + extensão PostGIS habilitada (`CREATE EXTENSION postgis;`)
-- ✅ JWT funcionando
-- ✅ CORS configurado
-- ✅ Migrations (Drizzle) executadas
-- ✅ Seeders idempotentes
-- ✅ Login funcionando para as 6 personas
-- ✅ Rotas protegidas por perfil funcionando (RBAC: público, pesquisador, gestor, parceiro,
-  equipe, administrador)
-- ✅ Pipeline ETL executando sem erros para as 6 fontes primárias
-- ✅ Logs limpos (loguru no ETL, logger estruturado no backend)
-- ✅ Erros tratados com JSON consistente, nunca "Error 500" cru
-- ✅ Build de frontend otimizado
-- ✅ Cache habilitado
-- ✅ Fluxo completo de autenticação testado
-- ✅ Índices GiST validados em todas as colunas de geometria
-- ✅ Camadas de mapa renderizando choropleth e heatmap de densidade corretamente
-
----
-
-## 🔟 Fluxo Oficial de Novo Projeto
-
-1. Criar repositório
-2. Subir template base
-3. Configurar Docker
-4. Criar `CLAUDE.md`
-5. Criar `README.md`
-6. Inicializar backend Node/Express + Drizzle
-7. Configurar PostgreSQL + PostGIS
-8. Inicializar React + TypeScript + Vite
-9. Configurar Tailwind
-10. Implementar autenticação base (JWT)
-11. Criar estrutura `etl/` com extractors das fontes primárias
-12. Criar Makefile
-13. Push do primeiro commit estruturado
+Mantido como meta para quando o backend/frontend existirem. Hoje, o equivalente real é a
+validação de cada extractor (ver padrão na Seção 4): confirmar contagem de
+sucesso/falha, rodar query de sanidade pós-carga contra casos de referência do DRF
+(São Paulo, Floresta-PE, Diamantina-MG), e comparar agregados nacionais contra estatística
+oficial conhecida antes de considerar um extractor validado.
 
 ---
 
@@ -387,3 +351,8 @@ Todas as datas e horários deste projeto usam UTC-3 (America/Sao_Paulo). Todos o
 data/hora fornecidos estarão em UTC-3. Armazenar datas com timezone consciente e sempre
 exibi-las em formato UTC-3 — nunca converter para UTC ou outros fusos ao salvar ou exibir
 datas ao usuário.
+
+(Nota: os timestamps `criadoEm`/`atualizadoEm` implementados usam
+`timestamp(..., { withTimezone: true })`, que armazena em UTC internamente no PostgreSQL
+mas é exibido convertido — confirmar, ao construir a camada de apresentação, que a
+conversão de exibição usa America/Sao_Paulo, não UTC bruto.)
