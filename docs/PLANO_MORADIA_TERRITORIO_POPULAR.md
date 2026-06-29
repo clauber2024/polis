@@ -20,6 +20,12 @@ famílias com renda equivalente, uma proprietária e outra inquilina, têm
 acesso estruturalmente desigual à MMGD no modelo atual. Cada eixo abaixo
 operacionaliza esta tese com uma fonte de dado diferente.
 
+> Ver também `docs/PLANO_QUALIDADE_FORNECIMENTO_BDGD.md` — frente
+> relacionada (mas conceitualmente distinta) sobre qualidade do
+> fornecimento de energia elétrica, identificada a partir de um estudo
+> prévio do Polis que já cruzou essa dimensão com aglomerados subnormais
+> em Rio Branco (AC), entre outras capitais.
+
 ## Mudança de enquadramento (importante)
 
 A primeira versão deste plano tratava "moradia" como sinônimo de "favela"
