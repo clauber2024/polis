@@ -52,34 +52,73 @@ Perguntas orientadoras:
 **Indicador:** `barreira_fundiaria_solar` = alta presença de
 informalidade/ZEIS/REURB + baixa MMGD residencial.
 
-**Viabilidade nacional:** BAIXA. Não existe base nacional uniforme de ZEIS —
-é definida município a município em plano diretor local. "Cadastros
-habitacionais municipais, quando disponíveis" e "dados via LAI" confirmam
-que não há fonte centralizada.
+**Viabilidade nacional:** BAIXA. Não existe base nacional uniforme — é
+definida município a município em plano diretor local, e o PRÓPRIO NOME DO
+INSTRUMENTO VARIA por município (ver achado importante abaixo).
+
+**⚠️ ACHADO IMPORTANTE — nomenclatura não padronizada:** o instrumento
+jurídico-urbanístico que o Estatuto da Cidade chama de "Zonas Especiais de
+Interesse Social" não tem nome único nas cidades brasileiras:
+- São Paulo, Recife, maioria das cidades: **ZEIS**
+- **Rio de Janeiro: AEIS** (Área de Especial Interesse Social) — nome
+  diferente, mesmo conceito jurídico
+- Outras cidades: **SEHIS** (Setores Especiais de Habitação de Interesse
+  Social)
+
+Isso significa que um futuro extractor multi-capital não pode buscar
+"ZEIS" como termo de busca universal — precisa de um mapeamento
+município→nome-do-instrumento-local antes de buscar a camada de dado.
 
 **Viabilidade reduzida a capitais (27 municípios): MÉDIA-ALTA, confirmada
-parcialmente nesta sessão:**
-- **São Paulo**: CONFIRMADO. O GeoSampa (portal oficial da prefeitura,
-  `geosampa.prefeitura.sp.gov.br`) disponibiliza shapefile de ZEIS do Plano
-  Diretor Estratégico, além de camadas de Favelas, Cortiço e Loteamento
-  Irregular — exatamente a "camada de territórios populares" ampla do
-  Eixo 5. ⚠️ O portal tem CAPTCHA — download manual funciona, automação via
-  script pode ser bloqueada.
-- **Rio de Janeiro**: PARCIALMENTE CONFIRMADO. Existe portal robusto
-  (DATA.RIO, `data.rio`) com API e múltiplos formatos (CSV/KML/GeoJSON/WFS),
-  mas a camada específica de ZEIS dentro dele ainda não foi confirmada —
-  próximo passo.
-- **Recife**: NÃO INVESTIGADO ainda (pioneira histórica em ZEIS desde os
-  anos 1980 — alta probabilidade de ter dado bom, mas não verificado).
-- **Padrão identificado**: cada capital usa portal e estrutura de dados
-  PRÓPRIA e DIFERENTE (GeoSampa ≠ DATA.RIO ≠ outras). NÃO existe um
-  extractor genérico reaproveitável como o que fizemos para SIDRA/IBGE —
-  cada capital exigirá investigação e extractor individual.
+em duas capitais nesta sessão:**
 
-**Recomendação:** tratar como projeto de pesquisa município por município,
-começando pelas capitais com maior população em favelas/comunidades urbanas
-já mapeada (ver dados do Eixo "Favelas", que já temos: Manaus, Belém, Rio de
-Janeiro, São Paulo concentram as maiores populações).
+- **São Paulo (ZEIS)**: CONFIRMADO. GeoSampa
+  (`geosampa.prefeitura.sp.gov.br`) disponibiliza shapefile de ZEIS do Plano
+  Diretor Estratégico (Lei nº 16.050/14, Mapa 4), com 4 subtipos (ZEIS 1:
+  favelas/loteamentos irregulares/HIS existente; ZEIS 2: glebas vazias para
+  HIS nova; ZEIS 3: imóveis ociosos/cortiços em áreas centrais; ZEIS 4: APA
+  de mananciais), além de camadas separadas de Favela, Cortiço e Loteamento
+  Irregular. ⚠️ Portal tem CAPTCHA — download manual funciona, automação via
+  script pode ser bloqueada.
+
+- **Rio de Janeiro (AEIS)**: CONFIRMADO nesta sessão. Camada oficial
+  "AEIS - Área de Especial Interesse Social - Habitação", validada pela
+  Secretaria Municipal de Habitação, disponível em:
+  ```
+  https://www.data.rio/maps/4fafa31418274fb185b3a94c4672f95a
+  ```
+  Também replicada via ArcGIS Hub público (potencialmente mais fácil de
+  automatizar, sem CAPTCHA):
+  ```
+  https://datario-pcrj.hub.arcgis.com/datasets/ac12b0d378d44f75a86042aad13b8741
+  ```
+  Dado quantitativo de contexto: quase 1.000 AEIS demarcadas no Rio, sendo
+  33,84% caracterizadas como favela e quase 2/3 como loteamento irregular —
+  confirma que AEIS/ZEIS é categoria mais ampla que "favela" isolada
+  (reforça o Eixo 5).
+
+- **Recife (PREZEIS)**: NÃO INVESTIGADO tecnicamente ainda (qual portal/
+  formato de dado), mas CONFIRMADO historicamente como pioneira nacional —
+  primeira experiência de ZEIS do Brasil, início nos anos 1980, através do
+  PREZEIS (Plano de Regularização das Zonas Especiais de Interesse Social),
+  com Comissões de Urbanização e Legalização da Posse da Terra (COMUL) e
+  fundo próprio (1,2% da arrecadação tributária municipal desde 1993). Alta
+  probabilidade de ter dado estruturado dado o histórico institucional,
+  mas fonte técnica específica (shapefile/portal) ainda não confirmada.
+
+- **Padrão confirmado**: cada capital usa portal E NOMENCLATURA própria e
+  DIFERENTE (GeoSampa/ZEIS ≠ DATA.RIO/AEIS ≠ Recife/PREZEIS). NÃO existe um
+  extractor genérico reaproveitável como o que fizemos para SIDRA/IBGE —
+  cada capital exigirá investigação e extractor individual, incluindo
+  descobrir o nome local do instrumento antes de buscar a fonte de dado.
+
+**Recomendação:** tratar como projeto de pesquisa município por município.
+Próximos passos técnicos imediatos: (1) confirmar se o endpoint ArcGIS Hub
+do Rio permite download direto via requests/geopandas sem CAPTCHA — testar
+antes de assumir; (2) pesquisar a fonte técnica específica de Recife/
+PREZEIS; (3) ao expandir para mais capitais, primeiro buscar "[cidade]
+plano diretor zonas especiais interesse social" para descobrir a
+nomenclatura local antes de procurar o portal de dados.
 
 ### Eixo 2 — Habitação de interesse social e programas habitacionais
 **Indicador:** `HIS_sem_solar` = municípios com alto volume de habitação
@@ -95,12 +134,24 @@ Casa Minha Vida" relançado, verificar nome/programa atual em 2026).
 **Indicadores:** % domicílios alugados × MMGD residencial PF; ônus
 excessivo com aluguel × baixa MMGD; coabitação/adensamento × baixa MMGD.
 
-**Viabilidade:** ALTA, NÃO CONFIRMADA AINDA (mas alta confiança). "Domicílio,
-condição de ocupação" (próprio/alugado/cedido) é variável clássica do
-Censo 2022, Questionário Básico — mesmo padrão de água/esgoto/lixo já
-implementado. **Esta é a frente mais viável para implementação imediata.**
-Próximo passo: confirmar número da tabela SIDRA (igual processo já usado
-4 vezes nesta sessão para outras tabelas).
+**Status: ✅ IMPLEMENTADO nesta sessão (29/06/2026).** Tabela SIDRA 9928,
+Censo 2022, nível municipal. Extractor: `extrair_moradia_censo.py`.
+Indicadores gravados: `percentual_domicilio_proprio`,
+`percentual_domicilio_alugado`, `percentual_domicilio_cedido` (proxy
+parcial de coabitação), além de `percentual_cortico` (Eixo 5, mesma fonte).
+5.570 de 5.570 municípios carregados com sucesso.
+
+Achado de validação: São Paulo tem a MENOR % próprio (65,8%) e MAIOR %
+alugado (28,4%) e cortiço (0,66%) entre os municípios de referência do DRF,
+apesar de ter os MELHORES indicadores de infraestrutura/educação —
+confirma que esta dimensão mede algo estrutural, não redutível a privação
+socioeconômica geral.
+
+**Pendente dentro deste eixo:** "ônus excessivo com aluguel" (% renda
+comprometida com aluguel) ainda não extraído — precisa cruzar valor do
+aluguel (Censo tem essa variável, "classes de aluguel nominal mensal
+domiciliar", ver Tabela 287/438 nas buscas realizadas) com renda
+domiciliar. Adiado para sessão futura.
 
 ### Eixo 4 — Inadequação habitacional e capacidade física de receber solar
 **Indicador:** `potencial_social_sem_capacidade_individual` = alta
