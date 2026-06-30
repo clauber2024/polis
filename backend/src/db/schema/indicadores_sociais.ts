@@ -105,6 +105,21 @@ export const indicadoresSociais = pgTable(
     /** % de domicílios em casa de cômodos ou cortiço (Tabela SIDRA 9928) — Eixo 5 */
     percentualCortico: doublePrecision('percentual_cortico'),
 
+    /**
+     * % de domicílios com material de parede inadequado (Eixo 4) — Tabela
+     * SIDRA 9928, classificação 137. "Inadequado" = soma de: taipa sem
+     * revestimento, madeira aproveitada de tapume/embalagens/andaimes,
+     * outro material, sem parede. NÃO inclui alvenaria sem revestimento
+     * nem madeira para construção (materiais legítimos, não precariedade
+     * em si). O componente "existência de energia elétrica", presente no
+     * índice oficial "Adequação da Moradia" (Censo 2010), NÃO foi incluído
+     * aqui: o IBGE não divulgou tabela equivalente para o Censo 2022,
+     * provavelmente por o acesso à eletricidade já estar quase
+     * universalizado (~99,8%, PNAD 2019) e ter perdido poder discriminativo
+     * entre municípios.
+     */
+    percentualParedeInadequada: doublePrecision('percentual_parede_inadequada'),
+
     criadoEm: timestamp('criado_em', { withTimezone: true }).defaultNow().notNull(),
   },
   (tabela) => ({
