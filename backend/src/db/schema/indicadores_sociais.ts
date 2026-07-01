@@ -120,6 +120,12 @@ export const indicadoresSociais = pgTable(
      */
     percentualParedeInadequada: doublePrecision('percentual_parede_inadequada'),
 
+    /** % da população residente em Favelas e Comunidades Urbanas (Tabela SIDRA 9888) */
+    percentualPopulacaoFavela: doublePrecision("percentual_populacao_favela"),
+    
+    /** Número absoluto de Favelas e Comunidades Urbanas no município (Tabela SIDRA 9883) */
+    numeroFavelasComunidades: integer("numero_favelas_comunidades"),
+
     criadoEm: timestamp('criado_em', { withTimezone: true }).defaultNow().notNull(),
   },
   (tabela) => ({
