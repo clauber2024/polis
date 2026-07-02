@@ -128,6 +128,12 @@ export const indicadoresSociais = pgTable(
 
     /** Total de unidades habitacionais MCMV financiadas pelo FGTS, acumulado historico (2009-2025) */
     unidadesHabitacionaisFgts: integer("unidades_habitacionais_fgts"),
+    /** Numero de empreendimentos MCMV subsidiados OGU no municipio */
+    empreendimentosOgu: integer("empreendimentos_ogu"),
+    /** Total de UH MCMV/OGU previstas (excluindo distratados) */
+    unidadesOguPrevistas: integer("unidades_ogu_previstas"),
+    /** Total de UH MCMV/OGU efetivamente entregues */
+    unidadesOguEntregues: integer("unidades_ogu_entregues"),
     criadoEm: timestamp('criado_em', { withTimezone: true }).defaultNow().notNull(),
   },
   (tabela) => ({
