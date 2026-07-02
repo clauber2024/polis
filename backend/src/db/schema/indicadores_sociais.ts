@@ -126,6 +126,8 @@ export const indicadoresSociais = pgTable(
     /** Número absoluto de Favelas e Comunidades Urbanas no município (Tabela SIDRA 9883) */
     numeroFavelasComunidades: integer("numero_favelas_comunidades"),
 
+    /** Total de unidades habitacionais MCMV financiadas pelo FGTS, acumulado historico (2009-2025) */
+    unidadesHabitacionaisFgts: integer("unidades_habitacionais_fgts"),
     criadoEm: timestamp('criado_em', { withTimezone: true }).defaultNow().notNull(),
   },
   (tabela) => ({
