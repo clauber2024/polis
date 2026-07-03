@@ -51,6 +51,29 @@ Tabela `unidades_espaciais`:
 3. **Cruzamento MMGD × indicadores sociais** — identificar vazios reais de acesso
 4. **Capital Humano** — DATASUS, mortalidade infantil
 5. Atualizar README e CLAUDE.md (Estado Real) com os dados das sessões de Moradia e INDQUAL
+## Ideias para investigar (não priorizadas)
+- **Perdas técnicas e não técnicas** (ANEEL) — indicador de justiça energética potencialmente
+  forte: perdas não técnicas (furto/fraude) tendem a concentrar em áreas de baixa renda e
+  correlacionam com fiscalização/corte mais agressivos nessas regiões. Não investigado ainda
+  se está no Portal de Dados Abertos, granularidade (distribuidora? conjunto? município?) e
+  formato. Levantado em sessão de 03/07/2026, ainda sem pesquisa de viabilidade.
+- **Queima de equipamentos** (transformadores/eletrodomésticos por sobretensão) — tende a
+  concentrar onde a rede tem pouca proteção (para-raios, aterramento) combinado com alta
+  incidência de raios (densidade de descargas atmosféricas maior em partes do Centro-Oeste/
+  Norte). Possível cruzamento: dados de proteção de rede (BDGD) × mapas de densidade de raios
+  (INPE/ELAT tem esse dado). Não investigado ainda se ANEEL disponibiliza reclamações/
+  ressarcimentos por queima de equipamento em dataset aberto. Levantado em 03/07/2026.
+- **DEC/FEC sem expurgo** — **confirmado, dado já carregado, falta só a view (03/07/2026)**:
+  DEC/FEC oficial da ANEEL exclui ocorrências em "dia Crítico" (Nota Técnica 071/2011-SRD/
+  ANEEL — mecanismo regulatório de expurgo por eventos emergenciais atípicos, ex. tempestades
+  extremas). O sufixo **"C"** nas siglas de `qualidade_indicadores` (`DECINC`, `DECIPC`,
+  `DECXNC`, `DECXPC` e equivalentes em FEC) é exatamente a parcela expurgada — já está
+  carregada, só falta agregar. Fórmula pro número real:
+  `DEC_real = DEC + DECINC + DECIPC + DECXNC + DECXPC` (idem pra FEC).
+  Relevante pra justiça energética: eventos extremos (mudança climática) tendem a concentrar
+  em certas regiões, e o número oficial "limpo" pode mascarar exatamente isso.
+  Próximo passo: criar `vw_qualidade_municipio_real` (ou equivalente) que soma as parcelas
+  por município/ano/período. Não requer nova extração de dados.
 ## Manutenção deste documento
 Atualizar ao fim de cada sessão de carga de dados: estado da `unidades_espaciais`,
 tabela de dimensões e fila de trabalho. Decisões de fontes só mudam com nova pesquisa.
