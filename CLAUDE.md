@@ -1,12 +1,12 @@
 # 🚀 Project Standard — Atlas Solar Justo
 ### Exceção documentada ao Official Project Standard da empresa
 
-> Revisado em 29/06/2026. Esta versão corrige divergências entre o padrão
-> originalmente escrito e a prática real do projeto, identificadas após
-> várias sessões de implementação da camada de dados. Onde o padrão
+> Revisado em 04/07/2026. Esta versao corrige divergencias entre o padrao
+> originalmente escrito e a pratica real do projeto, identificadas apos
+> varias sessoes de implementacao da camada de dados. Onde o padrao
 > original descrevia algo nunca implementado (Makefile, deploy completo),
-> isso foi marcado como **PLANEJADO**, não removido — mantém-se a intenção
-> para quando o projeto avançar ao backend/frontend.
+> isso foi marcado como **PLANEJADO**, nao removido - mantem-se a intencao
+> para quando o projeto avancar ao backend/frontend.
 
 ---
 
@@ -32,28 +32,44 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
 
 ---
 
-## 📍 Estado Real do Projeto (atualizado em 29/06/2026)
+## Estado Real do Projeto (atualizado em 04/07/2026)
 
 **Implementado e validado com dados reais:**
-- Schema do banco completo (`municipios`, `unidades_espaciais`, `mmgd_indicadores`,
-  `indicadores_sociais`, `irradiacao_solar`) — ver `backend/src/db/schema/`
-- Migrations incrementais (0000 a 0005) — ver `backend/src/db/migrations/`
-- 6 extractors Python funcionais, em `backend/src/etl/loaders/`:
-  território (seed de municípios), MMGD/ANEEL, Infraestrutura Urbana/Censo,
-  Renda e Trabalho/RAIS (BigQuery), Alfabetização/Censo, Moradia/Censo
-- Banco PostgreSQL+PostGIS local via `docker-compose.yml`, sem variante de produção ainda
+- Schema do banco: `municipios`, `unidades_espaciais`, `mmgd_indicadores`,
+  `indicadores_sociais`, `irradiacao_solar` via Drizzle (`backend/src/db/schema/`) +
+  tabelas `qualidade_conjuntos`, `qualidade_indicadores`, `qualidade_conjunto_municipio`
+  criadas FORA do Drizzle, via `backend/src/etl/schema_qualidade.sql` (ver nota de
+  inconsistencia arquitetural na Secao 2)
+- Migrations incrementais 0000 a 0012 - ver `backend/src/db/migrations/`. Numeracao
+  formal NAO cobre o schema de qualidade (criado fora do sistema de migrations ate a
+  migration 0011, que so adiciona as views DEC/FEC "real" em cima do schema ja existente)
+- 16 extractors Python funcionais em `backend/src/etl/loaders/` (territorio, MMGD/ANEEL,
+  Infraestrutura Urbana/Censo, Renda e Trabalho/RAIS via BigQuery, Alfabetizacao/Censo,
+  Mortalidade Infantil/SIM+SINASC via BigQuery, Moradia/Censo, Inadequacao Habitacional,
+  MCMV/FGTS, MCMV/OGU, Favelas/FCU (seed + extract), ZEIS/AEIS por capital - SP, Recife,
+  Rio Branco, Rio de Janeiro -, Irradiacao Solar/INPE) + 2 scripts fora do padrao
+  `loaders/`: `backend/src/etl/etl_indqual.py` e `backend/src/etl/schema_qualidade.sql`
+  (Qualidade de Fornecimento/ANEEL - ver nota na Secao 2)
+- Banco PostgreSQL+PostGIS local via `docker-compose.yml`, sem variante de producao ainda
+- Todas as 8 dimensoes de dados planejadas no DRF estao completas: Territorio, MMGD,
+  Infraestrutura Urbana, Renda e Trabalho, Moradia, Qualidade de Fornecimento, Capital
+  Humano, Irradiacao Solar. Unico indicador pendente por bloqueio externo (nao por falta
+  de trabalho): `percentual_tsee` (Beneficiarios da CDE/ANEEL), aguardando dado de
+  jan/2026+ com a nova subclasse "Residencial Desconto Social" - ver ARQUITETURA.md.
 
-**NÃO implementado ainda** (apesar de descrito em seções deste documento como padrão):
-- Backend Node/Express (rotas, controllers, services, autenticação JWT) — só o schema existe
-- Frontend React — não iniciado
-- Makefile — não existe; todos os comandos deste documento (`make up`, `make etl`, etc.)
-  são **especificação para quando o backend for construído**, não comandos reais hoje
-- Deploy/produção (Nginx, certbot, scheduler, `docker-compose.prod.yml`) — arquitetura
+**NAO implementado ainda** (apesar de descrito em secoes deste documento como padrao):
+- Backend Node/Express (rotas, controllers, services, autenticacao JWT) - so o schema existe
+- Frontend React - nao iniciado
+- Makefile - nao existe; todos os comandos deste documento (`make up`, `make etl`, etc.)
+  sao **especificacao para quando o backend for construido**, nao comandos reais hoje
+- Deploy/producao (Nginx, certbot, scheduler, `docker-compose.prod.yml`) - arquitetura
   especificada mas nunca implementada nem testada
-- Autenticação, 6 personas, RBAC — existem só no DRF como requisito, sem código
+- Autenticacao, 6 personas, RBAC - existem so no DRF como requisito, sem codigo
+- Cruzamento MMGD x indicadores sociais (identificacao de "vazios de acesso") - proximo
+  item da fila de trabalho, ver ARQUITETURA.md
 
-**Como rodar o que existe hoje:** ver `README.md`, seção "Como rodar localmente" — é
-execução direta de scripts Python (`python3 backend/src/etl/loaders/extrair_X.py`), não via
+**Como rodar o que existe hoje:** ver `README.md`, secao "Como rodar localmente" - e
+execucao direta de scripts Python (`python3 backend/src/etl/loaders/extrair_X.py`), nao via
 Makefile.
 
 ---
@@ -109,52 +125,82 @@ Makefile.
 ├── backend/
 │   └── src/
 │       ├── db/
-│       │   ├── schema/            (Drizzle schema — IMPLEMENTADO)
+│       │   ├── schema/            (Drizzle schema - IMPLEMENTADO)
 │       │   │   ├── municipios.ts
 │       │   │   ├── unidades_espaciais.ts
 │       │   │   ├── mmgd_indicadores.ts
 │       │   │   ├── indicadores_sociais.ts
 │       │   │   ├── irradiacao_solar.ts
 │       │   │   └── index.ts
-│       │   └── migrations/        (SQL incremental — IMPLEMENTADO)
+│       │   └── migrations/        (SQL incremental - IMPLEMENTADO, 0000 a 0012)
 │       │       ├── 0000_criacao_tabelas.sql
 │       │       ├── 0001_extensoes_e_indices_espaciais.sql
-│       │       ├── 0002_indicadores_sociais_infraestrutura.sql
-│       │       ├── 0003_indicadores_sociais_renda_trabalho.sql
-│       │       ├── 0004_indicadores_sociais_capital_humano.sql
-│       │       └── 0005_indicadores_sociais_moradia.sql
+│       │       ├── ... (0002 a 0010: infraestrutura, renda, capital humano,
+│       │       │        moradia, inadequacao, favelas, unidades_espaciais tipo,
+│       │       │        mcmv/fgts, mcmv/ogu - ver pasta para lista completa)
+│       │       ├── 0011_qualidade_dec_fec_real.sql
+│       │       └── 0012_capital_humano_mortalidade_infantil.sql
 │       └── etl/
-│           ├── venv/               (ambiente Python isolado — não versionado)
-│           ├── data/raw/           (shapefiles/parquet baixados — não versionado)
-│           └── loaders/            (extractors — IMPLEMENTADO)
+│           ├── venv/               (ambiente Python isolado - nao versionado)
+│           ├── data/raw/           (shapefiles/CSVs baixados - nao versionado,
+│           │                        inclui inpe_atlas_solar_2017/, aneel_mmgd/,
+│           │                        malha_municipal_2025/)
+│           ├── schema_qualidade.sql   (FORA do padrao Drizzle - ver nota abaixo)
+│           ├── etl_indqual.py         (FORA do padrao loaders/ - ver nota abaixo)
+│           └── loaders/            (extractors - IMPLEMENTADO, 16 scripts)
 │               ├── seed_municipios.py
 │               ├── extrair_mmgd_aneel.py
 │               ├── extrair_infraestrutura_censo.py
 │               ├── extrair_renda_trabalho_rais.py
 │               ├── extrair_alfabetizacao_censo.py
-│               └── extrair_moradia_censo.py
-├── frontend/                       (estrutura de pastas existe, vazia — NÃO INICIADO)
+│               ├── extrair_capital_humano_mortalidade_infantil.py
+│               ├── extrair_moradia_censo.py
+│               ├── extrair_inadequacao_moradia.py
+│               ├── extrair_mcmv_fgts.py
+│               ├── extrair_mcmv_ogu.py
+│               ├── seed_favelas_fcu.py
+│               ├── extrair_favelas_fcu.py
+│               ├── seed_zeis_sao_paulo.py
+│               ├── seed_zeis_recife.py
+│               ├── seed_zeis_rio_branco.py
+│               ├── seed_aeis_rio.py
+│               ├── extrair_irradiacao_solar_inpe.py
+│               └── validar_aneel_real.py
+├── frontend/                       (estrutura de pastas existe, vazia - NAO INICIADO)
 │   ├── pages/
 │   ├── components/
 │   ├── services/
 │   ├── hooks/
 │   └── utils/
-├── docker/                         (PLANEJADO — Dockerfiles de produção não existem)
+├── docker/                         (PLANEJADO - Dockerfiles de producao nao existem)
 ├── docs/
 │   ├── DRF.md
 │   ├── PLANO_MORADIA_TERRITORIO_POPULAR.md
 │   └── PLANO_QUALIDADE_FORNECIMENTO_BDGD.md
+├── ARQUITETURA.md                   (estado dos dados, decisoes de fonte, fila de trabalho)
 ├── CLAUDE.md
 ├── README.md
-├── docker-compose.yml               (só serviço `postgres` — IMPLEMENTADO)
+├── docker-compose.yml               (so servico `postgres` - IMPLEMENTADO)
 └── .gitignore
 ```
 
-A estrutura `etl/extractors/transformers/loaders/` do padrão original (com pastas
-separadas por etapa) **não foi adotada** — cada script de `backend/src/etl/loaders/`
-contém extração + transformação + carga juntas, por arquivo de fonte. Reavaliar essa
-divisão se o número de extractors crescer muito e a duplicação de lógica entre eles
+A estrutura `etl/extractors/transformers/loaders/` do padrao original (com pastas
+separadas por etapa) **nao foi adotada** - cada script de `backend/src/etl/loaders/`
+contem extracao + transformacao + carga juntas, por arquivo de fonte. Reavaliar essa
+divisao se o numero de extractors crescer muito e a duplicacao de logica entre eles
 justificar uma camada compartilhada.
+
+**INCONSISTENCIA ARQUITETURAL CONHECIDA - schema de Qualidade de Fornecimento:**
+as tabelas `qualidade_conjuntos`, `qualidade_indicadores`, `qualidade_conjunto_municipio`
+(dimensao INDQUAL/ANEEL, ver ARQUITETURA.md) foram criadas por um caminho diferente de
+todo o resto do projeto: schema via `backend/src/etl/schema_qualidade.sql` (SQL puro,
+sem arquivo `.ts` correspondente em `backend/src/db/schema/`) e carga via
+`backend/src/etl/etl_indqual.py` (fora da pasta `loaders/`, sem seguir o padrao de
+docstring metodologico + etapas numeradas dos demais extractors). A migration `0011`
+(views DEC/FEC "real") foi a primeira peca formal dessa dimensao a entrar no sistema de
+migrations padrao. Nao foi revertido/migrado para o padrao Drizzle+`loaders/` porque
+funciona corretamente como esta e refatorar traria risco sem beneficio imediato -
+mas qualquer trabalho futuro nessa dimensao deve estar ciente dessa excecao.
 
 ---
 

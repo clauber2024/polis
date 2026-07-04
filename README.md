@@ -20,7 +20,7 @@ urbana, CEP ou bairro) conforme novas fontes de dados se tornem disponíveis —
 
 ---
 
-## Estado atual dos dados (atualizado em 29/06/2026)
+## Estado atual dos dados (atualizado em 04/07/2026)
 
 | Dimensão | Cobertura | Fonte | Status |
 |---|---|---|---|
@@ -28,11 +28,11 @@ urbana, CEP ou bairro) conforme novas fontes de dados se tornem disponíveis —
 | MMGD instalada | 5.567 municípios, 50.086 MW, 8M UCs | ANEEL, snapshot jun/2026 | ✅ Completo |
 | Infraestrutura Urbana | 5.570 municípios, 5 indicadores | Censo 2022/SIDRA | ✅ Completo |
 | Renda e Trabalho | 5.571 municípios | RAIS, ano-base 2024 (BigQuery) | ✅ Completo |
-| Capital Humano | 5.570 municípios (só alfabetização) | Censo 2022/SIDRA | 🟡 Parcial — falta saúde (DATASUS) |
-| Moradia (regime de ocupação) | 5.570 municípios | Censo 2022/SIDRA | ✅ Completo |
-| Moradia (ZEIS/segurança da posse) | 0 municípios — planejado | Portais municipais (só capitais) | 📋 Planejado |
-| Qualidade de fornecimento (FIC/DIC) | 0 municípios — planejado | BDGD/ANEEL | 📋 Planejado |
-| Irradiação solar | — | INPE | 📋 Não iniciado |
+| Capital Humano | 5.570 municípios (alfabetização + mortalidade infantil) | Censo 2022/SIDRA + SIM/SINASC-DATASUS (BigQuery, média 2022-2024) | ✅ Completo |
+| Moradia | Regime de ocupação (5.570) + FCU (12.348) + ZEIS/AEIS (3.696, 4 capitais) + inadequação + MCMV/FGTS (5.111) + MCMV/OGU (4.883) | Censo 2022/SIDRA + Ministério das Cidades + portais municipais | ✅ Completo |
+| Qualidade de fornecimento | 5.570 municípios, DEC/FEC oficial + DEC/FEC "real" (sem expurgo de Dia Crítico) | ANEEL, Indicadores Coletivos de Continuidade (INDQUAL) | ✅ Completo |
+| Irradiação solar | 5.569 municípios, GHI médio anual | Atlas Brasileiro de Energia Solar (LABREN/CCST/INPE, 2ª ed. 2017) | ✅ Completo |
+| TSEE / baixa renda (`percentual_tsee`) | — | ANEEL, Beneficiários da CDE | 🔒 Bloqueado — aguardando dado de jan/2026+ (nova subclasse "Desconto Social") |
 
 Os índices de Infraestrutura Urbana, Renda e Trabalho, Capital Humano e Moradia são
 **construções próprias do Atlas, inspiradas no IVS/IPEA**, não o IVS oficial — que só tem
@@ -46,13 +46,16 @@ cobertura municipal completa até o Censo 2010. Ver nota metodológica em cada e
 | Fonte | Indicador | Acesso |
 |---|---|---|
 | ANEEL/MMGD | Micro e minigeração distribuída instalada | API REST (dadosabertos.aneel.gov.br) |
-| IBGE Censo 2022 | Infraestrutura urbana, alfabetização, regime de ocupação | API SIDRA |
+| IBGE Censo 2022 | Infraestrutura urbana, alfabetização, regime de ocupação, inadequação habitacional | API SIDRA |
 | IBGE Malha Municipal | Geometria dos municípios | Shapefile (geoftp.ibge.gov.br) |
 | RAIS (Base dos Dados) | Renda e vínculos formais | BigQuery público |
 | IBGE Favelas e Comunidades Urbanas (Censo 2022) | Territórios populares, geometria | Shapefile + SIDRA (ver `docs/PLANO_MORADIA_TERRITORIO_POPULAR.md`) |
-| BDGD (ANEEL) | Qualidade de fornecimento de energia (planejado) | API REST (ver `docs/PLANO_QUALIDADE_FORNECIMENTO_BDGD.md`) |
-| Portais municipais (ZEIS/AEIS) | Segurança da posse, só capitais (planejado) | Variável por município |
-| Irradiação Solar (INPE) | Potencial solar por território (não iniciado) | — |
+| Ministério das Cidades | MCMV/FGTS e MCMV/OGU | CSV (portal de dados abertos) |
+| Portais municipais (ZEIS/AEIS) | Segurança da posse — RJ, SP, Recife, Rio Branco | Variável por município |
+| ANEEL — Indicadores Coletivos de Continuidade (INDQUAL) | Qualidade de fornecimento (DEC/FEC oficial e "real") | 3 CSVs relacionais (dadosabertos.aneel.gov.br) |
+| SIM + SINASC (Base dos Dados/DATASUS) | Mortalidade infantil (Capital Humano) | BigQuery público |
+| Atlas Brasileiro de Energia Solar (LABREN/CCST/INPE) | Irradiação solar (GHI) por sede municipal | CSV, licença CC BY-NC-ND (uso não-comercial) |
+| ANEEL — Beneficiários da CDE | TSEE / baixa renda (`percentual_tsee`) — bloqueado | ZIP mensal (dadosabertos.aneel.gov.br) |
 
 > O **OBEPE** (Observatório Brasileiro de Erradicação da Pobreza Energética — EPE/MME/BID) é
 > referência metodológica para o Índice de Pobreza Energética Regional do Atlas, mas não é
@@ -122,12 +125,30 @@ docker compose exec -T postgres psql -U atlas -d atlas_solar_justo < backend/src
 # Popular o território (requer shapefile do IBGE — ver LEIA-ME do script)
 python3 backend/src/etl/loaders/seed_municipios.py
 
-# Popular os indicadores (cada extractor é independente)
+# Popular os indicadores (cada extractor e independente)
 python3 backend/src/etl/loaders/extrair_mmgd_aneel.py
 python3 backend/src/etl/loaders/extrair_infraestrutura_censo.py
-python3 backend/src/etl/loaders/extrair_renda_trabalho_rais.py      # requer autenticação gcloud
+python3 backend/src/etl/loaders/extrair_renda_trabalho_rais.py            # requer autenticacao gcloud
 python3 backend/src/etl/loaders/extrair_alfabetizacao_censo.py
+python3 backend/src/etl/loaders/extrair_capital_humano_mortalidade_infantil.py  # requer autenticacao gcloud
 python3 backend/src/etl/loaders/extrair_moradia_censo.py
+python3 backend/src/etl/loaders/extrair_inadequacao_moradia.py
+python3 backend/src/etl/loaders/extrair_mcmv_fgts.py
+python3 backend/src/etl/loaders/extrair_mcmv_ogu.py
+python3 backend/src/etl/loaders/seed_favelas_fcu.py
+python3 backend/src/etl/loaders/extrair_favelas_fcu.py
+python3 backend/src/etl/loaders/seed_zeis_sao_paulo.py
+python3 backend/src/etl/loaders/seed_zeis_recife.py
+python3 backend/src/etl/loaders/seed_zeis_rio_branco.py
+python3 backend/src/etl/loaders/seed_aeis_rio.py
+python3 backend/src/etl/loaders/extrair_irradiacao_solar_inpe.py          # requer baixar CSV do INPE antes, ver ARQUITETURA.md
+
+# Qualidade de Fornecimento (INDQUAL/ANEEL) - schema e ETL fora do padrao loaders/,
+# ver nota em CLAUDE.md secao 2. Requer aplicar schema_qualidade.sql manualmente antes:
+docker compose exec -T postgres psql -U atlas -d atlas_solar_justo < backend/src/etl/schema_qualidade.sql
+python3 backend/src/etl/etl_indqual.py
+# Depois aplicar a migration da view DEC/FEC "real":
+docker compose exec -T postgres psql -U atlas -d atlas_solar_justo < backend/src/db/migrations/0011_qualidade_dec_fec_real.sql
 ```
 
 O backend/frontend ainda não foram implementados nesta fase do projeto — o trabalho até aqui
