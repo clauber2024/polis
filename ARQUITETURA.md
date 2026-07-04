@@ -20,7 +20,7 @@ Tabela `unidades_espaciais`:
 | Renda e Trabalho | ok | RAIS 2024 via BigQuery, 5.571 mun. |
 | Moradia | ok Finalizada jul/2026 | Regime de ocupacao (Censo) + FCU + ZEIS/AEIS + inadequacao (% parede) + MCMV/FGTS (5.111 mun., 36,6M UH) + MCMV/OGU (4.883 mun., 1,7M UH) |
 | Qualidade de Fornecimento | ok Finalizada jul/2026 | INDQUAL/ANEEL: DEC/FEC + 21 variantes por origem de interrupcao, ~4,9M registros. Conjunto eletrico -> municipio e N:N (42.661 pares); view resolve por pior-caso e media. **DEC/FEC "real" (sem expurgo de Dia Critico) fechado em 04/07/2026**: views `vw_qualidade_conjunto_real` e `vw_qualidade_municipio_real` (migration 0011), formula confirmada contra o dicionario oficial da ANEEL (`dominio-indicadores.csv`) - soma `DEC + DECINC + DECIPC + DECXNC + DECXPC` (e equivalente FEC); variantes IND/INE/INO/IP/XN/XP sao decomposicao do valor ja incluso no oficial e NAO entram na soma. Cobertura validada identica a view oficial (423.147 linhas municipio/ano/periodo em ambas) |
-| Capital Humano | parcial | Alfabetizacao ok; falta DATASUS (mortalidade infantil) |
+| Capital Humano | ok Finalizada jul/2026 | Alfabetizacao (Censo 2022) + taxa de mortalidade infantil (SIM+SINASC/DATASUS via Base dos Dados/BigQuery, media poolada 2022-2024, 5.570 mun.) |
 | Irradiacao Solar | pendente | INPE, nao iniciado |
 
 ## Decisoes de fontes (confirmadas por pesquisa, jul/2026)
@@ -69,6 +69,20 @@ Tabela `unidades_espaciais`:
 - **Censo 2022**: sem dado utilizavel de acesso a eletricidade - excluido do Eixo 4.
 - **OBEPE**: referencia metodologica (Indice de Pobreza Energetica Regional), nao fonte
   primaria - ver `docs/DRF.md` secao 14.
+- **Mortalidade infantil (Capital Humano)** - fechado 04/07/2026, migration
+  `0012_capital_humano_mortalidade_infantil.sql`. Fonte: SIM (obitos) + SINASC
+  (nascidos vivos), ambos DATASUS, via Base dos Dados/BigQuery
+  (`basedosdados.br_ms_sim.microdados` e `basedosdados.br_ms_sinasc.microdados`
+  - NAO usar as tabelas pre-agregadas `municipio_causa_idade*`, estao
+  desatualizadas/travadas em 2019). Taxa = media poolada 2022-2024 (soma de
+  obitos infantis dividida pela soma de nascidos vivos do periodo, x 1000) -
+  escolhida para reduzir ruido estatistico em municipios pequenos. Campo
+  `idade` do SIM ja vem limpo em anos decimais pela Base dos Dados (nao e o
+  codigo bruto do DATASUS) - filtro `idade < 1` isola automaticamente os
+  obitos nao-fetais, sem precisar filtro adicional de `tipo_obito`. Validado
+  contra numero nacional: 86.522 obitos / 7.487.033 nascidos (periodo
+  2022-2024) = 11,56 por mil, compativel com a taxa oficial do Brasil.
+  Extractor: `backend/src/etl/loaders/extrair_capital_humano_mortalidade_infantil.py`.
 
 ## Estado das migrations (corrigido 04/07/2026)
 
@@ -83,9 +97,8 @@ migration formal relacionada a qualidade de fornecimento. Proxima migration: 001
 
 1. Irradiacao Solar - INPE
 2. Cruzamento MMGD x indicadores sociais - identificar vazios reais de acesso
-3. Capital Humano - DATASUS, mortalidade infantil
-4. Atualizar README e CLAUDE.md (Estado Real) com os dados das sessoes de Moradia,
-   INDQUAL e DEC/FEC real
+3. Atualizar README e CLAUDE.md (Estado Real) com os dados das sessoes de Moradia,
+   INDQUAL, DEC/FEC real e Capital Humano
 
 ## Bloqueado (aguardando dado externo)
 
