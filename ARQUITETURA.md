@@ -180,6 +180,81 @@ migration formal relacionada a qualidade de fornecimento. Proxima migration: 001
   ainda se ANEEL disponibiliza reclamacoes/ressarcimentos por queima de equipamento
   em dataset aberto. Levantado em 03/07/2026.
 
+## Indices compostos e metodologia de cruzamentos (sessao 04/07/2026)
+
+Alinhamento da metodologia de cruzamentos previstos no DRF (RF-049 a RF-057,
+RF-080). Decisoes tomadas:
+
+- **Eixo MMGD (Y)**: usar valor PER CAPITA, nao absoluto - contagem absoluta
+  favorece cidades grandes independente da taxa real de adocao. "% domicilios
+  com MMGD" seria mais correto conceitualmente mas exige numero de domicilios
+  do Censo, que nao esta carregado ainda - per capita e o viavel hoje.
+- **Limiar dos quadrantes**: usar MEDIANA, nao media - distribuicoes assimetricas
+  (poucos municipios grandes puxam a media, maioria fica artificialmente abaixo).
+- **Direcao dos indicadores**: cada indicador tem metadado positivo (quanto
+  maior, melhor) ou negativo (quanto maior, pior/mais vulneravel). O valor
+  exibido no grafico NUNCA e transformado/invertido - a logica de quadrante
+  (favoravel/desfavoravel) e calculada no backend considerando a direcao,
+  mantendo os numeros exibidos identicos aos armazenados.
+
+Indicadores negativos identificados: IVS, indice_precariedade_moradia,
+indice_precariedade_infraestrutura, taxa_mortalidade_infantil, DEC/FEC
+(Qualidade Fornecimento), percentual_pobreza_cadunico. Demais sao positivos.
+
+### Achado arquitetural: fragmentacao de indicadores_sociais por periodo
+
+A chave unica `(unidade_espacial_id, periodo_referencia)` fez cada extractor
+gravar os dados do seu proprio periodo de referencia, fragmentando um mesmo
+municipio em ate 4 linhas diferentes (2022-01-01, 2024-01-01, 2025-12-01,
+2025-12-31), cada uma preenchida so parcialmente. Nao ha serie temporal real
+intencional - e efeito colateral de cada extractor escolher seu proprio
+periodo. Resolvido via `vw_indicadores_sociais_consolidado` (migration 0014),
+que agrega por municipio pegando o valor nao-nulo de cada coluna (MAX, seguro
+porque cada coluna so tem valor em UM periodo por municipio).
+
+### Indices compostos de Moradia e Infraestrutura Urbana (migration 0014)
+
+Ate esta sessao, "Infraestrutura Urbana" e "Moradia" existiam so como colunas
+brutas de sub-indicadores (a `ARQUITETURA.md`/README ja diziam "indices
+proprios inspirados no IVS/IPEA", mas o indice composto de fato nunca tinha
+sido calculado). Construidos agora com a mesma metodologia do IVS/IPEA:
+normalizacao min-max (0=melhor, 1=pior) sobre a distribuicao nacional atual,
+media simples dos sub-indicadores normalizados.
+
+**Indice de Precariedade de Infraestrutura** (negativo, 0 a 1): media
+normalizada de `percentual_agua_inadequada`, `percentual_esgoto_inadequado`,
+`percentual_lixo_inadequado`. Excluidos `percentual_populacao_rural` e
+`densidade_populacional` (caracteristicas demograficas, nao vulnerabilidade
+por si so).
+
+**Indice de Precariedade Habitacional** (negativo, 0 a 1): media normalizada
+de `percentual_cortico`, `percentual_parede_inadequada`,
+`percentual_populacao_favela`. Excluidos regime de posse (ver indice proprio
+abaixo) e contagens absolutas/MCMV (viesadas por tamanho ou medem
+intervencao publica, nao vulnerabilidade).
+
+**Indice de Seguranca da Posse** (positivo, 0 a 100, NOVO - decisao explicita
+de nao deixar de fora regime de posse): `1,0 x %proprio + 0,5 x %alugado +
+0,0 x %cedido`. Pesos refletem seguranca decrescente (proprio = maxima
+seguranca; alugado = protegido por contrato mas sem propriedade; cedido =
+tipicamente informal/precario). Retorna NULL (nao 0) quando os 3 campos de
+origem sao nulos - 3 municipios sem nenhum dado de regime de posse (bug
+corrigido durante a validacao: a primeira versao usava COALESCE(...,0) sem
+guarda, fazendo esses 3 municipios aparecerem com "seguranca zero" ao inves
+de "sem dado").
+
+**Cobertura de Investimento Publico Habitacional** (positivo, unidades por
+1.000 hab, NOVO - decisao explicita de nao deixar de fora investimento
+publico): `(unidades FGTS + unidades OGU entregues) / populacao x 1000`.
+Populacao reconstituida via `densidade_populacional x area_km2` (mesmo
+metodo do extractor de RAIS).
+
+Validado: Sao Paulo (infra 0,018 - quase o melhor do pais) vs Rio Branco/AC
+(infra 0,230, moradia similar, cobertura MCMV maior per capita) - direcoes
+e magnitudes plausiveis.
+
+Views: `vw_indicadores_sociais_consolidado`, `vw_indices_compostos_moradia_infraestrutura`.
+
 ## Manutencao deste documento
 
 Atualizar ao fim de cada sessao de carga de dados: estado da `unidades_espaciais`,
