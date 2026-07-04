@@ -67,6 +67,33 @@ Tabela `unidades_espaciais`:
   antes de escrever o extractor. Extractor final deve capturar as duas subclasses:
   "Residencial Baixa Renda" E "Residencial Desconto Social".
 - **Censo 2022**: sem dado utilizavel de acesso a eletricidade - excluido do Eixo 4.
+- **CadUnico (cobertura e pobreza)** - fechado 04/07/2026, migration
+  `0013_capital_humano_cadunico.sql`. Fonte: MDS/SAGI, servico Solr publico
+  "MI Social" (`aplicacoes.mds.gov.br/sagi/servicos/misocial`) - API viva,
+  NAO e arquivo estatico, atualizada mensalmente. Achado importante: a
+  documentacao antiga do dataset (Portal de Dados Abertos, 2021) tem nomes
+  de campo desatualizados (`cadunico_tot_fam` nao existe mais - campo real
+  e `cadun_qtd_familias_cadastradas_i`) - sempre confirmar via `fl=*` antes
+  de usar. Codigo IBGE desta fonte tem 6 digitos (sem digito verificador,
+  ex: Sao Paulo = 355030) - join feito comparando com os 6 primeiros digitos
+  do codigo_ibge de 7 digitos da base territorial. Duas metricas gravadas:
+  `percentual_cadunico` (coluna ja existente desde o scaffold original) =
+  cobertura (pessoas cadastradas / populacao total x 100); `percentual_
+  pobreza_cadunico` (nova) = das familias JA cadastradas, % em situacao de
+  pobreza ou extrema pobreza. Periodo de referencia: 202512 (dez/2025,
+  mes mais recente disponivel). Cobertura: 5.570/5.573 municipios (3 sem
+  correspondencia). RESSALVA DE QUALIDADE DE DADO: alguns municipios
+  pequenos do Norte/Nordeste (ex: Itaubal/AP 129%, Sebastiao Barros/PI 125%)
+  apresentam `percentual_cadunico` ACIMA de 100% - fenomeno conhecido de
+  descompasso entre a populacao do Censo 2022 (subestimada em areas remotas)
+  e o numero de pessoas cadastradas no CadUnico (que pode incluir registros
+  de quem migrou e nao foi baixado do sistema) - nao e erro do extractor,
+  e limitacao conhecida da fonte, documentar ao exibir este indicador.
+  Este indicador e um dos 4 insumos previstos para o futuro "Indice de
+  Pobreza Energetica Regional" (RF-080 do DRF: IBGE, CadUnico, TSEE,
+  IVS/IPEA) - o indice completo continua bloqueado pelo TSEE (ver acima),
+  mas o CadUnico em si ja e indicador valido e utilizavel isoladamente.
+  Extractor: `backend/src/etl/loaders/extrair_cadunico.py`.
 - **Irradiacao Solar (INPE/LABREN)** - fechado 04/07/2026. Fonte: Atlas
   Brasileiro de Energia Solar, 2a edicao (2017), LABREN/CCST/INPE
   (`labren.ccst.inpe.br/atlas_2017.html`), extrato CSV "Sedes de Municipios"
