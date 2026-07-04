@@ -51,10 +51,20 @@ Tabela `unidades_espaciais`:
   `vw_qualidade_municipio_real` (agregada por municipio, mesmo padrao pior-caso/media
   da view oficial). Relevante para justica energetica: eventos extremos tendem a
   concentrar em certas regioes e o numero oficial "limpo" pode mascarar isso.
-- **TSEE / baixa renda** (indicador alvo: `percentual_tsee`): usar dataset ANEEL
-  "Beneficiarios da CDE" (`dadosabertos.aneel.gov.br/dataset/beneficiarios-da-cde`),
-  nao os shapefiles UCBT. Lei 15.235/2025 ("Luz do Povo") criou a subclasse
-  "Residencial Desconto Social" - extractors devem capturar duas subclasses:
+- **TSEE / baixa renda** (indicador alvo: `percentual_tsee`) - BLOQUEADO ate ter dados
+  de jan/2026 em diante (investigado 04/07/2026): usar dataset ANEEL "Beneficiarios da
+  CDE" (`dadosabertos.aneel.gov.br/dataset/beneficiarios-da-cde`), nao os shapefiles UCBT.
+  Estrutura: um arquivo ZIP por mes (nao consolidado), granularidade municipio+distribuidora.
+  Dicionario de dados oficial (PDF, `dm-beneficiarios-da-cde.pdf`) esta desatualizado
+  (23/11/2022) e NAO lista a subclasse "Residencial Desconto Social" criada pela Lei
+  15.235/2025 - so mostra as variantes antigas de baixa renda (indigena, quilombola,
+  BPC, multifamiliar). Achado critico via Voto ANEEL (41a RPO, 9/12/2025): embora a Lei
+  15.235/2025 seja de julho/2025, o FATURAMENTO sob a nova subclasse so comeca em
+  1o de janeiro de 2026 - arquivos mensais anteriores a essa data nao tem a subclasse
+  nova, mesmo apos a lei. Proximo passo: obter um arquivo mensal de jan/2026 em diante
+  (baixar manualmente via navegador, pois resource IDs de arquivos futuros nao sao
+  previsiveis/pesquisaveis) e inspecionar colunas reais (`IdcSubclasse` vs `DscTipoSubsidio`)
+  antes de escrever o extractor. Extractor final deve capturar as duas subclasses:
   "Residencial Baixa Renda" E "Residencial Desconto Social".
 - **Censo 2022**: sem dado utilizavel de acesso a eletricidade - excluido do Eixo 4.
 - **OBEPE**: referencia metodologica (Indice de Pobreza Energetica Regional), nao fonte
@@ -71,12 +81,18 @@ migration formal relacionada a qualidade de fornecimento. Proxima migration: 001
 
 ## Fila de trabalho
 
-1. Beneficiarios da CDE - testar endpoint, extractor de `percentual_tsee`
-2. Irradiacao Solar - INPE
-3. Cruzamento MMGD x indicadores sociais - identificar vazios reais de acesso
-4. Capital Humano - DATASUS, mortalidade infantil
-5. Atualizar README e CLAUDE.md (Estado Real) com os dados das sessoes de Moradia,
+1. Irradiacao Solar - INPE
+2. Cruzamento MMGD x indicadores sociais - identificar vazios reais de acesso
+3. Capital Humano - DATASUS, mortalidade infantil
+4. Atualizar README e CLAUDE.md (Estado Real) com os dados das sessoes de Moradia,
    INDQUAL e DEC/FEC real
+
+## Bloqueado (aguardando dado externo)
+
+- **Beneficiarios da CDE / `percentual_tsee`** - bloqueado desde 04/07/2026 ate existir
+  arquivo mensal de jan/2026 em diante com a subclasse "Residencial Desconto Social"
+  faturada (ver detalhes em Decisoes de fontes). Retomar quando o arquivo estiver
+  disponivel no portal.
 
 ## Ideias para investigar (nao priorizadas)
 
