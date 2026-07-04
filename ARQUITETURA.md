@@ -21,7 +21,7 @@ Tabela `unidades_espaciais`:
 | Moradia | ok Finalizada jul/2026 | Regime de ocupacao (Censo) + FCU + ZEIS/AEIS + inadequacao (% parede) + MCMV/FGTS (5.111 mun., 36,6M UH) + MCMV/OGU (4.883 mun., 1,7M UH) |
 | Qualidade de Fornecimento | ok Finalizada jul/2026 | INDQUAL/ANEEL: DEC/FEC + 21 variantes por origem de interrupcao, ~4,9M registros. Conjunto eletrico -> municipio e N:N (42.661 pares); view resolve por pior-caso e media. **DEC/FEC "real" (sem expurgo de Dia Critico) fechado em 04/07/2026**: views `vw_qualidade_conjunto_real` e `vw_qualidade_municipio_real` (migration 0011), formula confirmada contra o dicionario oficial da ANEEL (`dominio-indicadores.csv`) - soma `DEC + DECINC + DECIPC + DECXNC + DECXPC` (e equivalente FEC); variantes IND/INE/INO/IP/XN/XP sao decomposicao do valor ja incluso no oficial e NAO entram na soma. Cobertura validada identica a view oficial (423.147 linhas municipio/ano/periodo em ambas) |
 | Capital Humano | ok Finalizada jul/2026 | Alfabetizacao (Censo 2022) + taxa de mortalidade infantil (SIM+SINASC/DATASUS via Base dos Dados/BigQuery, media poolada 2022-2024, 5.570 mun.) |
-| Irradiacao Solar | pendente | INPE, nao iniciado |
+| Irradiacao Solar | ok Finalizada jul/2026 | Atlas Brasileiro de Energia Solar (LABREN/CCST/INPE, 2a ed. 2017), GHI anual, 5.569 mun. Media climatologica 1999-2015, nao ano especifico |
 
 ## Decisoes de fontes (confirmadas por pesquisa, jul/2026)
 
@@ -67,6 +67,29 @@ Tabela `unidades_espaciais`:
   antes de escrever o extractor. Extractor final deve capturar as duas subclasses:
   "Residencial Baixa Renda" E "Residencial Desconto Social".
 - **Censo 2022**: sem dado utilizavel de acesso a eletricidade - excluido do Eixo 4.
+- **Irradiacao Solar (INPE/LABREN)** - fechado 04/07/2026. Fonte: Atlas
+  Brasileiro de Energia Solar, 2a edicao (2017), LABREN/CCST/INPE
+  (`labren.ccst.inpe.br/atlas_2017.html`), extrato CSV "Sedes de Municipios"
+  (nao a grade completa 0.1x0.1 grau - evita interpolacao espacial propria).
+  Variavel: Irradiacao Global Horizontal (GHI) media anual, convertida de
+  Wh/m2.dia para kWh/m2.dia. DADO E MEDIA CLIMATOLOGICA DE 17 ANOS
+  (1999-2015), nao um ano especifico - gravado com periodo_referencia =
+  2017-01-01 (ano de publicacao) apenas como convencao de chave. LICENCA
+  CC BY-NC-ND: uso nao-comercial permitido, mas NAO pode ser usado para
+  fins comerciais sem autorizacao do INPE - citar sempre como "LABREN/CCST/
+  INPE". Fonte NAO tem codigo IBGE - join feito por NOME+ESTADO normalizado
+  (maiusculas, sem acento). Exigiu tabela de alias manual para 21 dos 5.573
+  municipios (grafias antigas, hifen vs espaco, DE/DO) - achado notavel:
+  a propria fonte do INPE tem um ERRO DE DADO real, a linha de "Porto
+  Alegre" (capital do RS) esta rotulada com estado "RIO GRANDE DO NORTE"
+  (confirmado via coordenadas - corrigido no extractor). Cobertura final:
+  5.569/5.573 municipios (os 4 ausentes sao genuinos: Fernando de Noronha,
+  2 placeholders de corpo d'agua no RS, e Boa Esperanca do Norte/MT sem
+  correspondencia). Schema ja existia desde a migration 0000 (tabela
+  `irradiacao_solar`) - nao precisou nova migration. Extractor:
+  `backend/src/etl/loaders/extrair_irradiacao_solar_inpe.py`. Dados mensais
+  e outras variaveis (Direta Normal, Difusa, Plano Inclinado, PAR) do
+  mesmo Atlas ainda NAO carregados - possivel expansao futura.
 - **OBEPE**: referencia metodologica (Indice de Pobreza Energetica Regional), nao fonte
   primaria - ver `docs/DRF.md` secao 14.
 - **Mortalidade infantil (Capital Humano)** - fechado 04/07/2026, migration
@@ -95,10 +118,9 @@ migration formal relacionada a qualidade de fornecimento. Proxima migration: 001
 
 ## Fila de trabalho
 
-1. Irradiacao Solar - INPE
-2. Cruzamento MMGD x indicadores sociais - identificar vazios reais de acesso
-3. Atualizar README e CLAUDE.md (Estado Real) com os dados das sessoes de Moradia,
-   INDQUAL, DEC/FEC real e Capital Humano
+1. Cruzamento MMGD x indicadores sociais - identificar vazios reais de acesso
+2. Atualizar README e CLAUDE.md (Estado Real) com os dados das sessoes de Moradia,
+   INDQUAL, DEC/FEC real, Capital Humano e Irradiacao Solar
 
 ## Bloqueado (aguardando dado externo)
 
