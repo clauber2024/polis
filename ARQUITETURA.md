@@ -154,7 +154,15 @@ migration formal relacionada a qualidade de fornecimento. Proxima migration: 001
 - **Beneficiarios da CDE / `percentual_tsee`** - bloqueado desde 04/07/2026 ate existir
   arquivo mensal de jan/2026 em diante com a subclasse "Residencial Desconto Social"
   faturada (ver detalhes em Decisoes de fontes). Retomar quando o arquivo estiver
-  disponivel no portal.
+  disponivel no portal. TENTATIVA ADICIONAL EM 04/07/2026: tentado avancar parcialmente
+  usando so a subclasse antiga "Residencial Baixa Renda" (sem "Desconto Social") com o
+  arquivo mais recente disponivel (jun/25) - bloqueado por problema tecnico no proprio
+  portal da ANEEL: downloads de "Beneficiarios da CDE" retornam loop de redirecionamento
+  HTTP 302 (confirmado via curl -v e tambem via navegador, testado com jun/25 e mai/24).
+  Outro recurso do mesmo portal ("rede-basica-2022") baixou normalmente, entao o
+  problema e especifico deste dataset/recurso, nao do portal inteiro - provavelmente
+  instabilidade temporaria do lado da ANEEL. Reintentar em sessao futura antes de
+  investir mais tempo nisso.
 
 ## Ideias para investigar (nao priorizadas)
 
