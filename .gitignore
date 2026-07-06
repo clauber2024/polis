@@ -9,3 +9,4 @@ backend/src/etl/data/
 backend/src/etl/loaders/__pycache__/
 backend/src/etl/analises/__pycache__/
 venv/
+vazios_de_acesso_municipios.csv

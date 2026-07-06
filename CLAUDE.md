@@ -198,6 +198,7 @@ Makefile.
 │           │   ├── investigar_fila_conexao_mmgd_centro_oeste.py
 │           │   ├── investigar_tarifa_centro_oeste.py
 │           │   ├── investigar_construto_posse_rural_sul.py
+│           │   ├── identificar_vazios_de_acesso.py
 │           │   ├── verificar_preenchimento_indicadores_sociais.py
 │           │   └── diagnosticar_estado_geral_banco.py
 │           └── loaders/            (extractors - IMPLEMENTADO, 19 scripts)

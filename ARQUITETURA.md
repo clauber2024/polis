@@ -210,6 +210,52 @@ analise de correlacao abaixo), `0017_indicadores_sociais_rdpc.sql` (`renda_per_c
    residencial, % apartamento, CadUnico, e sem os extractors/scripts de analise mais
    recentes) - atualizada a tabela "Estado atual dos dados", a tabela de fontes
    primarias, e a lista de comandos em "Como rodar localmente".
+3. **Identificacao e ranking de "Vazios de Acesso" (RF-055, RF-056, RF-057) - NOVO,
+   sessao 06/07/2026.** O item 1 (cruzamento MMGD x indicadores) produziu testes de
+   robustez e diagnostico de outliers, mas nunca gerou o produto que o DRF pede: lista
+   concreta de municipios classificados como "Vazio de Acesso" (alto potencial solar,
+   baixo MMGD). Script criado:
+   `backend/src/etl/analises/identificar_vazios_de_acesso.py` - classifica todos os
+   municipios em 4 quadrantes (mediana nacional de irradiacao solar x MMGD residencial
+   per capita, mesma metodologia ja decidida em "Indices compostos e metodologia de
+   cruzamentos"), prioriza os Vazios de Acesso por IVS (RF-056), e exporta CSV
+   completo. **PROTOTIPO DE VALIDACAO, nao a implementacao final** - a logica de
+   quadrante deve ser reimplementada no backend Node/Express quando ele existir (ja
+   documentado como decisao anterior).
+
+   **RESULTADO (executado 06/07/2026):** mediana nacional - potencial solar 5,015
+   kWh/m2.dia, MMGD residencial per capita 111,29 kW/1.000 hab. 1.451 municipios
+   (26,1% dos 5.569 classificaveis) sao VAZIO DE ACESSO (alto potencial, baixo MMGD).
+
+   **Achado principal: o vazio de acesso e extremamente concentrado no Nordeste.**
+   1.123 dos 1.451 vazios de acesso (77,4% do total nacional) estao no Nordeste, e
+   62,6% de TODOS os municipios do Nordeste sao vazio de acesso - de longe a maior
+   proporcao regional (Sudeste 13,8%, Centro-Oeste 13,3%, Norte 8,0%). O top 20 do
+   ranking por vulnerabilidade (IVS, do pior para o melhor) e quase todo Nordeste
+   (MA, AL, PB, PI, BA, PE) - IVS entre 0,68 e 0,76 (proximo do pior extremo
+   nacional, distribuicao vai de 0,09 a 0,78), renda media domiciliar entre R$
+   2.000 e R$ 3.400, % pobreza CadUnico entre 55% e 79%. RESSALVA
+   METODOLOGICA: esta classificacao e um corte bivariado simples (so
+   irradiacao x MMGD, sem controlar renda) - a analise de correlacao ja
+   mostrou que renda e o preditor mais robusto de MMGD nacionalmente, entao
+   parte dessa concentracao no Nordeste reflete o proprio gargalo de renda
+   documentado alhures, nao um efeito "puro" de potencial solar desperdicado.
+   Isso nao invalida o resultado para fins de RF-055/056 (o requisito pede
+   justamente esse corte simples, potencial x acesso), mas deve ser
+   comunicado como nota metodologica na exibicao (RF-080 ja preve nota
+   metodologica para o Indice de Pobreza Energetica Regional - vale o mesmo
+   cuidado aqui).
+
+   **Achado secundario: Sul tem ZERO vazios de acesso (0,0%)** - 857 dos 1.191
+   municipios do Sul (71,9%) caem em "Adocao acima do potencial" (baixo
+   potencial solar, alto MMGD) - o Sul supera sistematicamente o que seu
+   potencial fisico sozinho preveria, consistente com os achados ja
+   documentados de forte cultura cooperativista (Sicredi/Sicoob) e renda/
+   vinculos formais mais altos.
+
+   Arquivo `vazios_de_acesso_municipios.csv` gerado localmente (todos os
+   5.569 municipios classificados, nao versionado - dado derivado,
+   reproduzivel a partir do banco).
 
 ## Bloqueado (aguardando dado externo)
 
