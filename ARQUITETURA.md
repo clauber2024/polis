@@ -22,6 +22,7 @@ Tabela `unidades_espaciais`:
 | Qualidade de Fornecimento | ok Finalizada jul/2026 | INDQUAL/ANEEL: DEC/FEC + 21 variantes por origem de interrupcao, ~4,9M registros. Conjunto eletrico -> municipio e N:N (42.661 pares); view resolve por pior-caso e media. **DEC/FEC "real" (sem expurgo de Dia Critico) fechado em 04/07/2026**: views `vw_qualidade_conjunto_real` e `vw_qualidade_municipio_real` (migration 0011), formula confirmada contra o dicionario oficial da ANEEL (`dominio-indicadores.csv`) - soma `DEC + DECINC + DECIPC + DECXNC + DECXPC` (e equivalente FEC); variantes IND/INE/INO/IP/XN/XP sao decomposicao do valor ja incluso no oficial e NAO entram na soma. Cobertura validada identica a view oficial (423.147 linhas municipio/ano/periodo em ambas) |
 | Capital Humano | ok Finalizada jul/2026 | Alfabetizacao (Censo 2022) + taxa de mortalidade infantil (SIM+SINASC/DATASUS via Base dos Dados/BigQuery, media poolada 2022-2024, 5.570 mun.) |
 | Irradiacao Solar | ok Finalizada jul/2026 | Atlas Brasileiro de Energia Solar (LABREN/CCST/INPE, 2a ed. 2017), GHI anual, 5.569 mun. Media climatologica 1999-2015, nao ano especifico |
+| IVS Consolidado | ok Completa 06/07/2026 | Media de 3 blocos oficiais do IVS/IPEA (Infraestrutura Urbana, Renda e Trabalho, Capital Humano) sobre vw_indicadores_sociais_consolidado, normalizacao min-max. Moradia fica fora de proposito (ver indice separado). Migration 0015 |
 
 ## Decisoes de fontes (confirmadas por pesquisa, jul/2026)
 
@@ -254,6 +255,39 @@ Validado: Sao Paulo (infra 0,018 - quase o melhor do pais) vs Rio Branco/AC
 e magnitudes plausiveis.
 
 Views: `vw_indicadores_sociais_consolidado`, `vw_indices_compostos_moradia_infraestrutura`.
+
+### IVS Consolidado (migration 0015, sessao 06/07/2026)
+
+Fechando o indicador `ivs` (coluna ja existente desde o scaffold original,
+citada na lista de "indicadores negativos" desta mesma secao, mas nunca
+calculada ate agora). Mesma metodologia de normalizacao min-max ja usada nos
+indices de Moradia/Infraestrutura (migration 0014): media dos 3 blocos
+oficiais do IVS/IPEA, cada bloco = media de indicadores normalizados.
+
+- **Bloco Infraestrutura Urbana**: media normalizada de
+  `percentual_populacao_rural`, `percentual_agua_inadequada`,
+  `percentual_esgoto_inadequado`, `percentual_lixo_inadequado`.
+  `densidade_populacional` EXCLUIDA por ambiguidade de sinal (mesmo
+  criterio ja aplicado ao indice de precariedade de infraestrutura da
+  migration 0014 - baixa E alta densidade podem ambas indicar
+  vulnerabilidade, por motivos opostos).
+- **Bloco Renda e Trabalho**: media normalizada de `renda_media_domiciliar`
+  (invertida) e `percentual_vinculos_formais` (invertida).
+- **Bloco Capital Humano**: media normalizada de `taxa_alfabetizacao`
+  (invertida) e `taxa_mortalidade_infantil` (nao invertida).
+- **IVS** = media simples dos 3 blocos.
+- Moradia (seguranca da posse, cortico, favela) fica FORA do IVS de
+  proposito - eixo separado (`vw_indices_compostos_moradia_infraestrutura`),
+  para permitir testar "MMGD x Seguranca da Posse" isoladamente sem diluir
+  no IVS geral.
+
+Usa `vw_indicadores_sociais_consolidado` (migration 0014) como fonte, ja
+resolvendo a fragmentacao por `periodo_referencia`. Validado: 21.595 linhas
+/ ~5.571 municipios com IVS calculado, distribuicao 0,09 a 0,78 (media
+0,45) - plausivel para indice normalizado 0-1.
+
+View: `vw_ivs_consolidado`.
+
 
 ## Manutencao deste documento
 

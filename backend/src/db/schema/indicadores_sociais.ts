@@ -35,6 +35,16 @@ export const indicadoresSociais = pgTable(
 
     periodoReferencia: date('periodo_referencia').notNull(),
 
+    /**
+     * Indice de Vulnerabilidade Social - indice proprio inspirado no
+     * IVS/IPEA (NAO e o IVS oficial), calculado como media de 3 blocos:
+     * Infraestrutura Urbana, Renda e Trabalho, Capital Humano (cada bloco =
+     * media de indicadores normalizados min-max). Moradia (seguranca da
+     * posse, cortico, favela) fica FORA deste indice de proposito - e eixo
+     * separado do Atlas (ver vw_indices_compostos_moradia_infraestrutura,
+     * migration 0014). Ver migration 0015 e vw_ivs_consolidado para a
+     * formula completa.
+     */
     ivs: doublePrecision('ivs'),
 
     /**
