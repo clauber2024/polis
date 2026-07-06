@@ -214,6 +214,30 @@ analise de correlacao abaixo), `0017_indicadores_sociais_rdpc.sql` (`renda_per_c
   instabilidade temporaria do lado da ANEEL. Reintentar em sessao futura antes de
   investir mais tempo nisso.
 
+  **RECONFIRMADO em 06/07/2026 - bloqueio PERSISTE, dois problemas distintos e
+  independentes:**
+  1. **Disponibilidade do dado**: a pagina do dataset (`dadosabertos.aneel.gov.br/
+     dataset/beneficiarios-da-cde`) continua listando "jun/25" como o recurso mais
+     recente - nenhum arquivo de jan/2026 em diante foi publicado ainda, apesar da
+     metadata do dataset mostrar "Ultima Atualizacao: junho 12, 2026" (toque de
+     indexacao da plataforma, nao conteudo novo) e "Frequencia de atualizacao: Anual"
+     (isto pode explicar por que nao ha novos arquivos mensais ha mais de um ano -
+     se a lista de recursos so e revisada anualmente pela ANEEL, o proximo lote pode
+     demorar).
+  2. **Disponibilidade tecnica**: reconfirmado via `curl -v -L` que o proprio recurso
+     jun/2025 (o unico que existe) continua retornando um loop de auto-redirecionamento
+     HTTP 302 - o header `location` aponta para a MESMA URL que foi requisitada,
+     fazendo o curl esgotar o limite de 50 redirecionamentos (`Maximum (50) redirects
+     followed`). Ou seja, mesmo que so quisessemos validar a subclasse antiga
+     ("Residencial Baixa Renda", sem "Desconto Social") no arquivo ja existente, nao
+     e possivel baixar nenhum arquivo deste dataset especifico agora - bug do lado do
+     servidor da ANEEL, nao do cliente/rede.
+  **Conclusao**: nao e mais so "aguardar o dado" - o dataset esta com um bug de
+  infraestrutura persistente (mais de um mes, confirmado em 2 sessoes diferentes).
+  Se isso continuar bloqueado nas proximas sessoes, considerar abrir um chamado
+  formal com a ANEEL (contato do dataset: dadosabertos@aneel.gov.br) em vez de
+  so tentar de novo silenciosamente.
+
 ## Ideias para investigar (nao priorizadas)
 
 - **Perdas tecnicas e nao tecnicas** (ANEEL) - indicador de justica energetica
