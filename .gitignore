@@ -7,3 +7,5 @@ BR_Municipios_2025/
 backend/src/etl/venv/
 backend/src/etl/data/
 backend/src/etl/loaders/__pycache__/
+backend/src/etl/analises/__pycache__/
+venv/
