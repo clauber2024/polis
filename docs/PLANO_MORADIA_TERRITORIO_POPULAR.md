@@ -190,11 +190,47 @@ apesar de ter os MELHORES indicadores de infraestrutura/educação —
 confirma que esta dimensão mede algo estrutural, não redutível a privação
 socioeconômica geral.
 
-**Pendente dentro deste eixo:** "ônus excessivo com aluguel" (% renda
-comprometida com aluguel) ainda não extraído — precisa cruzar valor do
-aluguel (Censo tem essa variável, "classes de aluguel nominal mensal
-domiciliar", ver Tabela 287/438 nas buscas realizadas) com renda
-domiciliar. Adiado para sessão futura.
+**"Ônus excessivo com aluguel" — DESCARTADO como indicador do Atlas (achado
+definitivo, sessão 06/07/2026), não pendência temporária.** As Tabelas
+287/438 citadas na pesquisa original são do Censo 2010 (confirmado via
+metadado real da API, mesmo cuidado do caso TSEE) — não existe equivalente
+2022. Confirmado via material oficial do IBGE ("Apresentação - Censo 2022:
+Trabalho e Rendimento") que o bloco amostral de Características dos
+Domicílios do Censo 2022 investigou apenas 6 elementos (condição de
+ocupação, material das paredes, número de cômodos, número de dormitórios,
+máquina de lavar, internet) — **valor do aluguel em reais não foi
+coletado em 2022**, diferente de 2010. PNAD Contínua e POF também
+descartados: desenho amostral não é representativo a nível municipal para
+a maioria dos ~5.570 municípios (PNAD: estimativas nacionais/UF/RMs
+selecionadas; POF: ainda mais grosseiro, ~20 áreas metropolitanas/totais
+estaduais).
+
+Investigada como alternativa a fonte CadÚnico/CECAD (sessão 06/07/2026):
+o dicionário de variáveis oficial do CadÚnico (`Dicionario_de_Variaveis_
+CECAD.pdf`, confirmado via fetch real do PDF) TEM o campo
+`VAL_DESP_ALUGUEL_FAM` (valor de despesa com aluguel, por família) e campos
+de renda (`VLR_RENDA_TOTAL_FAM`, `FX_RFPC`) — tecnicamente permitiria
+calcular um "ônus excessivo com aluguel" restrito à população cadastrada.
+Mas esse campo só existe na base de microdados IDENTIFICADOS (download via
+CECAD, opção "Baixar"), e o acesso a essa base é restrito por perfil
+(confirmado via manual oficial, página "Quem pode ter acesso ao CECAD?"):
+apenas gestão municipal/estadual do CadÚnico via SIGPBF, Vigilância
+Socioassistencial via CADSUAS, servidores do Ministério da Cidadania, ou
+programas federais mediante demanda formal — nenhuma categoria cobre um
+projeto acadêmico/privado como o Atlas Solar Justo. A ferramenta pública
+sem login (TABCAD, tabulador aberto em `cecad.cidadania.gov.br/tab_cad.php`)
+foi conferida ao vivo e NÃO expõe despesa com aluguel como variável
+tabulável — só variáveis categóricas dos blocos 1-4/6-8/11-12 do
+formulário (estado cadastral, faixa de renda, características do
+domicílio, composição familiar, deficiência, educação, trabalho, grupos
+populacionais, situação de rua). Conclusão: CECAD fechado como fonte para
+este indicador — não por falta do dado, mas por restrição de acesso que
+o projeto não atende.
+
+Este eixo permanece coberto apenas pelos indicadores já implementados
+(regime de posse — próprio/alugado/cedido — e `indice_seguranca_da_posse`).
+Sem fonte nacional viável e acessível para o ônus excessivo com aluguel em
+si; não reabrir esta linha sem uma fonte nova e não pesquisada aqui.
 
 ### Eixo 4 — Inadequação habitacional e capacidade física de receber solar
 **Indicador:** `potencial_social_sem_capacidade_individual` = alta

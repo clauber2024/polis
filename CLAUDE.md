@@ -57,16 +57,23 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   tabelas `qualidade_conjuntos`, `qualidade_indicadores`, `qualidade_conjunto_municipio`
   criadas FORA do Drizzle, via `backend/src/etl/schema_qualidade.sql` (ver nota de
   inconsistencia arquitetural na Secao 2)
-- Migrations incrementais 0000 a 0012 - ver `backend/src/db/migrations/`. Numeracao
+- Migrations incrementais 0000 a 0017 - ver `backend/src/db/migrations/`. Numeracao
   formal NAO cobre o schema de qualidade (criado fora do sistema de migrations ate a
-  migration 0011, que so adiciona as views DEC/FEC "real" em cima do schema ja existente)
-- 16 extractors Python funcionais em `backend/src/etl/loaders/` (territorio, MMGD/ANEEL,
+  migration 0011, que so adiciona as views DEC/FEC "real" em cima do schema ja existente).
+  0014-0017: indices compostos + views consolidadas (`vw_indicadores_sociais_consolidado`,
+  `vw_indices_compostos_moradia_infraestrutura`), IVS (`vw_ivs_consolidado`),
+  `percentual_apartamento` - ver ARQUITETURA.md, secao "Analise de correlacao MMGD x
+  Indicadores Sociais" (06/07/2026) - e RDPC (`renda_per_capita_rdpc`,
+  `percentual_baixa_renda_rdpc`, migration 0017), achado colateral da investigacao de
+  onus excessivo com aluguel, ver ARQUITETURA.md secao "Decisoes de fontes" (06/07/2026).
+- 18 extractors Python funcionais em `backend/src/etl/loaders/` (territorio, MMGD/ANEEL,
   Infraestrutura Urbana/Censo, Renda e Trabalho/RAIS via BigQuery, Alfabetizacao/Censo,
-  Mortalidade Infantil/SIM+SINASC via BigQuery, Moradia/Censo, Inadequacao Habitacional,
-  MCMV/FGTS, MCMV/OGU, Favelas/FCU (seed + extract), ZEIS/AEIS por capital - SP, Recife,
-  Rio Branco, Rio de Janeiro -, Irradiacao Solar/INPE) + 2 scripts fora do padrao
-  `loaders/`: `backend/src/etl/etl_indqual.py` e `backend/src/etl/schema_qualidade.sql`
-  (Qualidade de Fornecimento/ANEEL - ver nota na Secao 2)
+  Mortalidade Infantil/SIM+SINASC via BigQuery, Moradia/Censo, Tipo de Domicilio/Censo,
+  RDPC/Censo, Inadequacao Habitacional, MCMV/FGTS, MCMV/OGU, Favelas/FCU (seed + extract),
+  ZEIS/AEIS por capital - SP, Recife, Rio Branco, Rio de Janeiro -, Irradiacao Solar/INPE)
+  + 2 scripts fora do padrao `loaders/`: `backend/src/etl/etl_indqual.py` e
+  `backend/src/etl/schema_qualidade.sql` (Qualidade de Fornecimento/ANEEL - ver nota na
+  Secao 2)
 - Banco PostgreSQL+PostGIS local via `docker-compose.yml`, sem variante de producao ainda
 - Todas as 8 dimensoes de dados planejadas no DRF estao completas: Territorio, MMGD,
   Infraestrutura Urbana, Renda e Trabalho, Moradia, Qualidade de Fornecimento, Capital
@@ -107,7 +114,9 @@ Makefile.
 - Ambiente isolado via `venv` (`backend/src/etl/venv/`) — **não usar Anaconda/conda
   neste projeto**: já causou conflitos sérios de NumPy 1.x/2.x em sessões anteriores
 - Bibliotecas reais em uso: `pandas`, `geopandas`, `sqlalchemy`, `psycopg2-binary`,
-  `requests`, `google-cloud-bigquery`, `db-dtypes`
+  `requests`, `google-cloud-bigquery`, `db-dtypes` (extractors, `backend/src/etl/loaders/`);
+  `scipy` (só `backend/src/etl/analises/`, scripts de análise estatística - Spearman/
+  correlação parcial, não usado nos extractors de carga)
 - Execução direta via `python3 backend/src/etl/loaders/<script>.py` (sem container
   dedicado ainda — PLANEJADO ter um serviço `etl` no Docker Compose quando o projeto
   amadurecer)
@@ -149,14 +158,19 @@ Makefile.
 │       │   │   ├── indicadores_sociais.ts
 │       │   │   ├── irradiacao_solar.ts
 │       │   │   └── index.ts
-│       │   └── migrations/        (SQL incremental - IMPLEMENTADO, 0000 a 0012)
+│       │   └── migrations/        (SQL incremental - IMPLEMENTADO, 0000 a 0017)
 │       │       ├── 0000_criacao_tabelas.sql
 │       │       ├── 0001_extensoes_e_indices_espaciais.sql
 │       │       ├── ... (0002 a 0010: infraestrutura, renda, capital humano,
 │       │       │        moradia, inadequacao, favelas, unidades_espaciais tipo,
 │       │       │        mcmv/fgts, mcmv/ogu - ver pasta para lista completa)
 │       │       ├── 0011_qualidade_dec_fec_real.sql
-│       │       └── 0012_capital_humano_mortalidade_infantil.sql
+│       │       ├── 0012_capital_humano_mortalidade_infantil.sql
+│       │       ├── 0013_capital_humano_cadunico.sql
+│       │       ├── 0014_indices_compostos_moradia_infraestrutura.sql
+│       │       ├── 0015_view_ivs_consolidado.sql
+│       │       ├── 0016_indicadores_sociais_tipo_domicilio.sql
+│       │       └── 0017_indicadores_sociais_rdpc.sql
 │       └── etl/
 │           ├── venv/               (ambiente Python isolado - nao versionado)
 │           ├── data/raw/           (shapefiles/CSVs baixados - nao versionado,
@@ -164,7 +178,18 @@ Makefile.
 │           │                        malha_municipal_2025/)
 │           ├── schema_qualidade.sql   (FORA do padrao Drizzle - ver nota abaixo)
 │           ├── etl_indqual.py         (FORA do padrao loaders/ - ver nota abaixo)
-│           └── loaders/            (extractors - IMPLEMENTADO, 16 scripts)
+│           ├── analises/           (scripts de analise exploratoria, SOMENTE LEITURA,
+│           │                        fora do padrao loaders/ de proposito - nao
+│           │                        carregam dado, so consultam/diagnosticam. Ver
+│           │                        ARQUITETURA.md, secao "Analise de correlacao MMGD
+│           │                        x Indicadores Sociais", 06/07/2026)
+│           │   ├── analisar_correlacao_mmgd_renda.py
+│           │   ├── diagnosticar_outliers_regionais.py
+│           │   ├── inspecionar_colunas_mmgd_parquet.py
+│           │   ├── inspecionar_metadados_sidra_9928.py
+│           │   ├── inspecionar_metadados_sidra_aluguel.py
+│           │   └── inspecionar_metadados_sidra_rdpc.py
+│           └── loaders/            (extractors - IMPLEMENTADO, 18 scripts)
 │               ├── seed_municipios.py
 │               ├── extrair_mmgd_aneel.py
 │               ├── extrair_infraestrutura_censo.py
@@ -172,9 +197,12 @@ Makefile.
 │               ├── extrair_alfabetizacao_censo.py
 │               ├── extrair_capital_humano_mortalidade_infantil.py
 │               ├── extrair_moradia_censo.py
+│               ├── extrair_tipo_domicilio_censo.py
+│               ├── extrair_rdpc_censo.py
 │               ├── extrair_inadequacao_moradia.py
 │               ├── extrair_mcmv_fgts.py
 │               ├── extrair_mcmv_ogu.py
+│               ├── extrair_cadunico.py
 │               ├── seed_favelas_fcu.py
 │               ├── extrair_favelas_fcu.py
 │               ├── seed_zeis_sao_paulo.py

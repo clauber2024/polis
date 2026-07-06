@@ -116,6 +116,21 @@ export const indicadoresSociais = pgTable(
     percentualCortico: doublePrecision('percentual_cortico'),
 
     /**
+     * % de domicílios do tipo "Apartamento" (Tabela SIDRA 9928, classificação
+     * 125 — Tipo de domicílio, categoria 3247 "Apartamento" / total 2932).
+     * Adicionada para testar a hipótese de que tipologia habitacional densa
+     * (sem telhado próprio individual) é um confundidor que explica parte da
+     * relação MMGD x indicadores sociais não capturado por renda nem por
+     * urbanização (% população rural) — ver análise de sensibilidade
+     * MMGD x indicadores sociais, casos Sul/Segurança da Posse e
+     * Centro-Oeste/Irradiação Solar, backend/src/etl/analises/. NÃO inclui
+     * "Casa de vila ou em condomínio" (categoria 121264) — mantido fora de
+     * propósito, é um tipo distinto (unidade horizontal, ainda com alguma
+     * chance de telhado individual dependendo do condomínio).
+     */
+    percentualApartamento: doublePrecision('percentual_apartamento'),
+
+    /**
      * % de domicílios com material de parede inadequado (Eixo 4) — Tabela
      * SIDRA 9928, classificação 137. "Inadequado" = soma de: taipa sem
      * revestimento, madeira aproveitada de tapume/embalagens/andaimes,
@@ -144,6 +159,32 @@ export const indicadoresSociais = pgTable(
     unidadesOguPrevistas: integer("unidades_ogu_previstas"),
     /** Total de UH MCMV/OGU efetivamente entregues */
     unidadesOguEntregues: integer("unidades_ogu_entregues"),
+
+    /**
+     * RDPC (Rendimento Domiciliar Per Capita) médio, em R$ — Tabela SIDRA
+     * 10295, variável 13431, Censo 2022, classificações Sexo/Cor ou raça/
+     * Grupo de idade fixadas em "Total" (não quebrado por subgrupo).
+     * Adicionado para complementar `renda_media_domiciliar` (RAIS): aquela
+     * capta SOMENTE renda de trabalho formal; esta é renda de TODAS as
+     * fontes (trabalho formal e informal, aposentadoria, benefícios sociais,
+     * aluguel recebido etc.) — ver ARQUITETURA.md, seção "Decisões de
+     * fontes", investigação de ônus excessivo com aluguel (sessão 06/07/2026),
+     * de onde este achado colateral veio. Direção positiva (quanto maior,
+     * melhor).
+     */
+    rendaPerCapitaRdpc: doublePrecision("renda_per_capita_rdpc"),
+
+    /**
+     * % de moradores com RDPC até 1/2 salário mínimo — Tabela SIDRA 10296,
+     * variável 1013604 ("percentual do total geral"), soma das categorias
+     * 9681 ("Até 1/4 de salário mínimo") + 9682 ("Mais de 1/4 a 1/2 salário
+     * mínimo") da classificação 386. Proxy de pobreza monetária mais amplo
+     * que `percentual_pobreza_cadunico` (que só cobre quem já está
+     * cadastrado no CadÚnico) — este cobre toda a população do município.
+     * Direção negativa (quanto maior, pior).
+     */
+    percentualBaixaRendaRdpc: doublePrecision("percentual_baixa_renda_rdpc"),
+
     criadoEm: timestamp('criado_em', { withTimezone: true }).defaultNow().notNull(),
   },
   (tabela) => ({
