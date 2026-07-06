@@ -1,3 +1,20 @@
+## Checagem obrigatória de sincronização (início de toda sessão)
+
+ANTES de qualquer outra ação nesta sessão (ler arquivos, propor mudanças,
+rodar migrations, etc.), rode SEMPRE:
+
+```bash
+git fetch origin
+git log HEAD..origin/main --oneline
+```
+
+Se aparecer QUALQUER commit remoto que não está local, PARE e informe o
+usuário antes de prosseguir — não presuma que o estado local reflete o
+estado real do projeto. Este projeto é trabalhado em múltiplas sessões
+paralelas (Claude Code + conversas normais), e divergências não detectadas
+cedo já causaram retrabalho de reconciliação (ver histórico de commits
+04-06/07/2026).
+
 # 🚀 Project Standard — Atlas Solar Justo
 ### Exceção documentada ao Official Project Standard da empresa
 
