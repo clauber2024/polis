@@ -193,9 +193,14 @@ analise de correlacao abaixo), `0017_indicadores_sociais_rdpc.sql` (`renda_per_c
 1. Cruzamento MMGD x indicadores sociais - EM ANDAMENTO (ver secao "Analise de
    correlacao MMGD x Indicadores Sociais" abaixo, sessao 06/07/2026). Metodologia
    (Spearman + parcial controlando renda + sensibilidade regiao/urbanizacao) esta
-   pronta e reutilizavel; 2 casos especificos (Seguranca da Posse no Sul, Irradiacao
-   Solar no Centro-Oeste) permanecem sem explicacao apos testar 3 hipoteses - ver
-   "Ideias para investigar" para o proximo candidato (distribuidora/concessionaria).
+   pronta e reutilizavel. Irradiacao Solar no Centro-Oeste: parcialmente explicado
+   (tarifa historica 2010-2024, ver secao propria) - mecanismo de fila de conexao
+   descartado, mecanismo de tarifa confirmado regionalmente. **Seguranca da Posse no
+   Sul: caso ENCERRADO por decisao do usuario (sessao 06/07/2026) apos 6 tentativas de
+   explicacao descartadas (renda, agronegocio/irrigacao, tipologia habitacional,
+   distribuidora, validade de constructo rural/urbano, regularizacao fundiaria/
+   ambiental) - ver secao "Caso Sul x Seguranca da Posse encerrado" abaixo. NAO
+   retomar sem fonte/evidencia nova que justifique reabrir.**
 2. Atualizar README e CLAUDE.md (Estado Real) com os dados das sessoes de Moradia,
    INDQUAL, DEC/FEC real, Capital Humano e Irradiacao Solar
 
@@ -261,6 +266,156 @@ analise de correlacao abaixo), `0017_indicadores_sociais_rdpc.sql` (`renda_per_c
   minigeracao especifica do grupo Equatorial (presente tambem no Para, Maranhao, Piaui,
   Alagoas, e agora CEEE-Equatorial no RS). Nao investigado ainda se a ANEEL publica
   dado de fila de conexao/tempo de espera por distribuidora em dataset aberto.
+- **Validade de constructo regional do Indice de Seguranca da Posse no Sul** - 5a
+  hipotese para o caso "Sul x Seguranca da Posse" (levantada pelo usuario, sessao
+  06/07/2026), de categoria diferente das 4 ja descartadas (renda, agronegocio/
+  irrigacao, tipologia habitacional, distribuidora - todas mecanismos
+  economicos/geograficos). Hipotese: o indice pode estar medindo coisas diferentes
+  em contexto rural vs. urbano dentro do Sul. O peso do indice (1,0 proprio / 0,5
+  alugado / 0,0 cedido) assume que "nao proprio" reflete precariedade, mas no Sul
+  "alugado"/"cedido" pode capturar em boa parte arrendamento rural FORMALIZADO e
+  estavel - regiao com forte presenca de cooperativas de credito rural nascidas
+  ali (Sicredi/Sicoob) - em vez de ocupacao irregular urbana, que e o padrao que o
+  peso do indice presume nas demais regioes. Se confirmado, "baixa seguranca da
+  posse" no Sul rural nao significaria vulnerabilidade real, quebrando a
+  comparabilidade do indice entre regioes (nao um confundidor a controlar, mas um
+  problema de validade do proprio indicador). RESSALVA: os municipios extremos ja
+  identificados no ranking de MMGD para este caso (Piraquara, Almirante Tamandare,
+  Itaperucu, Rio Branco do Sul) sao periferia METROPOLITANA de Curitiba, nao rural
+  profundo - a hipotese precisa ser testada na composicao agregada da correlacao
+  regional (rho do Sul como um todo), nao necessariamente nesses casos pontuais.
+  Caminhos de teste sugeridos para a proxima sessao: (1) checar se
+  `percentual_populacao_rural` modula o desvio de sinal dentro do Sul (subgrupo
+  rural vs urbano); (2) verificar se o Censo permite decompor regime de posse por
+  situacao do domicilio (rural/urbano) alem do dado municipal agregado atual; (3)
+  usar presenca/densidade de agencias Sicredi/Sicoob por municipio como proxy de
+  formalizacao do arrendamento rural. Nao investigado ainda - proximo candidato
+  apos as 4 tentativas descartadas (ver secao "Hipotese de distribuidora/
+  concessionaria" acima).
+
+  **ATUALIZACAO (5a hipotese testada, sessao 06/07/2026) - ver secao "Teste da
+  hipotese de validade de constructo regional" abaixo: NAO CONFIRMADA na forma
+  proposta.** O tercil mais rural do Sul teve sinal POSITIVO e significativo
+  (rho=+0,103, p=0,041) - direcao esperada, nao anomala -, contrariando a
+  premissa de que arrendamento rural estaria "quebrando" o indice. O tercil
+  mais urbano do Sul e que teve relacao indetectavel (rho=-0,039, p=0,436,
+  NAO significativo). Ver bullet abaixo (6a hipotese) para o candidato que
+  emergiu desse resultado.
+
+- **Regularizacao fundiaria bloqueada por APA/mananciais na regiao
+  metropolitana de Curitiba (Sul x Seguranca da Posse)** - 6a hipotese
+  candidata, emergida do teste da 5a hipotese (ver secao "Teste da hipotese de
+  validade de constructo regional", sessao 06/07/2026), CORRIGIDA apos
+  contra-argumento do usuario (mesma sessao) e pesquisa externa. Formulacao
+  ORIGINAL (paineis solares fisicamente restritos por licenciamento ambiental
+  em APA) foi REFUTADA: confirmado via Instrucao Normativa IAT no 20/2025-PR
+  que a instalacao de paineis solares em cobertura/telhado de empreendimento
+  residencial JA EXISTENTE fica DISPENSADA de licenciamento ambiental estadual
+  no Parana (mesmo padrao em SP e outros estados) - nao ha proibicao de placa
+  em telhado por causa de APA. Formulacao CORRIGIDA (mecanismo documental, nao
+  fisico): a APA Estadual do Piraquara e a APA do Irai (Decreto Estadual
+  2200/2000 e 9021/2018) tem parte expressiva do territorio de Piraquara
+  (93% em area de manancial) ocupada por parcelamento irregular do solo -
+  confirmado que a Prefeitura NAO EMITE alvara de construcao/reforma para
+  lotes de loteamento nao aprovado. Hipotese: essa barreira de regularizacao
+  fundiaria (nao a placa em si) pode impedir o titular de formalizar a
+  matricula/endereco fiscal do imovel exigido pela distribuidora para
+  registrar conexao de MMGD em seu nome - conectando este caso ao proprio
+  mecanismo que o Indice de Seguranca da Posse tenta medir (posse informal),
+  so que concentrado geograficamente por zoneamento ambiental especifico da
+  RMC, nao difuso pelo Sul rural como a 5a hipotese original supunha.
+
+  **ATUALIZACAO (checado 06/07/2026): a parte de "documento de posse impede
+  cadastro" foi ENFRAQUECIDA por pesquisa da regulacao real.** Resolucao
+  Normativa ANEEL no 1.000/2021 (atualizada pela REN 1.059/2023) exige
+  "documento com data que comprove a propriedade OU POSSE do imovel" para
+  implantar MMGD, mas e explicitamente FLEXIVEL: veda exigir reconhecimento de
+  firma ou formalidade "excessivamente onerosa"; e para NUCLEO URBANO
+  INFORMAL CONSOLIDADO (Reurb, Lei 13.465/2017 - categoria que provavelmente
+  cobre parte da ocupacao irregular na APA do Piraquara) a comprovacao pode
+  ser feita por AUTODECLARACAO do consumidor + comprovante de residencia, sem
+  exigir documento formal de propriedade. Ou seja: a ANEEL ja previu esse
+  cenario e criou um caminho deliberadamente leve - o mecanismo "posse
+  informal bloqueia o cadastro de MMGD" nao tem respaldo forte na regulacao
+  nacional como estava formulado.
+
+  **Achado novo, mais especifico, para investigar:** o procedimento da
+  COPEL-DIS (NTC 905200 - Acesso de Micro e Minigeracao Distribuida) exige,
+  entre os documentos anexados no sistema CAW (Anexo II para <=10kW, Anexo
+  III para >10kW), uma "Licenca Ambiental OU Dispensa emitida pelo orgao
+  ambiental competente" - um documento DIFERENTE do comprovante de posse,
+  especifico de licenciamento ambiental (mesmo com paineis em telhado
+  residencial existente dispensados de licenciamento pela IN IAT no
+  20/2025-PR, ainda seria preciso obter/anexar o documento de DISPENSA formal
+  emitido pelo orgao ambiental, nao presumir a dispensa automaticamente). NAO
+  INVESTIGADO ainda: (1) se obter essa dispensa formal junto ao IAT-PR e mais
+  dificil/lento para imoveis em lote de parcelamento irregular dentro de APA
+  (ex.: se o pedido de dispensa exige matricula/inscricao municipal
+  regularizada do imovel, o mesmo problema documental reaparece por essa
+  porta, nao pela de posse); (2) se existe shapefile/dataset aberto de
+  limites de APA e/ou parcelamento irregular no Parana (IAT/SEMA-PR, COMEC/
+  AMEP) para cruzar com os municipios do Sul; (3) se ha correlacao, dentro do
+  proprio tercil urbano do Sul, entre indicador de irregularidade fundiaria e
+  MMGD residencial per capita.
+
+  **CONCLUSAO FINAL (checado 06/07/2026, texto integral da Instrucao Normativa
+  IAT no 20/2025-PR lido): hipotese 6 tambem REFUTADA na porta da dispensa
+  ambiental - a mesma que ficara aberta na atualizacao anterior.** A IN
+  20/2025 tem DUAS trilhas bem distintas para energia solar, e a leitura
+  anterior nao tinha diferenciado as duas:
+  (a) **Campo solar em SOLO** (usina/gerador dedicado, medido em hectares) -
+  Quadro 1 do Art. 7o: ate 1,5 ha = inexigibilidade; 1,5 a 7,5 ha = precisa de
+  DLAM (Declaracao de Dispensa), cujo requerimento (Art. 17) EXIGE certidao do
+  Municipio atestando que o local esta em conformidade com o Plano Diretor
+  Municipal e legislacao urbanistica - EXATAMENTE o tipo de exigencia que um
+  lote de parcelamento irregular reprovaria, confirmando a logica da hipotese
+  SE fosse essa a trilha aplicavel.
+  (b) **Paineis em cobertura/telhado de empreendimento residencial,
+  comercial, industrial ou agropecuario JA EXISTENTE** (Art. 15) - a trilha
+  que de fato se aplica a MMGD residencial (posto que MMGD residencial e por
+  definicao telhado de casa existente, nao campo solar em solo) - fica
+  DISPENSADA de licenciamento ambiental estadual de forma direta, sem as
+  exigencias do Art. 17 (sem certidao de conformidade com Plano Diretor, sem
+  comprovacao de dominialidade). O ato correspondente e a DILA (Declaracao de
+  Inexigibilidade de Licenca Ambiental), emitida de forma AUTOMATICA pelo
+  sistema informatizado do IAT para atividades de potencial insignificante
+  (Art. 5o) - nao ha analise caso a caso nem certidao municipal.
+  **Ou seja: o gargalo documental que sustentaria a hipotese (certidao
+  municipal de conformidade urbanistica) existe na regulacao, mas so se
+  aplica ao campo solar em solo de 1,5-7,5 ha - uma categoria irrelevante
+  para MMGD residencial, que segue a trilha automatica do Art. 15/DILA, sem
+  esse gargalo.** RESSALVA: nao foi encontrado um caso concreto documentado
+  de pedido de DILA para telhado residencial especificamente em Piraquara
+  (a pagina do IAT sobre a "primeira declaracao automatica" nao carregou
+  conteudo legivel na consulta) - a conclusao se apoia no texto normativo
+  integral, nao em um caso pratico confirmado. **Caso Sul x Seguranca da
+  Posse permanece NAO EXPLICADO apos 6 tentativas** (renda, agronegocio/
+  irrigacao, tipologia habitacional, distribuidora, validade de constructo
+  rural/urbano, regularizacao fundiaria/ambiental) - nenhum novo candidato
+  levantado nesta sessao.
+
+### Caso Sul x Seguranca da Posse ENCERRADO (decisao do usuario, sessao 06/07/2026)
+
+Apos 6 tentativas de explicacao descartadas em sequencia - colinearidade com
+renda, agronegocio/irrigacao, tipologia habitacional (`percentual_apartamento`),
+distribuidora/concessionaria, validade de constructo regional rural/urbano do
+Indice de Seguranca da Posse, e regularizacao fundiaria/ambiental bloqueada por
+APA (ambas as portas testadas - documento de posse via ANEEL/COPEL-DIS e
+dispensa ambiental via IAT-PR - refutadas por texto normativo real) - o
+usuario decidiu ENCERRAR a investigacao deste outlier especifico. O padrao
+(Sul destoa das outras 4 regioes no sinal da correlacao parcial entre Indice
+de Seguranca da Posse e MMGD residencial per capita, controlando renda)
+continua real e nao explicado, mas nao sera mais objeto de novas tentativas
+de hipotese salvo se surgir fonte ou evidencia nova que justifique reabrir.
+Mesmo criterio ja usado no projeto para fechar linhas de investigacao sem
+sucesso (ver "Onus excessivo com aluguel - DESCARTADO" acima) - registrado
+como decisao consciente, nao como abandono silencioso.
+
+**Efeito pratico:** o Indice de Seguranca da Posse continua fazendo parte do
+Atlas normalmente (indice de Moradia, `vw_indices_compostos_moradia_
+infraestrutura`) - nenhuma mudanca de schema ou remocao de dado. O que muda e
+so a fila de trabalho: este caso sai da lista de pendencias ativas de
+investigacao (ver "Fila de trabalho" acima).
 
 ## Indices compostos e metodologia de cruzamentos (sessao 04/07/2026)
 
@@ -508,6 +663,71 @@ importa e algo mais local que a distribuidora - talvez proximidade
 metropolitana especifica, nao capturada por regiao, UF nem distribuidora.
 Caso permanece NAO EXPLICADO apos 4 tentativas (colinearidade com renda,
 agronegocio/irrigacao, tipologia habitacional, distribuidora).
+
+### Teste da hipotese de validade de constructo regional (Seguranca da Posse, Sul) - sessao 06/07/2026, 5a tentativa
+
+Hipotese (categoria diferente das 4 anteriores - nao mecanismo economico/
+geografico, e sim validade de constructo do indicador): o Indice de Seguranca
+da Posse pesa 1,0 x %proprio + 0,5 x %alugado + 0,0 x %cedido, assumindo que
+"nao proprio" reflete precariedade - premissa pensada para o padrao urbano. No
+Sul, com forte presenca de cooperativas de credito rural nascidas na regiao
+(Sicredi/Sicoob), "nao proprio" poderia capturar arrendamento rural
+formalizado e estavel, nao ocupacao irregular - o indice mediria coisas
+diferentes em municipio rural vs. urbano dentro do proprio Sul. Script:
+`backend/src/etl/analises/investigar_construto_posse_rural_sul.py` - divide o
+Sul (so o Sul, nao tercis nacionais) em tercis de `percentual_populacao_rural`
+e recalcula a correlacao parcial (controlando renda) de Indice de Seguranca
+da Posse x MMGD residencial per capita em cada tercil.
+
+**RESULTADO: NAO confirma a hipotese como originalmente formulada, mas revela
+um padrao mais especifico que reformula o problema.** Correlacao parcial
+(controlando renda) por tercil de ruralidade dentro do Sul (n=397 cada):
+Mais urbano rho=-0,039 (p=0,436, NAO significativo); Intermediario
+rho=+0,127 (p=0,011, significativo); Mais rural rho=+0,103 (p=0,041,
+significativo). Leitura correta (o script imprime um veredito automatico
+simplificado - "sinal muda, hipotese sustentada" - que NAO deve ser lido
+literalmente aqui): o sinal so muda de positivo para levemente negativo no
+tercil mais URBANO, mas esse valor nao e estatisticamente significativo (p
+alto, n=397) - e mais correto descrever como "relacao ausente/indetectavel
+no tercil urbano" do que "sinal invertido no rural", ja que rural e
+intermediario tem sinal POSITIVO e significativo, semelhante entre si -
+exatamente o OPOSTO da direcao que a hipotese original previa (que apontava
+o rural como o lado "anomalo").
+
+**Achado qualitativo mais relevante:** dos 4 municipios outlier ja
+identificados no ranking de MMGD residencial do Sul (Piraquara, Itaperucu,
+Almirante Tamandare, Rio Branco do Sul), 3 caem no tercil MAIS URBANO
+(Piraquara 8,5% rural, Itaperucu 17,0%, Almirante Tamandare 4,4%) e 1 no
+intermediario (Rio Branco do Sul 27,7%) - nenhum no tercil mais rural,
+contrariando a premissa original de que o problema estaria ligado a
+ruralidade/arrendamento agricola. Olhando o bottom 10 completo da inspecao
+qualitativa, aparece um padrao geografico ainda mais especifico nao
+cogitado antes: Piraquara, Rio Branco do Sul, Itaperucu, Cerro Azul e
+Guaraqueçaba sao todos municipios da regiao metropolitana de Curitiba
+proximos a areas de protecao ambiental/mananciais (Piraquara, em particular,
+sedia parte dos reservatorios que abastecem Curitiba) - candidato a 6a
+hipotese, ver secao "Ideias para investigar" para a formulacao CORRIGIDA
+(a formulacao inicial - paineis fisicamente restritos por licenciamento
+ambiental em APA - foi contestada pelo usuario na mesma sessao e REFUTADA por
+pesquisa externa: instalacao de paineis solares em telhado residencial ja
+existente e dispensada de licenciamento ambiental no Parana, mesmo dentro de
+APA. A formulacao corrigida desloca o mecanismo de "placa proibida" para
+"regularizacao fundiaria bloqueada" - a APA do Piraquara nao emite alvara
+para lotes de parcelamento irregular, o que pode impedir o titular de
+regularizar a documentacao do imovel exigida pela distribuidora para MMGD,
+reconectando o caso ao proprio fenomeno que o Indice de Seguranca da Posse
+mede, so que concentrado geograficamente por zoneamento ambiental).
+
+**Conclusao:** a 5a tentativa (validade de constructo regional rural/urbano)
+NAO E CONFIRMADA na forma proposta - o tercil rural do Sul se comporta bem
+(sinal positivo, significativo, direcao esperada), entao nao ha evidencia de
+que arrendamento rural formalizado esteja "quebrando" o indice ali. O
+problema parece estar concentrado especificamente no tercil urbano do Sul, e
+mais especificamente ainda nos municipios metropolitanos de
+Curitiba/mananciais - candidato a 6a hipotese (regularizacao fundiaria
+bloqueada por APA, formulacao corrigida) fica registrado em "Ideias para
+investigar" para proxima sessao. Caso permanece NAO EXPLICADO apos 5
+tentativas.
 
 ### Teste quantitativo do mecanismo "fila de conexao" (sessao 06/07/2026)
 
