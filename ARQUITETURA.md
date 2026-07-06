@@ -201,8 +201,15 @@ analise de correlacao abaixo), `0017_indicadores_sociais_rdpc.sql` (`renda_per_c
    distribuidora, validade de constructo rural/urbano, regularizacao fundiaria/
    ambiental) - ver secao "Caso Sul x Seguranca da Posse encerrado" abaixo. NAO
    retomar sem fonte/evidencia nova que justifique reabrir.**
-2. Atualizar README e CLAUDE.md (Estado Real) com os dados das sessoes de Moradia,
-   INDQUAL, DEC/FEC real, Capital Humano e Irradiacao Solar
+2. ~~Atualizar README e CLAUDE.md (Estado Real) com os dados das sessoes de Moradia,
+   INDQUAL, DEC/FEC real, Capital Humano e Irradiacao Solar~~ - FEITO (sessao
+   06/07/2026): CLAUDE.md ja estava majoritariamente atualizado (verificado, incluia
+   migrations 0014-0018 e os 8 eixos do DRF); adicionado so o script novo
+   `investigar_construto_posse_rural_sul.py` na estrutura da secao 2. README.md
+   estava desatualizado (datado 04/07/2026, sem IVS Consolidado, RDPC, tarifa
+   residencial, % apartamento, CadUnico, e sem os extractors/scripts de analise mais
+   recentes) - atualizada a tabela "Estado atual dos dados", a tabela de fontes
+   primarias, e a lista de comandos em "Como rodar localmente".
 
 ## Bloqueado (aguardando dado externo)
 

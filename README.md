@@ -20,24 +20,38 @@ urbana, CEP ou bairro) conforme novas fontes de dados se tornem disponíveis —
 
 ---
 
-## Estado atual dos dados (atualizado em 04/07/2026)
+## Estado atual dos dados (atualizado em 06/07/2026)
 
 | Dimensão | Cobertura | Fonte | Status |
 |---|---|---|---|
 | Território (municípios) | 5.573 municípios, geometria real | IBGE, Malha Municipal 2025 | ✅ Completo |
-| MMGD instalada | 5.567 municípios, 50.086 MW, 8M UCs | ANEEL, snapshot jun/2026 | ✅ Completo |
-| Infraestrutura Urbana | 5.570 municípios, 5 indicadores | Censo 2022/SIDRA | ✅ Completo |
-| Renda e Trabalho | 5.571 municípios | RAIS, ano-base 2024 (BigQuery) | ✅ Completo |
-| Capital Humano | 5.570 municípios (alfabetização + mortalidade infantil) | Censo 2022/SIDRA + SIM/SINASC-DATASUS (BigQuery, média 2022-2024) | ✅ Completo |
-| Moradia | Regime de ocupação (5.570) + FCU (12.348) + ZEIS/AEIS (3.696, 4 capitais) + inadequação + MCMV/FGTS (5.111) + MCMV/OGU (4.883) | Censo 2022/SIDRA + Ministério das Cidades + portais municipais | ✅ Completo |
+| MMGD instalada | 5.567 municípios, 50.086 MW, 8M UCs (quebra por classe Residencial/Rural/Outras disponível via Parquet bruto) | ANEEL, snapshot jun/2026 | ✅ Completo |
+| Infraestrutura Urbana | 5.570 municípios, 5 indicadores + índice composto (Índice de Precariedade de Infraestrutura) | Censo 2022/SIDRA | ✅ Completo |
+| Renda e Trabalho | 5.571 municípios (RAIS) + RDPC — Rendimento Domiciliar Per Capita, 5.570 municípios (renda de todas as fontes, não só trabalho formal) | RAIS ano-base 2024 (BigQuery) + Censo 2022/SIDRA 10295-10296 | ✅ Completo |
+| Capital Humano | 5.570 municípios (alfabetização + mortalidade infantil) + CadÚnico (cobertura e % pobreza, 5.570 municípios, dez/2025) | Censo 2022/SIDRA + SIM/SINASC-DATASUS (BigQuery, média 2022-2024) + MDS/SAGI (Solr "MI Social") | ✅ Completo |
+| Moradia | Regime de ocupação (5.570) + FCU (12.348) + ZEIS/AEIS (3.696, 4 capitais) + inadequação + MCMV/FGTS (5.111) + MCMV/OGU (4.883) + % tipo apartamento (5.570) + índices compostos (Precariedade Habitacional, Segurança da Posse, Cobertura de Investimento Habitacional) | Censo 2022/SIDRA + Ministério das Cidades + portais municipais | ✅ Completo |
 | Qualidade de fornecimento | 5.570 municípios, DEC/FEC oficial + DEC/FEC "real" (sem expurgo de Dia Crítico) | ANEEL, Indicadores Coletivos de Continuidade (INDQUAL) | ✅ Completo |
-| Irradiação solar | 5.569 municípios, GHI médio anual | Atlas Brasileiro de Energia Solar (LABREN/CCST/INPE, 2ª ed. 2017) | ✅ Completo |
-| TSEE / baixa renda (`percentual_tsee`) | — | ANEEL, Beneficiários da CDE | 🔒 Bloqueado — aguardando dado de jan/2026+ (nova subclasse "Desconto Social") |
+| Irradiação solar | 5.569 municípios, GHI médio anual (média climatológica 1999-2015) | Atlas Brasileiro de Energia Solar (LABREN/CCST/INPE, 2ª ed. 2017) | ✅ Completo |
+| Tarifa de Energia Residencial | 4.724/5.540 municípios (TUSD+TE), 116 distribuidoras | ANEEL, Tarifas de Aplicação das Distribuidoras | ✅ Completo — variável de interesse regional (Centro-Oeste), não indicador nacional robusto (ver ARQUITETURA.md) |
+| IVS Consolidado (índice próprio) | ~5.571 municípios, média de 3 blocos (Infraestrutura, Renda e Trabalho, Capital Humano) | `vw_ivs_consolidado`, normalização min-max sobre dados já carregados | ✅ Completo |
+| TSEE / baixa renda (`percentual_tsee`) | — | ANEEL, Beneficiários da CDE | 🔒 Bloqueado — aguardando dado de jan/2026+ (nova subclasse "Desconto Social") e resolução de bug de infraestrutura no portal ANEEL |
 
-Os índices de Infraestrutura Urbana, Renda e Trabalho, Capital Humano e Moradia são
-**construções próprias do Atlas, inspiradas no IVS/IPEA**, não o IVS oficial — que só tem
-cobertura municipal completa até o Censo 2010. Ver nota metodológica em cada extractor
-(`backend/src/etl/loaders/`).
+Os índices de Infraestrutura Urbana, Renda e Trabalho, Capital Humano, Moradia e o IVS
+Consolidado são **construções próprias do Atlas, inspiradas no IVS/IPEA**, não o IVS
+oficial — que só tem cobertura municipal completa até o Censo 2010. Ver nota metodológica
+em cada extractor (`backend/src/etl/loaders/`) e em `ARQUITETURA.md`, seção "Índices
+compostos e metodologia de cruzamentos".
+
+### Análise exploratória: cruzamento MMGD x indicadores sociais
+
+Scripts em `backend/src/etl/analises/` (somente leitura, não fazem parte da carga de
+dados) testam a correlação entre adoção de MMGD residencial per capita e os indicadores
+sociais acima (Spearman + parcial controlando renda, com sensibilidade por região e
+urbanização). Ver `ARQUITETURA.md`, seção "Análise de correlação MMGD x Indicadores
+Sociais", para a metodologia completa e o histórico de hipóteses testadas nos dois casos
+regionais que mais destoaram do padrão nacional (Segurança da Posse no Sul — caso
+encerrado após 6 hipóteses descartadas; Irradiação Solar no Centro-Oeste — parcialmente
+explicado por tarifa histórica mais baixa da distribuidora local).
 
 ---
 
@@ -55,6 +69,10 @@ cobertura municipal completa até o Censo 2010. Ver nota metodológica em cada e
 | ANEEL — Indicadores Coletivos de Continuidade (INDQUAL) | Qualidade de fornecimento (DEC/FEC oficial e "real") | 3 CSVs relacionais (dadosabertos.aneel.gov.br) |
 | SIM + SINASC (Base dos Dados/DATASUS) | Mortalidade infantil (Capital Humano) | BigQuery público |
 | Atlas Brasileiro de Energia Solar (LABREN/CCST/INPE) | Irradiação solar (GHI) por sede municipal | CSV, licença CC BY-NC-ND (uso não-comercial) |
+| MDS/SAGI ("MI Social") | CadÚnico — cobertura e % pobreza (Capital Humano) | API Solr pública (aplicacoes.mds.gov.br/sagi/servicos/misocial) |
+| IBGE Censo 2022/SIDRA (tabelas 10295, 10296) | RDPC — Rendimento Domiciliar Per Capita e % baixa renda | API SIDRA |
+| IBGE Censo 2022/SIDRA (tabela 9928) | % Tipo de domicílio Apartamento (Moradia) | API SIDRA |
+| ANEEL — Tarifas de Aplicação das Distribuidoras | Tarifa de Energia Residencial (TUSD+TE) | CSV, atualizado semanalmente (dadosabertos.aneel.gov.br) |
 | ANEEL — Beneficiários da CDE | TSEE / baixa renda (`percentual_tsee`) — bloqueado | ZIP mensal (dadosabertos.aneel.gov.br) |
 
 > O **OBEPE** (Observatório Brasileiro de Erradicação da Pobreza Energética — EPE/MME/BID) é
@@ -142,13 +160,23 @@ python3 backend/src/etl/loaders/seed_zeis_recife.py
 python3 backend/src/etl/loaders/seed_zeis_rio_branco.py
 python3 backend/src/etl/loaders/seed_aeis_rio.py
 python3 backend/src/etl/loaders/extrair_irradiacao_solar_inpe.py          # requer baixar CSV do INPE antes, ver ARQUITETURA.md
+python3 backend/src/etl/loaders/extrair_cadunico.py
+python3 backend/src/etl/loaders/extrair_tipo_domicilio_censo.py           # requer migration 0016 aplicada antes
+python3 backend/src/etl/loaders/extrair_rdpc_censo.py                     # requer migration 0017 aplicada antes
+python3 backend/src/etl/loaders/extrair_tarifa_distribuidoras.py          # requer migration 0018 aplicada antes
 
 # Qualidade de Fornecimento (INDQUAL/ANEEL) - schema e ETL fora do padrao loaders/,
 # ver nota em CLAUDE.md secao 2. Requer aplicar schema_qualidade.sql manualmente antes:
 docker compose exec -T postgres psql -U atlas -d atlas_solar_justo < backend/src/etl/schema_qualidade.sql
 python3 backend/src/etl/etl_indqual.py
-# Depois aplicar a migration da view DEC/FEC "real":
+# Depois aplicar as migrations que dependem do INDQUAL/indicadores consolidados ja carregados
+# (rodar em ordem numerica, 0011 a 0018 - ver backend/src/db/migrations/):
 docker compose exec -T postgres psql -U atlas -d atlas_solar_justo < backend/src/db/migrations/0011_qualidade_dec_fec_real.sql
+# ... seguir numeracao ate 0018_indicadores_sociais_tarifa_residencial.sql
+
+# Analise exploratoria (opcional, so leitura - nao faz parte da carga de dados,
+# requer scipy: pip install scipy --break-system-packages, ver ARQUITETURA.md):
+python3 backend/src/etl/analises/analisar_correlacao_mmgd_renda.py
 ```
 
 O backend/frontend ainda não foram implementados nesta fase do projeto — o trabalho até aqui
