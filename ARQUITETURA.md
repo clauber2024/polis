@@ -584,6 +584,69 @@ instaladoras, decisao de investimento da propria Equatorial em GD antes da
 troca de controle societario). Registrado como parcialmente explicado
 geograficamente, mecanismo causal ainda em aberto.
 
+### Teste do mecanismo tarifa - TUSD+TE (sessao 06/07/2026, 5a tentativa)
+
+Racional: a economia de instalar MMGD residencial e proporcional a tarifa total
+(TUSD+TE) que o consumidor paga por kWh - tarifa mais baixa = payback mais
+longo = menos incentivo a adotar. Testado via dataset ANEEL "Tarifas de
+aplicacao das distribuidoras de energia eletrica" (atualizado semanalmente,
+historico 2010-2026) - script `backend/src/etl/analises/
+investigar_tarifa_centro_oeste.py`. Campos reais do CSV DIVERGEM do
+dicionario oficial (novamente, mesmo cuidado do caso TSEE): `DscBaseTarifaria`
+(nao `DscBaseTarifa`), `DscSubGrupo` (nao `DscSubgrupo`), `VlrTUSD`/`VlrTE`
+(nao `VlrTusd`/`VlrTe`), `DscUnidadeTerciaria` (nao `DscUnidade`). Arquivo
+tambem NAO e UTF-8 (e latin-1/cp1252) - mesmo tipo de achado ja visto no
+INDQUAL.
+
+**RESULTADO: hipotese de tarifa CONFIRMADA para o periodo relevante de
+adocao (2010-2024), mas o padrao SE INVERTEU recentemente (2025-2026).**
+Serie historica de tarifa total (TUSD+TE, R$/MWh, Residencial/Convencional/
+Tarifa de Aplicacao) por ano:
+
+| Ano | EMS | EMT | EQUATORIAL GO |
+|---|---|---|---|
+| 2010 | 353,0 | 349,2 | **305,9** |
+| 2015 | 455,7 | 467,4 | **449,4** |
+| 2020 | 595,2 | 600,1 | **512,5** |
+| 2022 | 628,8 | 634,6 | **467,3** |
+| 2024 | 681,6 | 651,6 | **548,0** |
+| 2025 | 648,7 | 607,9 | 623,4 |
+| 2026 (vigencia mais recente) | 510,7 | 423,7 | **613,0** |
+
+EQUATORIAL GO (Goias) teve a tarifa MAIS BAIXA das 3 distribuidoras em TODOS
+os 15 anos de 2010 a 2024, sem excecao - diferenca tipicamente de 80 a 160
+R$/MWh abaixo de EMS/EMT. Isso cobre quase todo o periodo em que a adocao de
+MMGD residencial cresceu no Brasil (2016-2024) - ou seja, para quem decidiu
+instalar solar residencial em Goias nesses anos, o retorno financeiro
+(economia por kWh gerado) era sistematicamente MENOR que para um morador
+equivalente em MT ou MS. Isso e uma explicacao economica plausivel e
+consistente para o estoque acumulado mais baixo de MMGD residencial em
+Goias, independente de renda, urbanizacao, tipologia habitacional ou fila de
+conexao (ja descartadas). **Achado notavel: o padrao se inverteu em
+2025-2026** - a tarifa vigente mais recente da EQUATORIAL GO (613,0,
+vigencia 01/01/2026) ja supera a de EMT (423,7, vigencia 08/04/2026) e fica
+proxima da EMS (510,7, vigencia 22/04/2026). Se a hipotese de tarifa estiver
+certa, o incentivo economico para MMGD residencial em Goias deveria estar
+MELHORANDO relativamente a MT/MS agora - efeito so deve aparecer no estoque
+de MMGD em sessoes/anos futuros, nao no snapshot atual (que reflete decisoes
+tomadas majoritariamente sob as tarifas mais baixas do periodo 2010-2024).
+
+RESSALVA DE QUALIDADE DE DADO: EMT apareceu com `VlrTE` NEGATIVO (-37,53) na
+vigencia mais recente (08/04/2026) - nao investigado a fundo se e um credito/
+subsidio tarifario real (plausivel, ANEEL as vezes zera ou credita parcela
+de TE em certas composicoes) ou uma inconsistencia da fonte; nao afeta a
+soma total nem a conclusao principal (serie 2010-2024), mas vale nota se
+este dado for usado para outro proposito no futuro.
+
+**Conclusao do caso Centro-Oeste x Irradiacao Solar apos 5 tentativas:**
+diferente do padrao geografico (que so aponta "e Goias"), agora ha um
+mecanismo economico CONCRETO e quantificado (tarifa historica mais baixa)
+consistente com a adocao residencial mais baixa observada no estoque atual
+de MMGD. Registrado como PARCIALMENTE EXPLICADO por mecanismo (nao so
+geografia) - ressalva de que e correlacao historica robusta, nao
+experimento controlado, e que o padrao de tarifa mudou muito recentemente
+(2025-2026), o que sera importante observar em cruzamentos futuros.
+
 ### Ideia de produto: ranking publico de distribuidoras por desempenho em conexao de MMGD
 
 Levantada pelo usuario a partir do achado acima (sessao 06/07/2026): o
