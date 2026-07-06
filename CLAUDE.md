@@ -57,7 +57,7 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   tabelas `qualidade_conjuntos`, `qualidade_indicadores`, `qualidade_conjunto_municipio`
   criadas FORA do Drizzle, via `backend/src/etl/schema_qualidade.sql` (ver nota de
   inconsistencia arquitetural na Secao 2)
-- Migrations incrementais 0000 a 0017 - ver `backend/src/db/migrations/`. Numeracao
+- Migrations incrementais 0000 a 0018 - ver `backend/src/db/migrations/`. Numeracao
   formal NAO cobre o schema de qualidade (criado fora do sistema de migrations ate a
   migration 0011, que so adiciona as views DEC/FEC "real" em cima do schema ja existente).
   0014-0017: indices compostos + views consolidadas (`vw_indicadores_sociais_consolidado`,
@@ -66,14 +66,18 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   Indicadores Sociais" (06/07/2026) - e RDPC (`renda_per_capita_rdpc`,
   `percentual_baixa_renda_rdpc`, migration 0017), achado colateral da investigacao de
   onus excessivo com aluguel, ver ARQUITETURA.md secao "Decisoes de fontes" (06/07/2026).
-- 18 extractors Python funcionais em `backend/src/etl/loaders/` (territorio, MMGD/ANEEL,
+  0018: `tarifa_energia_residencial` (TUSD+TE, ANEEL, sentido AMBIGUO), teste do
+  mecanismo tarifa para o caso Centro-Oeste x Irradiacao Solar - ver ARQUITETURA.md,
+  secao "Teste do mecanismo tarifa" e "Extensao do teste de tarifa para todas as
+  distribuidoras" (06/07/2026).
+- 19 extractors Python funcionais em `backend/src/etl/loaders/` (territorio, MMGD/ANEEL,
   Infraestrutura Urbana/Censo, Renda e Trabalho/RAIS via BigQuery, Alfabetizacao/Censo,
   Mortalidade Infantil/SIM+SINASC via BigQuery, Moradia/Censo, Tipo de Domicilio/Censo,
   RDPC/Censo, Inadequacao Habitacional, MCMV/FGTS, MCMV/OGU, Favelas/FCU (seed + extract),
-  ZEIS/AEIS por capital - SP, Recife, Rio Branco, Rio de Janeiro -, Irradiacao Solar/INPE)
-  + 2 scripts fora do padrao `loaders/`: `backend/src/etl/etl_indqual.py` e
-  `backend/src/etl/schema_qualidade.sql` (Qualidade de Fornecimento/ANEEL - ver nota na
-  Secao 2)
+  ZEIS/AEIS por capital - SP, Recife, Rio Branco, Rio de Janeiro -, Irradiacao Solar/INPE,
+  Tarifa Residencial/ANEEL) + 2 scripts fora do padrao `loaders/`:
+  `backend/src/etl/etl_indqual.py` e `backend/src/etl/schema_qualidade.sql` (Qualidade
+  de Fornecimento/ANEEL - ver nota na Secao 2)
 - Banco PostgreSQL+PostGIS local via `docker-compose.yml`, sem variante de producao ainda
 - Todas as 8 dimensoes de dados planejadas no DRF estao completas: Territorio, MMGD,
   Infraestrutura Urbana, Renda e Trabalho, Moradia, Qualidade de Fornecimento, Capital
@@ -158,7 +162,7 @@ Makefile.
 │       │   │   ├── indicadores_sociais.ts
 │       │   │   ├── irradiacao_solar.ts
 │       │   │   └── index.ts
-│       │   └── migrations/        (SQL incremental - IMPLEMENTADO, 0000 a 0017)
+│       │   └── migrations/        (SQL incremental - IMPLEMENTADO, 0000 a 0018)
 │       │       ├── 0000_criacao_tabelas.sql
 │       │       ├── 0001_extensoes_e_indices_espaciais.sql
 │       │       ├── ... (0002 a 0010: infraestrutura, renda, capital humano,
@@ -170,7 +174,8 @@ Makefile.
 │       │       ├── 0014_indices_compostos_moradia_infraestrutura.sql
 │       │       ├── 0015_view_ivs_consolidado.sql
 │       │       ├── 0016_indicadores_sociais_tipo_domicilio.sql
-│       │       └── 0017_indicadores_sociais_rdpc.sql
+│       │       ├── 0017_indicadores_sociais_rdpc.sql
+│       │       └── 0018_indicadores_sociais_tarifa_residencial.sql
 │       └── etl/
 │           ├── venv/               (ambiente Python isolado - nao versionado)
 │           ├── data/raw/           (shapefiles/CSVs baixados - nao versionado,
@@ -188,8 +193,13 @@ Makefile.
 │           │   ├── inspecionar_colunas_mmgd_parquet.py
 │           │   ├── inspecionar_metadados_sidra_9928.py
 │           │   ├── inspecionar_metadados_sidra_aluguel.py
-│           │   └── inspecionar_metadados_sidra_rdpc.py
-│           └── loaders/            (extractors - IMPLEMENTADO, 18 scripts)
+│           │   ├── inspecionar_metadados_sidra_rdpc.py
+│           │   ├── investigar_distribuidora_regioes_problema.py
+│           │   ├── investigar_fila_conexao_mmgd_centro_oeste.py
+│           │   ├── investigar_tarifa_centro_oeste.py
+│           │   ├── verificar_preenchimento_indicadores_sociais.py
+│           │   └── diagnosticar_estado_geral_banco.py
+│           └── loaders/            (extractors - IMPLEMENTADO, 19 scripts)
 │               ├── seed_municipios.py
 │               ├── extrair_mmgd_aneel.py
 │               ├── extrair_infraestrutura_censo.py
@@ -210,6 +220,7 @@ Makefile.
 │               ├── seed_zeis_rio_branco.py
 │               ├── seed_aeis_rio.py
 │               ├── extrair_irradiacao_solar_inpe.py
+│               ├── extrair_tarifa_distribuidoras.py
 │               └── validar_aneel_real.py
 ├── frontend/                       (estrutura de pastas existe, vazia - NAO INICIADO)
 │   ├── pages/

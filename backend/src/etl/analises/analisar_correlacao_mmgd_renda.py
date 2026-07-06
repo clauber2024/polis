@@ -144,6 +144,7 @@ VARIAVEIS_X = {
     "percentual_populacao_rural": ("% População Rural", "negativo (proxy vulnerabilidade infra.; também usada como moderador de urbanização, ver abaixo)"),
     "irradiacao_media_kwh_m2_dia": ("Irradiação Solar Média (potencial físico, INPE/LABREN)", "positivo"),
     "percentual_apartamento": ("% Domicílios tipo Apartamento (Censo 2022)", "negativo p/ MMGD residencial (barreira física — sem telhado próprio; também usada como moderador de tipologia habitacional, ver abaixo). Requer migration 0016."),
+    "tarifa_energia_residencial": ("Tarifa de Energia Residencial (TUSD+TE, ANEEL)", "ambíguo — NÃO é vulnerabilidade; positivo ESPERADO para MMGD (tarifa maior = mais economia por kWh gerado = mais incentivo a adotar), mas negativo do ponto de vista do consumidor em geral. Requer migration 0018."),
 }
 
 # Variáveis-alvo (Y): adoção de MMGD, sempre per capita.
@@ -219,7 +220,8 @@ def carregar_dados(engine) -> pd.DataFrame:
             vim.indice_precariedade_moradia,
             vim.indice_seguranca_posse,
             vim.cobertura_investimento_habitacional,
-            irr.irradiacao_media_kwh_m2_dia
+            irr.irradiacao_media_kwh_m2_dia,
+            vsc.tarifa_energia_residencial
     """
     joins_comuns = """
         FROM municipios m

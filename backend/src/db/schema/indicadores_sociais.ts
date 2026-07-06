@@ -185,6 +185,33 @@ export const indicadoresSociais = pgTable(
      */
     percentualBaixaRendaRdpc: doublePrecision("percentual_baixa_renda_rdpc"),
 
+    /**
+     * Tarifa de energia RESIDENCIAL (TUSD + TE somadas, R$/MWh), subgrupo B1,
+     * modalidade Convencional, Tarifa de Aplicação (o que o consumidor de
+     * fato paga) — vigência mais recente disponível no dataset ANEEL
+     * "Tarifas de aplicação das distribuidoras de energia elétrica".
+     * Resolvida por município via a mesma sig_agente já carregada pelo
+     * INDQUAL (qualidade_conjuntos/qualidade_conjunto_municipio) — municípios
+     * com MÚLTIPLAS distribuidoras (área de concessão dividida) ficam NULL
+     * aqui, não é possível atribuir uma tarifa única.
+     *
+     * ACHADO que motivou esta coluna (sessão 06/07/2026, ver ARQUITETURA.md
+     * "Teste do mecanismo tarifa"): EQUATORIAL GO (Goiás) teve a tarifa
+     * residencial mais baixa entre EMS/EMT/EQUATORIAL GO em TODOS os anos de
+     * 2010 a 2024, revertendo só em 2025-2026 — retorno financeiro mais
+     * fraco de instalar MMGD residencial é uma explicação econômica
+     * plausível para a adoção mais baixa em Goiás. Esta coluna generaliza o
+     * teste para TODAS as distribuidoras do país, não só as 3 do
+     * Centro-Oeste.
+     *
+     * SENTIDO AMBÍGUO — NÃO é indicador de vulnerabilidade como os demais
+     * desta tabela: tarifa mais alta é ruim para o consumidor em geral, mas
+     * é o incentivo ESPERADO POSITIVO para adoção de MMGD (mais economia por
+     * kWh gerado = payback mais curto). Não inverter o valor armazenado;
+     * a interpretação de sentido é responsabilidade da camada de análise.
+     */
+    tarifaEnergiaResidencial: doublePrecision("tarifa_energia_residencial"),
+
     criadoEm: timestamp('criado_em', { withTimezone: true }).defaultNow().notNull(),
   },
   (tabela) => ({

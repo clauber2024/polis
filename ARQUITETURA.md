@@ -647,6 +647,67 @@ geografia) - ressalva de que e correlacao historica robusta, nao
 experimento controlado, e que o padrao de tarifa mudou muito recentemente
 (2025-2026), o que sera importante observar em cruzamentos futuros.
 
+### Extensao do teste de tarifa para todas as distribuidoras + correlacao nacional (sessao 06/07/2026)
+
+A pedido do usuario, o achado descritivo acima (limitado a 3 distribuidoras
+do Centro-Oeste) foi generalizado para TODO o Brasil e testado
+estatisticamente pelo metodo Spearman/parcial ja padrao do projeto.
+
+**Extractor nacional:** `backend/src/etl/loaders/extrair_tarifa_distribuidoras.py`
++ migration `0018_indicadores_sociais_tarifa_residencial.sql` (coluna
+`tarifa_energia_residencial` em `indicadores_sociais`, exposta na view
+`vw_indicadores_sociais_consolidado`). Reaproveita a mesma logica de
+resolucao municipio -> distribuidora via `sig_agente` (INDQUAL) ja usada nas
+investigacoes anteriores desta secao. Roda contra as 116 distribuidoras
+distintas encontradas no CSV completo de tarifas (nao so as 3 do
+Centro-Oeste). Resultado da carga: 4.724/5.540 municipios receberam tarifa
+(753 excluidos por area de concessao dividida - multiplas distribuidoras -,
+63 sem tarifa homologada no periodo filtrado); media nacional 557,50 R$/MWh,
+mediana 508,49 R$/MWh.
+
+**Integracao no pipeline de correlacao:** `tarifa_energia_residencial`
+adicionada a `VARIAVEIS_X` e a query de
+`analisar_correlacao_mmgd_renda.py`, com sentido anotado como AMBIGUO (nao
+e vulnerabilidade - e incentivo economico esperado positivo para MMGD).
+
+**RESULTADO NACIONAL: tarifa NAO e um preditor nacional robusto de adocao de
+MMGD residencial.** Para Y = potencia MMGD residencial per capita (variavel
+principal do pipeline): rho bruto = 0,0012 (p=0,934, NAO significativo);
+parcial controlando renda = -0,0073 (p=0,615, NAO significativo); parcial
+controlando renda+urbanizacao conjuntamente = +0,0725 (p<0,0001,
+estatisticamente significativo mas com magnitude muito pequena e sinal
+instavel). No resumo de robustez por regiao/urbanizacao, o indicador ficou
+classificado como "sensivel - sinal muda/inverte" (2/5 regioes com mesmo
+sinal, 0/3 faixas de urbanizacao com mesmo sinal) - o pior resultado de
+consistencia entre todos os 14 indicadores testados nesta rodada.
+
+**MAS o efeito e fortemente concentrado no Centro-Oeste - exatamente onde a
+hipotese foi originalmente formulada.** Sensibilidade regional (parcial
+controlando renda, Y = potencia MMGD residencial per capita):
+
+| Regiao | rho parcial (renda) |
+|---|---|
+| Centro-Oeste | **+0,466** |
+| Norte | +0,217 |
+| Sul | +0,077 |
+| Nordeste | -0,018 |
+| Sudeste | -0,034 |
+
+Centro-Oeste destaca-se com folga como a regiao onde tarifa mais alta se
+associa a mais MMGD residencial (controlando renda) - consistente com o
+mecanismo descritivo ja documentado (EQUATORIAL GO com tarifa
+sistematicamente mais baixa 2010-2024). Nas demais regioes o efeito e fraco,
+nulo ou nao significativo.
+
+**Conclusao (integra e refina a conclusao da secao anterior):** a hipotese
+de tarifa NAO se sustenta como driver geral de MMGD no Brasil, mas SUSTENTA-SE
+como mecanismo regional especifico do Centro-Oeste - o que e coerente com a
+motivacao original do teste (explicar por que Centro-Oeste destoa do padrao
+nacional de Irradiacao Solar) e nao um resultado nacional generico. Tratar
+`tarifa_energia_residencial` como variavel de interesse regional
+(Centro-Oeste), nao como indicador nacional robusto de vulnerabilidade/
+incentivo a incluir em rankings compostos nacionais.
+
 ### Ideia de produto: ranking publico de distribuidoras por desempenho em conexao de MMGD
 
 Levantada pelo usuario a partir do achado acima (sessao 06/07/2026): o
