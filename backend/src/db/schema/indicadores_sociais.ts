@@ -22,7 +22,7 @@ import {
   uniqueIndex,
   integer,
 } from 'drizzle-orm/pg-core';
-import { unidadesEspaciais } from './unidades_espaciais';
+import { unidadesEspaciais } from './unidades_espaciais.js';
 
 export const indicadoresSociais = pgTable(
   'indicadores_sociais',
@@ -60,6 +60,21 @@ export const indicadoresSociais = pgTable(
     rendaMediaDomiciliar: doublePrecision('renda_media_domiciliar'),
 
     percentualCadunico: doublePrecision('percentual_cadunico'),
+
+    /**
+     * % das famílias cadastradas no CadÚnico em situação de pobreza ou
+     * extrema pobreza — coluna existente no banco desde a migration 0013
+     * (`ALTER TABLE`), mas que nunca tinha sido adicionada a este schema
+     * Drizzle (drift encontrado na sessão 07/07/2026, ao construir o
+     * endpoint de "Vazios de Acesso" — RF-055/056/057 — que depende dela
+     * para exibir contexto de vulnerabilidade no ranking). Diferente de
+     * `percentualCadunico` (cobertura: % da população total cadastrada);
+     * esta é sobre quem JÁ está cadastrado. Direção negativa (quanto maior,
+     * pior). Ver também `percentualBaixaRendaRdpc` abaixo, proxy de pobreza
+     * mais amplo (cobre toda a população, não só cadastrados).
+     */
+    percentualPobrezaCadunico: doublePrecision('percentual_pobreza_cadunico'),
+
     percentualTarifaSocial: doublePrecision('percentual_tarifa_social'),
 
     // --- Dimensão Infraestrutura Urbana (inspirada no IVS/IPEA, construída

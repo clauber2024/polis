@@ -190,7 +190,22 @@ analise de correlacao abaixo), `0017_indicadores_sociais_rdpc.sql` (`renda_per_c
 
 ## Fila de trabalho
 
-1. Cruzamento MMGD x indicadores sociais - EM ANDAMENTO (ver secao "Analise de
+1. Cruzamento MMGD x indicadores sociais - **CONCLUIDO (rotulo "EM ANDAMENTO"
+   corrigido em 08/07/2026 - a pendencia de robustez por regiao/urbanizacao
+   foi encerrada em 07/07/2026, ver abaixo "Com isso, a pendencia de
+   06/07/2026 esta encerrada"; os itens 3-6 desta mesma fila - Vazios de
+   Acesso e Grupo Equatorial no Nordeste - tambem estao todos executados ou
+   formalmente encerrados). O trabalho pendente de OUTRA natureza -
+   reimplementar a logica de classificacao de Vazio de Acesso como rota/
+   endpoint real no backend Node/Express - foi FEITO em 07/07/2026:
+   `GET /api/vazios-de-acesso` (`backend/src/services/vaziosDeAcesso.service.ts`),
+   ver "Backend Node/Express" em CLAUDE.md, secao "Estado Real do Projeto",
+   para os detalhes (inclui o bloqueio real encontrado - MMGD residencial nao
+   estava persistido no banco - e a decisao de expandir `extrair_mmgd_aneel.py`
+   + migration 0020 para resolver, em vez do endpoint usar MMGD total com
+   divergencia). `identificar_vazios_de_acesso.py` continua existindo como
+   protótipo de validação (nao remover) - o endpoint é a implementação final,
+   nao substitui o script como documentação da metodologia.** (ver secao "Analise de
    correlacao MMGD x Indicadores Sociais" abaixo, sessao 06/07/2026). Metodologia
    (Spearman + parcial controlando renda + sensibilidade regiao/urbanizacao) esta
    pronta e reutilizavel. Irradiacao Solar no Centro-Oeste: parcialmente explicado
@@ -337,6 +352,15 @@ analise de correlacao abaixo), `0017_indicadores_sociais_rdpc.sql` (`renda_per_c
    completo. **PROTOTIPO DE VALIDACAO, nao a implementacao final** - a logica de
    quadrante deve ser reimplementada no backend Node/Express quando ele existir (ja
    documentado como decisao anterior).
+
+   **REIMPLEMENTADO no backend em 07/07/2026**: `GET /api/vazios-de-acesso`
+   (`backend/src/services/vaziosDeAcesso.service.ts`) - mesma metodologia (mediana
+   nacional, priorizacao por IVS), com filtros uf/regiao/quadrante, ordenacao e
+   paginacao via query params, e a ressalva metodologica abaixo embutida na resposta
+   da API (campo `notaMetodologica`). Requereu migration 0020 (persistir MMGD
+   residencial em `mmgd_indicadores`, antes so calculavel lendo o Parquet bruto em
+   Python) - ver CLAUDE.md, "Estado Real do Projeto", para o detalhe do bloqueio e
+   da decisao.
 
    **RESULTADO (executado 06/07/2026):** mediana nacional - potencial solar 5,015
    kWh/m2.dia, MMGD residencial per capita 111,29 kW/1.000 hab. 1.451 municipios

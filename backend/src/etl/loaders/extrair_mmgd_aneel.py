@@ -39,6 +39,25 @@ não vem deste arquivo da ANEEL. Viria de outra fonte (ex: dados de mercado
 das distribuidoras). Não inventamos esse número — fica NULL até termos uma
 fonte real para ele, evitando que o "% de UCs com MMGD" do DRF seja calculado
 sobre um denominador fictício.
+
+QUEBRA RESIDENCIAL (potencia_residencial_kw, numero_ucs_residencial) — NOVO,
+migration 0020, sessão 07/07/2026:
+--------------------------------------------------------------------------
+Além do TOTAL (todas as classes de consumo), este extractor agora também
+separa e persiste o subtotal da classe 'Residencial' (DscClasseConsumo).
+Motivação: a metodologia de "Vazio de Acesso" (RF-055/056/057, já validada
+em ARQUITETURA.md) usa MMGD RESIDENCIAL per capita como eixo Y — o total
+mistura agronegócio/irrigação, que tipicamente tem instalações muito maiores
+em kW e concentradas em poucos municípios rurais, distorcendo a classificação.
+Até esta sessão, essa quebra só existia em memória, dentro de scripts de
+análise Python (ver `backend/src/etl/analises/analisar_correlacao_mmgd_renda.py`,
+função `carregar_classe_consumo_mmgd`, cuja regra de classificação é
+reaproveitada aqui) — o backend Node/Express, que só acessa o banco via
+Drizzle, não tinha como reproduzir a classificação sem essa persistência.
+Rural/Outras/Não-classificado (inclui o valor espúrio 'REBR'/'RE' já
+documentado em `carregar_classe_consumo_mmgd`) NÃO são trazidos para o banco
+nesta migration — só Residencial, que é o que a metodologia de Vazio de
+Acesso precisa. Requer a migration 0020 aplicada antes de rodar este script.
 ================================================================================
 """
 
@@ -137,14 +156,53 @@ def agregar_por_municipio(df: pd.DataFrame) -> pd.DataFrame:
     # mantemos a normalização por segurança e consistência).
     df["codigo_ibge"] = df["CodMunicipioIbge"].astype(int).astype(str).str.zfill(7)
 
+    # Classificação Residencial x demais classes de consumo — mesma regra já
+    # validada em analisar_correlacao_mmgd_renda.py (carregar_classe_consumo_mmgd),
+    # usada aqui só para separar o subtotal Residencial (ver docstring do
+    # módulo, migration 0020). Não replica o tratamento completo do valor
+    # espúrio 'REBR'/'RE' daquele script porque, para ESTE extractor, essas
+    # linhas já caem corretamente fora de "Residencial" (não precisam de um
+    # grupo NAO_CLASSIFICADO próprio — só o total e o subtotal residencial
+    # importam aqui, não os 4 grupos completos).
+    df["classe_normalizada"] = df["DscClasseConsumo"].astype("string").str.strip()
+    eh_residencial = df["classe_normalizada"] == "Residencial"
+    n_residencial = int(eh_residencial.sum())
+    print(f"      {n_residencial} empreendimento(s) classificados como Residencial "
+          f"({n_residencial / len(df) * 100:.1f}% do total, após os filtros acima).")
+
     agregado = df.groupby("codigo_ibge").agg(
         potencia_instalada_kw=("MdaPotenciaInstaladaKW", "sum"),
         numero_ucs_com_mmgd=("QtdUCRecebeCredito", "sum"),
         numero_empreendimentos=("codigo_ibge", "count"),
     ).reset_index()
 
+    residencial = (
+        df[eh_residencial]
+        .groupby("codigo_ibge")
+        .agg(
+            potencia_residencial_kw=("MdaPotenciaInstaladaKW", "sum"),
+            numero_ucs_residencial=("QtdUCRecebeCredito", "sum"),
+        )
+        .reset_index()
+    )
+    agregado = agregado.merge(residencial, on="codigo_ibge", how="left")
+
+    # Município sem NENHUM empreendimento Residencial (só Rural/Comercial/
+    # Industrial/etc.) é 0 residencial, não NULL — ausência de instalação
+    # residencial é dado válido (mesmo raciocínio já documentado em
+    # calcular_indicadores_per_capita, script de análise), diferente de
+    # "sem nenhum dado de MMGD no município" (esse município nem aparece
+    # em `agregado`, que só existe a partir do groupby acima).
+    agregado["potencia_residencial_kw"] = agregado["potencia_residencial_kw"].fillna(0.0)
+    agregado["numero_ucs_residencial"] = agregado["numero_ucs_residencial"].fillna(0).astype(int)
+
     print(f"      {len(agregado)} municípios com MMGD agregados.")
     print(f"      Potência total nacional: {agregado['potencia_instalada_kw'].sum() / 1000:.1f} MW")
+    potencia_total_nacional = agregado["potencia_instalada_kw"].sum()
+    potencia_residencial_nacional = agregado["potencia_residencial_kw"].sum()
+    if potencia_total_nacional > 0:
+        print(f"      Potência RESIDENCIAL nacional: {potencia_residencial_nacional / 1000:.1f} MW "
+              f"({potencia_residencial_nacional / potencia_total_nacional * 100:.1f}% do total)")
     print(f"      Total de empreendimentos: {agregado['numero_empreendimentos'].sum()}")
 
     return agregado
@@ -207,13 +265,17 @@ def executar_upsert_mmgd(engine, agregado: pd.DataFrame, periodo_referencia: str
     sql_upsert = text("""
         INSERT INTO mmgd_indicadores
             (unidade_espacial_id, periodo_referencia, potencia_instalada_kw,
-             numero_ucs_com_mmgd, total_ucs_municipio, e_dado_ilustrativo)
+             numero_ucs_com_mmgd, potencia_residencial_kw, numero_ucs_residencial,
+             total_ucs_municipio, e_dado_ilustrativo)
         VALUES
             (:unidade_espacial_id, :periodo_referencia, :potencia_instalada_kw,
-             :numero_ucs_com_mmgd, NULL, 'false')
+             :numero_ucs_com_mmgd, :potencia_residencial_kw, :numero_ucs_residencial,
+             NULL, 'false')
         ON CONFLICT (unidade_espacial_id, periodo_referencia) DO UPDATE SET
             potencia_instalada_kw = EXCLUDED.potencia_instalada_kw,
-            numero_ucs_com_mmgd = EXCLUDED.numero_ucs_com_mmgd;
+            numero_ucs_com_mmgd = EXCLUDED.numero_ucs_com_mmgd,
+            potencia_residencial_kw = EXCLUDED.potencia_residencial_kw,
+            numero_ucs_residencial = EXCLUDED.numero_ucs_residencial;
     """)
 
     total = len(agregado)
@@ -229,6 +291,8 @@ def executar_upsert_mmgd(engine, agregado: pd.DataFrame, periodo_referencia: str
                     "periodo_referencia": periodo_referencia,
                     "potencia_instalada_kw": float(linha["potencia_instalada_kw"]),
                     "numero_ucs_com_mmgd": int(linha["numero_ucs_com_mmgd"]),
+                    "potencia_residencial_kw": float(linha["potencia_residencial_kw"]),
+                    "numero_ucs_residencial": int(linha["numero_ucs_residencial"]),
                 })
             inseridos += 1
         except Exception as e:

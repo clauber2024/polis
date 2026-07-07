@@ -28,7 +28,7 @@ import {
   timestamp,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
-import { municipios } from './municipios';
+import { municipios } from './municipios.js';
 
 export const irradiacaoSolar = pgTable(
   'irradiacao_solar',

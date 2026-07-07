@@ -37,9 +37,9 @@ um WebGIS analítico que depende de:
   — recurso central do PostGIS, sem equivalente robusto no MySQL.
 - **ETL Python** para extração de fontes governamentais (ANEEL, IBGE/SIDRA, RAIS via
   BigQuery), com scripts isolados por fonte.
-- **Backend Node.js/Express + Drizzle ORM (TypeScript)** — schema e migrations já
-  implementados; rotas/controllers ainda **NÃO implementados** (ver Estado Real do
-  Projeto, abaixo).
+- **Backend Node.js/Express + Drizzle ORM (TypeScript)** — schema e migrations
+  implementados; rotas/controllers **em construção** (1 endpoint real desde
+  07/07/2026 — ver Estado Real do Projeto, abaixo).
 
 Por isso, esta é uma exceção justificada e documentada, nos termos previstos pelo próprio
 Official Project Standard ("seguido em todos os projetos, salvo exceção justificada e
@@ -49,15 +49,46 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
 
 ---
 
-## Estado Real do Projeto (atualizado em 04/07/2026)
+## Estado Real do Projeto (atualizado em 07/07/2026)
 
 **Implementado e validado com dados reais:**
+- **Backend Node/Express — primeiro endpoint real (07/07/2026):**
+  `GET /api/vazios-de-acesso` (RF-055/056/057), reimplementando no backend a
+  metodologia antes só validada em
+  `backend/src/etl/analises/identificar_vazios_de_acesso.py` (ver
+  ARQUITETURA.md, secao "Identificacao e ranking de Vazios de Acesso").
+  Estrutura minima: `backend/package.json`, `tsconfig.json`,
+  `src/{index,app}.ts`, `src/config/env.ts`, `src/db/client.ts`,
+  `src/{routes,controllers,services,schemas,middlewares,utils}/`. Zod para
+  validacao de query params, tratamento de erro central (`errorHandler.ts`,
+  formato `{ erro: { mensagem, detalhes? } }`). Autenticacao/JWT/RBAC/6
+  personas continuam **PLANEJADO** - fora do escopo desta sessao.
+  **Bloqueio real encontrado e resolvido**: a metodologia validada usa MMGD
+  RESIDENCIAL per capita (nao o total), mas essa quebra por classe de
+  consumo so existia em memoria no script Python (lida direto do Parquet
+  bruto da ANEEL, dado nao versionado) - o backend Node nao tinha como
+  reproduzir isso so com o banco. Decisao (usuario): expandir
+  `extrair_mmgd_aneel.py` para persistir `potencia_residencial_kw` e
+  `numero_ucs_residencial` em `mmgd_indicadores` (migration 0020), em vez do
+  endpoint usar MMGD total com nota de divergencia. **Requer rodar a
+  migration 0020 e re-executar `extrair_mmgd_aneel.py` no banco local antes
+  do endpoint refletir os numeros validados em ARQUITETURA.md** (1.451
+  municipios, 26,1%) - ate isso rodar, municipios cujo snapshot de MMGD e
+  anterior a migration 0020 ficam fora da classificacao (ver campo
+  `avisos.totalPrecisaReextrairMmgd` na resposta da API).
+  **Drift de schema corrigido nesta sessao**: `indicadores_sociais.ts`
+  (Drizzle) nao tinha a coluna `percentual_pobreza_cadunico`, que existe no
+  banco desde a migration 0013 (`ALTER TABLE`) - adicionada ao `.ts`.
+  Drift semelhante em `taxa_mortalidade_infantil` (migration 0012) **NAO foi
+  corrigido** (fora do escopo desta sessao, nao usado pelo endpoint novo) -
+  ciente para quando for necessario.
 - Schema do banco: `municipios`, `unidades_espaciais`, `mmgd_indicadores`,
-  `indicadores_sociais`, `irradiacao_solar` via Drizzle (`backend/src/db/schema/`) +
-  tabelas `qualidade_conjuntos`, `qualidade_indicadores`, `qualidade_conjunto_municipio`
-  criadas FORA do Drizzle, via `backend/src/etl/schema_qualidade.sql` (ver nota de
-  inconsistencia arquitetural na Secao 2)
-- Migrations incrementais 0000 a 0018 - ver `backend/src/db/migrations/`. Numeracao
+  `indicadores_sociais`, `irradiacao_solar`, `indicadores_climaticos` via Drizzle
+  (`backend/src/db/schema/`) + tabelas `qualidade_conjuntos`, `qualidade_indicadores`,
+  `qualidade_conjunto_municipio` criadas FORA do Drizzle, via
+  `backend/src/etl/schema_qualidade.sql` (ver nota de inconsistencia arquitetural na
+  Secao 2)
+- Migrations incrementais 0000 a 0020 - ver `backend/src/db/migrations/`. Numeracao
   formal NAO cobre o schema de qualidade (criado fora do sistema de migrations ate a
   migration 0011, que so adiciona as views DEC/FEC "real" em cima do schema ja existente).
   0014-0017: indices compostos + views consolidadas (`vw_indicadores_sociais_consolidado`,
@@ -69,49 +100,67 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   0018: `tarifa_energia_residencial` (TUSD+TE, ANEEL, sentido AMBIGUO), teste do
   mecanismo tarifa para o caso Centro-Oeste x Irradiacao Solar - ver ARQUITETURA.md,
   secao "Teste do mecanismo tarifa" e "Extensao do teste de tarifa para todas as
-  distribuidoras" (06/07/2026).
-- 19 extractors Python funcionais em `backend/src/etl/loaders/` (territorio, MMGD/ANEEL,
+  distribuidoras" (06/07/2026). 0019: criacao de `indicadores_climaticos`
+  (`precipitacao_max_mes_mm`, MERGE/CPTEC-INPE, zonal statistics) - primeiro indicador
+  climatico formal do Atlas, formalizado apos a linha de investigacao "Queima de
+  equipamentos" confirmar sinal robusto em escala nacional (ver ARQUITETURA.md, secao
+  "RESULTADO FINAL - COBERTURA NACIONAL", 08/07/2026). Vento (ERA5) NAO foi formalizado -
+  sinal nao se sustentou em escala nacional, permanece exploratorio em `analises/`.
+  0020: `potencia_residencial_kw` e `numero_ucs_residencial` em
+  `mmgd_indicadores` (sessao 07/07/2026, ver bloco "Backend Node/Express" acima).
+- 20 extractors Python funcionais em `backend/src/etl/loaders/` (territorio, MMGD/ANEEL,
   Infraestrutura Urbana/Censo, Renda e Trabalho/RAIS via BigQuery, Alfabetizacao/Censo,
   Mortalidade Infantil/SIM+SINASC via BigQuery, Moradia/Censo, Tipo de Domicilio/Censo,
   RDPC/Censo, Inadequacao Habitacional, MCMV/FGTS, MCMV/OGU, Favelas/FCU (seed + extract),
   ZEIS/AEIS por capital - SP, Recife, Rio Branco, Rio de Janeiro -, Irradiacao Solar/INPE,
-  Tarifa Residencial/ANEEL) + 2 scripts fora do padrao `loaders/`:
-  `backend/src/etl/etl_indqual.py` e `backend/src/etl/schema_qualidade.sql` (Qualidade
-  de Fornecimento/ANEEL - ver nota na Secao 2)
+  Tarifa Residencial/ANEEL, Precipitacao Mensal/MERGE-CPTEC-INPE) + 2 scripts fora do
+  padrao `loaders/`: `backend/src/etl/etl_indqual.py` e
+  `backend/src/etl/schema_qualidade.sql` (Qualidade de Fornecimento/ANEEL - ver nota na
+  Secao 2)
 - Banco PostgreSQL+PostGIS local via `docker-compose.yml`, sem variante de producao ainda
 - Todas as 8 dimensoes de dados planejadas no DRF estao completas: Territorio, MMGD,
   Infraestrutura Urbana, Renda e Trabalho, Moradia, Qualidade de Fornecimento, Capital
   Humano, Irradiacao Solar. Unico indicador pendente por bloqueio externo (nao por falta
   de trabalho): `percentual_tsee` (Beneficiarios da CDE/ANEEL), aguardando dado de
   jan/2026+ com a nova subclasse "Residencial Desconto Social" - ver ARQUITETURA.md.
+  **Alem das 8 dimensoes originais do DRF**: `indicadores_climaticos` (precipitacao
+  mensal) e uma 9a dimensao NAO prevista no DRF original, nascida de uma investigacao
+  organica (clima x ressarcimento por danos eletricos) - ver ARQUITETURA.md para o
+  historico completo. Nao remover das 8 originais do DRF nem misturar com elas.
 
 **NAO implementado ainda** (apesar de descrito em secoes deste documento como padrao):
-- Backend Node/Express (rotas, controllers, services, autenticacao JWT) - so o schema existe
+- Backend Node/Express: **1 endpoint real** (`GET /api/vazios-de-acesso`, ver acima) -
+  demais rotas/controllers do DRF (RF-001 a RF-080), autenticacao JWT, RBAC e as 6
+  personas continuam nao implementados
 - Frontend React - nao iniciado
 - Makefile - nao existe; todos os comandos deste documento (`make up`, `make etl`, etc.)
   sao **especificacao para quando o backend for construido**, nao comandos reais hoje
 - Deploy/producao (Nginx, certbot, scheduler, `docker-compose.prod.yml`) - arquitetura
   especificada mas nunca implementada nem testada
 - Autenticacao, 6 personas, RBAC - existem so no DRF como requisito, sem codigo
-- Cruzamento MMGD x indicadores sociais (identificacao de "vazios de acesso") - proximo
-  item da fila de trabalho, ver ARQUITETURA.md
+- Cruzamento MMGD x indicadores sociais (identificacao de "vazios de acesso") -
+  classificacao/ranking (item 3) ja tem endpoint real (acima); RF-057 (painel tipo
+  heatmap) continua pendente - e exibicao/frontend, nao calculo
 
-**Como rodar o que existe hoje:** ver `README.md`, secao "Como rodar localmente" - e
-execucao direta de scripts Python (`python3 backend/src/etl/loaders/extrair_X.py`), nao via
-Makefile.
+**Como rodar o que existe hoje:** ver `README.md`, secao "Como rodar localmente" - ETL via
+execucao direta de scripts Python (`python3 backend/src/etl/loaders/extrair_X.py`);
+backend via `cd backend && npm install && npm run dev` (requer `backend/.env` com
+`DATABASE_URL` e as migrations ja aplicadas - ver README). Nao ha Makefile ainda.
 
 ---
 
 ## 1️⃣ Stack Oficial do Projeto
 
-### 🔹 Backend (schema implementado; rotas/controllers PLANEJADOS)
+### 🔹 Backend (schema implementado; 1 endpoint real desde 07/07/2026; demais rotas/controllers PLANEJADOS)
 - Node.js 20+ (LTS)
 - TypeScript 5+
 - Express
 - Drizzle ORM
+- Zod (validação de request, middleware dedicado)
 - PostgreSQL 16 + PostGIS 3.4
 - JWT (autenticação) — PLANEJADO, não implementado
-- REST JSON API — PLANEJADO, não implementado
+- REST JSON API — parcial: `GET /api/vazios-de-acesso` implementado, demais rotas do
+  DRF PLANEJADAS
 
 ### 🔹 ETL (implementado)
 - Python 3.12+
@@ -153,16 +202,25 @@ Makefile.
 ```
 /
 ├── backend/
+│   ├── package.json               (IMPLEMENTADO 07/07/2026 - Node 20+, TS 5+, Express,
+│   │                                Drizzle, zod, pg. Scripts: dev/build/start/typecheck)
+│   ├── tsconfig.json               (IMPLEMENTADO 07/07/2026 - ES2022, NodeNext, strict)
 │   └── src/
+│       ├── index.ts                (IMPLEMENTADO - entrypoint, sobe o Express)
+│       ├── app.ts                  (IMPLEMENTADO - monta app: middlewares, rotas, error handler)
+│       ├── config/
+│       │   └── env.ts              (IMPLEMENTADO - leitura central de process.env)
 │       ├── db/
+│       │   ├── client.ts           (IMPLEMENTADO - instancia Drizzle, driver `pg`)
 │       │   ├── schema/            (Drizzle schema - IMPLEMENTADO)
 │       │   │   ├── municipios.ts
 │       │   │   ├── unidades_espaciais.ts
-│       │   │   ├── mmgd_indicadores.ts
-│       │   │   ├── indicadores_sociais.ts
+│       │   │   ├── mmgd_indicadores.ts   (+ potenciaResidencialKw/numeroUcsResidencial, migration 0020)
+│       │   │   ├── indicadores_sociais.ts (+ percentualPobrezaCadunico, drift da migration 0013 corrigido 07/07/2026)
 │       │   │   ├── irradiacao_solar.ts
+│       │   │   ├── indicadores_climaticos.ts
 │       │   │   └── index.ts
-│       │   └── migrations/        (SQL incremental - IMPLEMENTADO, 0000 a 0018)
+│       │   └── migrations/        (SQL incremental - IMPLEMENTADO, 0000 a 0020)
 │       │       ├── 0000_criacao_tabelas.sql
 │       │       ├── 0001_extensoes_e_indices_espaciais.sql
 │       │       ├── ... (0002 a 0010: infraestrutura, renda, capital humano,
@@ -175,7 +233,25 @@ Makefile.
 │       │       ├── 0015_view_ivs_consolidado.sql
 │       │       ├── 0016_indicadores_sociais_tipo_domicilio.sql
 │       │       ├── 0017_indicadores_sociais_rdpc.sql
-│       │       └── 0018_indicadores_sociais_tarifa_residencial.sql
+│       │       ├── 0018_indicadores_sociais_tarifa_residencial.sql
+│       │       ├── 0019_criacao_indicadores_climaticos.sql
+│       │       └── 0020_mmgd_indicadores_residencial.sql  (NOVO 07/07/2026 - ver "Backend
+│       │           Node/Express" em Estado Real do Projeto)
+│       ├── middlewares/            (IMPLEMENTADO 07/07/2026)
+│       │   ├── validateRequest.ts  (validação zod genérica, por query/body/params)
+│       │   └── errorHandler.ts     (JSON de erro consistente + notFoundHandler)
+│       ├── routes/                 (IMPLEMENTADO 07/07/2026)
+│       │   ├── index.ts            (agrega routers sob /api)
+│       │   └── vaziosDeAcesso.routes.ts
+│       ├── controllers/            (IMPLEMENTADO 07/07/2026)
+│       │   └── vaziosDeAcesso.controller.ts
+│       ├── services/                (IMPLEMENTADO 07/07/2026 - lógica de negócio isolada aqui)
+│       │   └── vaziosDeAcesso.service.ts  (RF-055/056/057 - ver docstring do arquivo
+│       │       para a metodologia completa)
+│       ├── schemas/                 (IMPLEMENTADO 07/07/2026 - contratos zod)
+│       │   └── vaziosDeAcesso.schema.ts
+│       └── utils/
+│           └── AppError.ts
 │       └── etl/
 │           ├── venv/               (ambiente Python isolado - nao versionado)
 │           ├── data/raw/           (shapefiles/CSVs baixados - nao versionado,
@@ -205,10 +281,26 @@ Makefile.
 │           │   ├── mapear_desempenho_conexao_mmgd_nacional.py
 │           │   ├── construir_ranking_distribuidoras_conexao_mmgd.py
 │           │   ├── verificar_preenchimento_indicadores_sociais.py
-│           │   └── diagnosticar_estado_geral_banco.py
-│           └── loaders/            (extractors - IMPLEMENTADO, 19 scripts)
+│           │   ├── diagnosticar_estado_geral_banco.py
+│           │   ├── investigar_clima_ressarcimento_danos_eletricos.py
+│           │   ├── diagnosticar_leitura_merge_grib2.py
+│           │   ├── diagnosticar_leitura_era5_rajada_vento.py
+│           │   ├── diagnosticar_convencao_longitude_merge.py
+│           │   ├── prova_conceito_merge_precipitacao_x_inmet.py
+│           │   ├── prova_conceito_era5_vento_x_inmet.py
+│           │   ├── prova_conceito_zonal_statistics_merge_precipitacao.py
+│           │   ├── prova_conceito_zonal_statistics_era5_vento.py
+│           │   ├── escalar_merge_precipitacao_nacional.py
+│           │   ├── escalar_era5_vento_nacional.py
+│           │   ├── consolidar_parquets_climaticos.py
+│           │   └── investigar_clima_ressarcimento_cobertura_nacional.py
+│           │       (linha de investigacao "Queima de equipamentos" completa - ver
+│           │        ARQUITETURA.md; vento (ERA5) NAO virou indicador formal, so chuva)
+│           └── loaders/            (extractors - IMPLEMENTADO, 20 scripts)
 │               ├── seed_municipios.py
-│               ├── extrair_mmgd_aneel.py
+│               ├── extrair_mmgd_aneel.py       (ATUALIZADO 07/07/2026 - agora tambem
+│               │   classifica e persiste potencia_residencial_kw/numero_ucs_residencial,
+│               │   migration 0020, ver "Backend Node/Express" em Estado Real do Projeto)
 │               ├── extrair_infraestrutura_censo.py
 │               ├── extrair_renda_trabalho_rais.py
 │               ├── extrair_alfabetizacao_censo.py
@@ -228,7 +320,8 @@ Makefile.
 │               ├── seed_aeis_rio.py
 │               ├── extrair_irradiacao_solar_inpe.py
 │               ├── extrair_tarifa_distribuidoras.py
-│               └── validar_aneel_real.py
+│               ├── validar_aneel_real.py
+│               └── extrair_precipitacao_mensal_merge.py
 ├── frontend/                       (estrutura de pastas existe, vazia - NAO INICIADO)
 │   ├── pages/
 │   ├── components/
@@ -239,7 +332,11 @@ Makefile.
 ├── docs/
 │   ├── DRF.md
 │   ├── PLANO_MORADIA_TERRITORIO_POPULAR.md
-│   └── PLANO_QUALIDADE_FORNECIMENTO_BDGD.md
+│   ├── PLANO_QUALIDADE_FORNECIMENTO_BDGD.md
+│   └── backend/                    (NOVO 07/07/2026 - biblioteca de receitas
+│       praticas do backend, formato inspirado no Claude Cookbook oficial da
+│       Anthropic, conteudo proprio do Atlas - ver README.md da pasta para o
+│       indice, e Secao 4 abaixo para como ela se relaciona com este documento)
 ├── ARQUITETURA.md                   (estado dos dados, decisoes de fonte, fila de trabalho)
 ├── CLAUDE.md
 ├── README.md
@@ -277,6 +374,14 @@ stack tecnológica, estrutura de pastas, convenções de código, tratamento de 
 ---
 
 ## 4️⃣ Padrões de Código
+
+> 📚 **[`docs/backend/`](./docs/backend/README.md)** é a biblioteca de receitas
+> práticas que acompanha esta seção — formato inspirado no [Claude Cookbook oficial
+> da Anthropic](https://github.com/anthropics/claude-cookbooks) (receitas curtas:
+> problema → código real → por quê), mas com conteúdo 100% próprio do Atlas. Esta
+> seção diz **a regra**; `docs/backend/` mostra **o exemplo de trabalho**, com o
+> código real do repositório e as armadilhas já encontradas. Consultar antes de
+> escrever um extractor novo, um endpoint novo, ou uma tabela com geometria.
 
 ### 🔹 React — PLANEJADO (frontend não iniciado)
 - Apenas componentes funcionais, hooks, props tipadas via `interface`

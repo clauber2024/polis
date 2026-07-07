@@ -26,7 +26,7 @@ import {
   timestamp,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
-import { unidadesEspaciais } from './unidades_espaciais';
+import { unidadesEspaciais } from './unidades_espaciais.js';
 
 export const mmgdIndicadores = pgTable(
   'mmgd_indicadores',
@@ -47,6 +47,24 @@ export const mmgdIndicadores = pgTable(
     potenciaInstaladaKw: doublePrecision('potencia_instalada_kw').notNull(),
 
     numeroUcsComMmgd: integer('numero_ucs_com_mmgd').notNull(),
+
+    /**
+     * Potência instalada (kW) apenas dos empreendimentos com
+     * DscClasseConsumo = 'Residencial' na fonte ANEEL — subconjunto de
+     * potenciaInstaladaKw (TOTAL, todas as classes). Adicionada na migration
+     * 0020 para suportar a metodologia de "Vazio de Acesso" (RF-055/056/057,
+     * ver ARQUITETURA.md), que usa MMGD RESIDENCIAL per capita como eixo Y —
+     * o total mistura agronegócio/irrigação e distorce a classificação.
+     * NULL para snapshots carregados antes da migration 0020 (é preciso
+     * rodar extrair_mmgd_aneel.py novamente para preencher).
+     */
+    potenciaResidencialKw: doublePrecision('potencia_residencial_kw'),
+
+    /**
+     * Nº de UCs com MMGD (QtdUCRecebeCredito somado) apenas da classe
+     * Residencial — mesmo racional de potenciaResidencialKw acima.
+     */
+    numeroUcsResidencial: integer('numero_ucs_residencial'),
 
     totalUcsMunicipio: integer('total_ucs_municipio'),
 

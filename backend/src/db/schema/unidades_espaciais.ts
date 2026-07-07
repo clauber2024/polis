@@ -39,7 +39,7 @@ import {
   customType,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
-import { municipios } from './municipios';
+import { municipios } from './municipios.js';
 
 /**
  * Geometria genérica — aqui usamos 'Geometry' (não 'MultiPolygon' como em

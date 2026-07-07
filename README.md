@@ -25,7 +25,7 @@ urbana, CEP ou bairro) conforme novas fontes de dados se tornem disponíveis —
 | Dimensão | Cobertura | Fonte | Status |
 |---|---|---|---|
 | Território (municípios) | 5.573 municípios, geometria real | IBGE, Malha Municipal 2025 | ✅ Completo |
-| MMGD instalada | 5.567 municípios, 50.086 MW, 8M UCs (quebra por classe Residencial/Rural/Outras disponível via Parquet bruto) | ANEEL, snapshot jun/2026 | ✅ Completo |
+| MMGD instalada | 5.567 municípios, 50.086 MW, 8M UCs (quebra Residencial persistida em `mmgd_indicadores` desde a migration 0020, 07/07/2026 — Rural/Outras seguem disponíveis só via Parquet bruto) | ANEEL, snapshot jun/2026 | ✅ Completo |
 | Infraestrutura Urbana | 5.570 municípios, 5 indicadores + índice composto (Índice de Precariedade de Infraestrutura) | Censo 2022/SIDRA | ✅ Completo |
 | Renda e Trabalho | 5.571 municípios (RAIS) + RDPC — Rendimento Domiciliar Per Capita, 5.570 municípios (renda de todas as fontes, não só trabalho formal) | RAIS ano-base 2024 (BigQuery) + Censo 2022/SIDRA 10295-10296 | ✅ Completo |
 | Capital Humano | 5.570 municípios (alfabetização + mortalidade infantil) + CadÚnico (cobertura e % pobreza, 5.570 municípios, dez/2025) | Censo 2022/SIDRA + SIM/SINASC-DATASUS (BigQuery, média 2022-2024) + MDS/SAGI (Solr "MI Social") | ✅ Completo |
@@ -96,7 +96,7 @@ explicado por tarifa histórica mais baixa da distribuidora local).
 
 ## Stack técnica
 
-- **Backend:** Node.js 20+, TypeScript, Express, Drizzle ORM
+- **Backend:** Node.js 20+, TypeScript, Express, Drizzle ORM (1 endpoint real desde 07/07/2026 — `GET /api/vazios-de-acesso`; demais rotas do DRF ainda não implementadas)
 - **Banco de dados:** PostgreSQL 16 + PostGIS 3.4 (SIRGAS 2000 / EPSG:4674)
 - **ETL:** Python 3.12+ (venv isolado), pandas, geopandas, SQLAlchemy, google-cloud-bigquery
 - **Frontend:** React 19, TypeScript, Vite, Tailwind CSS, MapLibre GL JS (ainda não iniciado)
@@ -118,6 +118,9 @@ Detalhamento completo de padrões de código, banco de dados, deploy e Git em
   inadequação habitacional, tipologias populares)
 - [`docs/PLANO_QUALIDADE_FORNECIMENTO_BDGD.md`](./docs/PLANO_QUALIDADE_FORNECIMENTO_BDGD.md) —
   plano da dimensão Qualidade de Fornecimento de Energia (FIC/DIC via BDGD/ANEEL)
+- [`docs/backend/`](./docs/backend/README.md) — biblioteca de receitas práticas do
+  backend (ETL Python, API Express, schema PostGIS/Drizzle), formato inspirado no
+  Claude Cookbook oficial da Anthropic
 
 ---
 
@@ -177,10 +180,31 @@ docker compose exec -T postgres psql -U atlas -d atlas_solar_justo < backend/src
 # Analise exploratoria (opcional, so leitura - nao faz parte da carga de dados,
 # requer scipy: pip install scipy --break-system-packages, ver ARQUITETURA.md):
 python3 backend/src/etl/analises/analisar_correlacao_mmgd_renda.py
+
+# migration 0020 (persiste a quebra MMGD Residencial - necessaria para o
+# endpoint de Vazios de Acesso abaixo) + re-executar o extractor de MMGD:
+docker compose exec -T postgres psql -U atlas -d atlas_solar_justo < backend/src/db/migrations/0020_mmgd_indicadores_residencial.sql
+python3 backend/src/etl/loaders/extrair_mmgd_aneel.py
 ```
 
-O backend/frontend ainda não foram implementados nesta fase do projeto — o trabalho até aqui
-se concentrou em construir e validar a camada de dados (schema + ETL).
+### Backend (Node/Express)
+
+```bash
+cd backend
+cp .env.example .env   # ajuste DATABASE_URL se necessario
+npm install
+npm run dev             # http://localhost:3000 - GET /api/vazios-de-acesso, GET /health
+```
+
+Requer a migration 0020 aplicada e `extrair_mmgd_aneel.py` executado (ver acima) para o
+endpoint `GET /api/vazios-de-acesso` refletir os numeros ja validados em ARQUITETURA.md
+(secao "Identificacao e ranking de Vazios de Acesso") — sem isso, municipios com snapshot
+de MMGD anterior a migration 0020 ficam fora da classificacao (ver campo
+`avisos.totalPrecisaReextrairMmgd` na resposta).
+
+O frontend ainda não foi implementado nesta fase do projeto. O backend tem, até aqui, 1
+endpoint real — o trabalho anterior se concentrou em construir e validar a camada de dados
+(schema + ETL).
 
 Para a etapa de RAIS via BigQuery, é necessária autenticação prévia:
 ```bash
