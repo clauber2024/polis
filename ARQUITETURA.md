@@ -1289,6 +1289,139 @@ grave e enganoso (ausencia de dado, nao desempenho). Continua NAO
 PRIORIZADO como item da fila de dados - registrado aqui como insumo pronto
 para quando o produto for priorizado.
 
+**DECISAO DE ESCOPO (sessao 06/07/2026, a pedido do usuario): produto
+PRIORIZADO.** Duas decisoes de escopo tomadas: (1) ESCOPO = tecnico +
+justica energetica (nao so desempenho de conexao isolado); (2)
+GRANULARIDADE = nacional por distribuidora (nao por UF/regiao).
+
+Script criado: `backend/src/etl/analises/
+construir_ranking_distribuidoras_conexao_mmgd.py` - PROTOTIPO DE VALIDACAO
+(mesma ressalva de `identificar_vazios_de_acesso.py`: a logica de cruzamento
+e composicao do score deve ser reimplementada no backend Node/Express quando
+ele existir). Reaproveita o CSV tecnico ja gerado por
+`mapear_desempenho_conexao_mmgd_nacional.py` (sem recalcular/rebaixar nada) e
+os indicadores sociais + mapeamento municipio->distribuidora ja usados em
+`investigar_distribuidora_regioes_problema.py` (`carregar_dados`,
+`carregar_municipio_distribuidora`).
+
+**ACHADO METODOLOGICO CENTRAL: o dataset de fila de conexao
+(`SigAgenteDistribuicao`) e o schema INDQUAL (`sig_agente`) usam
+nomenclaturas DIFERENTES para a mesma distribuidora** (ex.: "Equatorial MA"
+vs. "EQUATORIAL MA"; "Neoenergia Coelba" vs. "COELBA"). O script tenta casar
+automaticamente (normalizacao + contencao de substring em ambas direcoes),
+aplica equivalencias MANUAIS ja confirmadas em sessoes anteriores (EMT/EMS
+= Energisa MT/MS, Enel GO = EQUATORIAL GO - ver "Teste do mecanismo tarifa"
+e achados de nome de agente no Centro-Oeste), e IMPRIME toda distribuidora
+sem par encontrado - essas ficam de fora do eixo de justica energetica (mas
+continuam no ranking tecnico), em vez de arriscar cruzamento errado.
+
+Composicao do score (mesma convencao dos indices ja usados no projeto -
+normalizacao min-max, 0=melhor/1=pior): eixo tecnico = media de (1-%conectado
+normalizado) e (1-%dentro do prazo normalizado, SO quando `prazo_confiavel`
+- as 11 distribuidoras com DatLim ausente usam so a metrica de conexao,
+marcadas explicitamente, nunca tratadas como "0% no prazo"); eixo justica =
+IVS medio (simples, nao ponderado por populacao) dos municipios atendidos
+pela distribuidora; score composto = media dos dois eixos, so quando ambos
+disponiveis (`score_apenas_tecnico` marca quando a distribuidora nao tem par
+no INDQUAL). Exporta CSV local (nao versionado) com o ranking completo.
+Ainda NAO EXECUTADO - proximo passo: rodar e registrar resultado aqui
+(precisa do banco Postgres local rodando, ja que carrega indicadores
+sociais via `carregar_dados`/`carregar_municipio_distribuidora`, diferente
+dos scripts anteriores desta linha que so leem Parquet/CSV locais).
+
+**1a EXECUCAO (06/07/2026): so 26/52 distribuidoras casaram com o INDQUAL -
+corrigido apos achar um bug de codigo e consultar a lista real de
+sig_agente.** Bug: o filtro de contencao de substring exigia
+`len(norm_fila) >= 4`, o que zerava candidatos sempre que o nome do lado da
+fila de conexao tinha so 3 caracteres (bloqueou "RGE", a maior distribuidora
+do RS, 4,77M pedidos, de casar). Corrigido - siglas curtas sao normais neste
+dominio (EMT, EMS, RGE, EPB...).
+
+Consultado `SELECT DISTINCT sig_agente FROM qualidade_conjuntos` (115 siglas
+reais) para completar o mapeamento manual com confianca, em vez de assumir.
+Adicionadas ao script: Energisa PB=EPB, Energisa SE=ESE, Energisa RO=ERO,
+Energisa TO=ETO, Energisa AC=EAC, Energisa Borborema=EBO, Energisa Minas
+Rio=EMR, Energisa Sul-Sudeste=ESS (todas de alta confianca - mesmo padrao
+"Energisa"+sigla de 3 letras ja confirmado para EMT/EMS); Enel SP=ELETROPAULO
+(Enel adquiriu a AES Eletropaulo em 2018, mesmo padrao do caso Enel GO/
+Equatorial GO); Amazonas Energia=AME e CEEE Equatorial=CEEE-D (Equatorial
+adquiriu a CEEE-D/RS em 2021, mesmo padrao); Roraima Energia=BOA VISTA
+(historico: federalizada 2001 -> "Boa Vista Energia" -> privatizada e
+renomeada "Roraima Energia" 2021 - CONFIANCA MENOR que as demais, conferir
+antes de publicar).
+
+CASO AMBIGUO deixado sem mapeamento manual de proposito: "RGE" (fila de
+conexao) pode corresponder a "RGE" OU "RGE SUL" no INDQUAL (ambos existem
+como sig_agente distintos, possivel resquicio da fusao RGE/AES Sul pos-2021)
+- casamento automatico vai achar os 2 candidatos e corretamente marcar como
+"sem par unico" em vez de escolher errado.
+
+**ACHADO ADICIONAL: varias distribuidoras pequenas (Chesp, Cocel,
+Cooperalianca, Demei, Eflul, Hidropan, Mux Energia) EXISTEM no INDQUAL com
+nome identico ao da fila de conexao, mas mesmo assim nao casaram na 1a
+execucao - a causa provavel NAO e nome, e sim cobertura: essas distribuidoras
+tem 0 registros em `qualidade_conjunto_municipio` (nenhum municipio
+associado ao seu "conjunto" nessa tabela), entao nunca aparecem no resultado
+de `carregar_municipio_distribuidora`. Outras (Dmed, Forcel, João Cesa, Nova
+Palma, Santa Maria) simplesmente NAO EXISTEM na lista de sig_agente do
+INDQUAL - provavelmente pequenas demais para estarem sujeitas ao reporte de
+qualidade (DEC/FEC). Nenhuma acao tomada sobre isso ainda - registrado para
+nao confundir numa leitura futura do "AVISO" de nomes sem par.
+
+Proximo passo: rodar de novo com a correcao + mapeamento ampliado e
+registrar o resultado final aqui.
+
+**RESULTADO FINAL (2a execucao, 06/07/2026): 39/52 distribuidoras casadas com
+o INDQUAL (antes 26/52).** As 13 restantes sem par: CPFL Santa Cruz, Chesp,
+Cocel, Cooperalianca, Demei, Dmed, Eflul, Forcel, Hidropan, Joao Cesa, Mux
+Energia, Nova Palma, Santa Maria - a maioria pequenas distribuidoras
+municipais/cooperativas do Sul. Confirmado o palpite registrado acima: varias
+delas (Chesp, Cocel, Cooperalianca, Demei, Eflul, Hidropan, Mux Energia,
+tambem Energisa Borborema apesar do crosswalk EBO ter funcionado) aparecem no
+CSV final com `ivs_medio` NaN mesmo quando o nome bateu - confirma que o
+problema e cobertura (conjunto sem municipio associado em
+`qualidade_conjunto_municipio`), nao nomenclatura.
+
+CSV final salvo em `backend/src/etl/data/raw/aneel_fila_conexao_mmgd/
+ranking_distribuidoras_mmgd.csv` (52 distribuidoras, ordenado por score
+composto, menor = melhor).
+
+**Leitura do ranking (metodologica, nao definitiva):**
+- Topo do ranking (score ~0,00-0,17): quase todo composto por pequenas
+  distribuidoras municipais/cooperativas do Sul (Demei, Dmed, Joao Cesa, Mux
+  Energia, Hidropan, Eflul, Cooperalianca, Cocel, Forcel) com
+  `score_apenas_tecnico=True` - ou seja, o "0,00" delas reflete SO o eixo
+  tecnico (sem par no INDQUAL para o eixo de justica), nao e diretamente
+  comparavel ao score das distribuidoras com os dois eixos. Qualquer versao
+  publica precisa deixar isso visualmente claro (selo "sem dado de justica
+  energetica"), nao só a nota de rodapé.
+- Das distribuidoras grandes com os dois eixos calculados: RGE (0,292), CPFL
+  Paulista (0,297) e Neoenergia Brasilia (0,303) tem os melhores scores
+  compostos; Energisa PB (0,637), Cemig-D (0,630, sem prazo confiavel) e CEA
+  Equatorial (0,614, sem prazo confiavel) tem os piores.
+- Todas as subsidiarias da Equatorial fora de Goias (PI 0,459, PA 0,471, MA
+  0,490, AL 0,589, CEA/AP 0,614) ficam concentradas na metade pior do
+  ranking - mas ATENCAO METODOLOGICA: parte disso reflete o eixo de justica
+  (IVS medio dos municipios atendidos - MA, PI, AL, PA sao estados com IVS
+  sistematicamente mais alto/pior no pais), nao so desempenho operacional.
+  Um score composto ruim aqui sinaliza "area de atencao prioritaria"
+  (operacao + vulnerabilidade social somadas), nao necessariamente "pior
+  distribuidora do Brasil em desempenho puro" - importante essa distincao
+  ficar clara em qualquer exibicao publica, para nao virar uma leitura
+  simplista de "a Equatorial e a pior empresa do Brasil".
+
+**Status do produto:** prototipo de validacao funcional, PRIORIZADO pelo
+usuario (decisao desta sessao). Falta, antes de uma versao publica real:
+(1) mover a logica para o backend Node/Express quando ele existir (mesma
+ressalva de sempre para prototipos desta pasta `analises/`); (2) decidir
+tratamento visual dos casos `score_apenas_tecnico=True` e
+`prazo_confiavel=False` (nao esconder, mas nao deixar comparar como se fosse
+igual); (3) considerar ponderar o IVS medio por populacao do municipio (hoje
+e media simples, mesma limitacao ja assumida em outros cruzamentos deste
+projeto); (4) decidir se cabe nota metodologica explicita sobre a
+concentracao da Equatorial fora-GO no fundo do ranking refletir tambem
+regiao/vulnerabilidade social, nao so desempenho.
+
 
 ## Manutencao deste documento
 

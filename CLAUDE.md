@@ -203,6 +203,7 @@ Makefile.
 │           │   ├── investigar_tarifa_nordeste_equatorial.py
 │           │   ├── investigar_fila_conexao_mmgd_nordeste.py
 │           │   ├── mapear_desempenho_conexao_mmgd_nacional.py
+│           │   ├── construir_ranking_distribuidoras_conexao_mmgd.py
 │           │   ├── verificar_preenchimento_indicadores_sociais.py
 │           │   └── diagnosticar_estado_geral_banco.py
 │           └── loaders/            (extractors - IMPLEMENTADO, 19 scripts)
