@@ -598,16 +598,584 @@ analise de correlacao abaixo), `0017_indicadores_sociais_rdpc.sql` (`renda_per_c
 - **Perdas tecnicas e nao tecnicas** (ANEEL) - indicador de justica energetica
   potencialmente forte: perdas nao tecnicas (furto/fraude) tendem a concentrar em
   areas de baixa renda e correlacionam com fiscalizacao/corte mais agressivos nessas
-  regioes. Nao investigado ainda se esta no Portal de Dados Abertos, granularidade
-  (distribuidora? conjunto? municipio?) e formato. Levantado em sessao de 03/07/2026,
-  ainda sem pesquisa de viabilidade.
+  regioes. Levantado em sessao de 03/07/2026.
+
+  **PESQUISA DE VIABILIDADE - 1a PASSADA (sessao 07/07/2026, so via busca web,
+  Chrome indisponivel na hora) achou o dataset mas nao confirmava colunas reais.**
+
+  **CONFIRMADO por inspecao direta (sessao 07/07/2026, Chrome reconectado,
+  dicionario de dados real + API `datastore_search` consultada ao vivo):**
+  - Dataset: **SAMP - Balanco** (`dadosabertos.aneel.gov.br/dataset/samp-balanco`),
+    542.641 linhas, mensal desde 2003, atualizado mensalmente (ultima carga
+    15/06/2026). Base legal: Resolucao Normativa ANEEL 1.003/2022.
+  - **Colunas reais (12)**: `DatGeracaoConjuntoDados`, `NumCPFCNPJ`, `NomAgente`,
+    `AnmCompetenciaBalanco`, `DscModalidadeBalanco`, `DscFluxoEnergia`,
+    `DscCctBalanco`, `DscClassificacaoAgente`, `AnoReferenciaBalanco`,
+    `MesReferenciaBalanco`, `DscDetalheBalanco`, `VlrEnergia`.
+  - **GRANULARIDADE CONFIRMADA: por DISTRIBUIDORA (CNPJ/NomAgente) x mes, SEM
+    NENHUM campo de municipio/conjunto** - confirma a suspeita original. Diferente
+    de MMGD, indicadores sociais e INDQUAL (municipio nativo ou resolvido via
+    tabela de juncao), este indicador so entraria no Atlas via desagregacao
+    (ex.: proporcional ao mercado consumidor por municipio, usando a BDGD como
+    peso) - esforco de engenharia bem maior que os extractors atuais.
+  - **CONFIRMADO: perdas Tecnicas e Nao-Tecnicas SAO segregadas**, como VALORES
+    categoricos do campo `DscCctBalanco` (nao colunas proprias): "Perdas Tecnicas",
+    "Perdas Nao-Tecnicas", "Perdas Totais", sob `DscModalidadeBalanco` = "Perdas na
+    Distribuicao (valor medido)" OU "(valor faturado)" - ambas as visoes (medida e
+    faturada) existem, em kWh (`VlrEnergia`). Exemplo real (Energisa Acre,
+    2003-01): Perdas Tecnicas = 6.109.263 kWh, Perdas Nao-Tecnicas = 9.974.728 kWh,
+    Perdas Totais = 16.083.991 kWh (valor medido). 125.341 das 542.641 linhas
+    totais contem "Perda" no `DscModalidadeBalanco` - dado rico e bem populado.
+  - **CONCLUSAO**: dado real, rico e de boa qualidade, mas o GARGALO CONTINUA
+    sendo granularidade por distribuidora (nao municipio) - confirmado, nao so
+    suspeitado. Se este indicador for priorizado, o proximo passo e desenhar a
+    metodologia de desagregacao municipal (nao um extractor simples de upsert
+    direto como os demais).
+
 - **Queima de equipamentos** (transformadores/eletrodomesticos por sobretensao) -
   tende a concentrar onde a rede tem pouca protecao (para-raios, aterramento)
   combinado com alta incidencia de raios (densidade de descargas atmosfericas maior
-  em partes do Centro-Oeste/Norte). Possivel cruzamento: dados de protecao de rede
-  (BDGD) x mapas de densidade de raios (INPE/ELAT tem esse dado). Nao investigado
-  ainda se ANEEL disponibiliza reclamacoes/ressarcimentos por queima de equipamento
-  em dataset aberto. Levantado em 03/07/2026.
+  em partes do Centro-Oeste/Norte). Levantado em 03/07/2026.
+
+  **PESQUISA DE VIABILIDADE - 1a PASSADA (sessao 07/07/2026, so busca web) achou
+  os datasets candidatos mas sem confirmar colunas reais.**
+
+  **CONFIRMADO por inspecao direta (sessao 07/07/2026, Chrome reconectado):**
+  - Dataset do lado do RESSARCIMENTO: **INDGER - Dados Comerciais**
+    (`indger-dados-comerciais.csv`, dentro de "INDGER - Indicadores Gerenciais da
+    Distribuicao"), 63 colunas, mensal desde dez/2023, atualizado 5/07/2026 (dado
+    bem recente). Base legal do ressarcimento: Resolucao Normativa ANEEL 1.000/2021.
+  - **ACHADO IMPORTANTE - GRANULARIDADE MUNICIPAL CONFIRMADA**: o dicionario real
+    tem a coluna `CodMunicipioIBGE` (campo 7 de 63) - diferente do SAMP-Balanco
+    acima, este dataset JA VEM em nivel municipio x distribuidora (`SigAgente`) x
+    mes (`DatReferenciaInformada`), o MESMO padrao de granularidade que MMGD,
+    INDQUAL e indicadores sociais ja usam no projeto. Isso muda a avaliacao:
+    diferente de perdas tecnicas (acima), este indicador poderia entrar no Atlas
+    como um extractor comum (upsert direto por municipio), sem desagregacao.
+  - **Colunas relevantes para ressarcimento por dano** (de 63 totais):
+    `QtdSolicRessarcimentoDano` (qtd de solicitacoes), `QtdRessarcIndeferido`
+    (indeferidas), `VlrPendentePgtRessarcDanoDefe` (valor pendente de pagamento,
+    deferido), `VlrPagoRessarcDano` (valor efetivamente pago).
+  - **LIMITACAO CONFIRMADA**: o dataset NAO tem nenhum campo de CAUSA do dano
+    (raio/sobretensao atmosferica vs. outras causas) - so conta solicitacoes e
+    valores, sem classificar motivo. Ou seja, `QtdSolicRessarcimentoDano` e um
+    proxy de "danos eletricos em geral" (queima de equipamento por qualquer
+    causa - sobretensao de rede, oscilacao, raio etc.), nao um indicador
+    especifico de raio. O cruzamento com densidade de raios (INPE/ELAT, abaixo)
+    seria uma correlacao INFERIDA (mais fraco que os raio-a-raio de ressarcimento
+    que a hipotese original supunha), nao uma causa ja rotulada na fonte.
+  - Densidade de raios (INPE/ELAT): mesma avaliacao da 1a passada - dado real
+    existe ("Densidade de Descargas Atmosfericas (Ng)", `data.inpe.br/geonetwork`,
+    climatologia TRMM/LIS 1988-2011, mesmo padrao ja aceito no projeto para
+    Irradiacao Solar/INPE), mas em formato raster/shapefile nacional, exigindo
+    processamento GIS (agregacao por poligono municipal via PostGIS) - nao
+    confirmado via inspecao direta nesta sessao (manual do BDGD e a pagina do
+    geonetwork sao PDF/canvas, nao extraiveis como texto pelo navegador).
+  - Protecao de rede (para-raios/aterramento) na BDGD: **AINDA NAO CONFIRMADO** -
+    tentativa de ler o Manual de Instrucoes da BDGD falhou (PDF renderizado como
+    imagem/canvas, sem texto extraivel) e busca web nao achou o codigo de
+    entidade especifico. Recomendacao: **abandonar esse eixo do cruzamento
+    original** (proteção de rede como moderador) a menos que alguem consiga
+    abrir o PDF manualmente e confirmar - nao vale mais tempo de busca as cegas.
+  - **AVALIACAO GERAL ATUALIZADA**: o indicador de RESSARCIMENTO POR DANOS
+    ELETRICOS (sozinho, sem a hipotese de causa-raio) e VIAVEL e muito mais
+    simples do que se pensava - vem em nivel municipal nativo, mesmo padrao dos
+    extractors existentes. A hipotese ORIGINAL (queima por sobretensao de raio
+    especificamente, cruzando com protecao de rede) fica mais fraca - o dado nao
+    distingue causa, e o lado de protecao de rede segue nao confirmado. Duas
+    linhas de produto possiveis daqui: (a) mais simples, indicador de "danos
+    eletricos per capita" por municipio (proxy geral de qualidade/confiabilidade
+    da rede, sem atribuir causa) - viavel como extractor comum; (b) mais ambiciosa
+    e ainda especulativa, correlacionar esse indicador com densidade de raios do
+    INPE via GIS, sabendo que a causalidade fica inferida, nao confirmada pela
+    fonte.
+  - **PROXIMO PASSO CONCRETO se priorizado**: (1) desenhar extractor de
+    `indger-dados-comerciais.csv` (padrao ja usado no projeto, upsert por
+    municipio) para `QtdSolicRessarcimentoDano`/`VlrPagoRessarcDano`; (2) se
+    quiser seguir com o cruzamento de raios, avaliar o esforco de processar o
+    raster do INPE via PostGIS antes de comprometer a sessao a isso.
+
+  **PESQUISA DE VIABILIDADE - cobertura nacional (MERGE/ERA5), sessao
+  07/07/2026, apos o sinal robusto na amostra restrita a estacoes INMET
+  (ver secao de resultado do script mais abaixo):**
+
+  - **Precipitacao - MERGE/CPTEC-INPE: CONFIRMADO, viavel, sem conta/login.**
+    FTP publico `ftp.cptec.inpe.br/modelos/tempo/MERGE/GPM/DAILY/` - 1 arquivo
+    `.grib2` por dia desde 1998 (confirmado ate 2026), grade nacional
+    (America do Sul), resolucao **0,1 grau (~11 km)**, confirmada lendo o
+    `.ctl` real (`xdef 1001 linear -120.05 0.1`, `ydef 924 linear -60.05
+    0.1`). Variavel `PREC` = precipitacao de superficie (kg/m² = mm,
+    acumulado 24h) + `NEST` = numero de estacoes pluviometricas que
+    alimentaram aquele ponto de grade (proxy de confianca - `NEST=0` e
+    puramente satelite, sem gauge local). Fonte: GPM-IMERG V07B (satelite)
+    fundido com rede de pluviometros - mesmo raciocinio ja aceito no projeto
+    para o Atlas de Irradiacao Solar do proprio INPE (produto "gridded" de
+    referencia em vez de interpolacao propria). Arquivos pequenos (~400
+    KB/dia) - 2 anos (2024-2025) e ~300 MB, tranquilo de baixar.
+
+  **DIAGNOSTICO ESTAGIO 0 (executado 07/07/2026) - leitura MERGE confirmada,
+  COM RESSALVA IMPORTANTE:** `diagnosticar_leitura_merge_grib2.py` baixou e
+  leu com sucesso 1 dia de teste (15/01/2024) via `cfgrib`/`xarray`.
+  **Achado: o `cfgrib` renomeia as variaveis errado.** O `.ctl` oficial deste
+  arquivo (conferido via Chrome, direto no FTP) diz explicitamente que so
+  existem 2 variaveis, nesta ordem: `PREC` (precipitacao de superficie) e
+  `NEST` (numero de estacoes). O `cfgrib`, porem, rotula a 1a variavel como
+  `rdp` ("Precipitation from radar") e a 2a como `prmsl` ("Pressure reduced
+  to MSL") — rotulos ERRADOS. Causa: o CPTEC reaproveita, sem tabela local
+  propria reconhecida pelo eccodes, os mesmos codigos numericos
+  discipline/categoria/parametro que a tabela PADRAO da OMM usa para
+  "precipitacao de radar" e "pressao ao nivel do mar" — problema conhecido de
+  tabelas GRIB2 locais nao documentadas para bibliotecas genericas. A POSICAO
+  bate exatamente com o `.ctl` (1a variavel=PREC, 2a=NEST) e os valores fazem
+  sentido (NaN no canto da 2a variavel = NEST=0/undef, plausivel em area sem
+  estacao). **Regra para qualquer script que ler MERGE**: identificar a
+  variavel de precipitacao pela ORDEM/POSICAO no dataset (a primeira),
+  nunca pelo nome que o cfgrib atribui (`rdp`/`prmsl` sao rotulos genericos
+  errados, nao confiar neles).
+
+  **PROVA DE CONCEITO COMPLETA (executada 07/07/2026) - BUG ENCONTRADO E
+  CORRIGIDO: convencao de longitude.** Primeira rodada de
+  `prova_conceito_merge_precipitacao_x_inmet.py` (15 municipios, jan/2024)
+  deu razao MERGE/INMET entre 0,01 e 0,23 - muito abaixo do plausivel
+  (esperava-se mesma ordem de grandeza). Causa confirmada com
+  `diagnosticar_convencao_longitude_merge.py`: **a grade do MERGE guarda
+  longitude na convencao 0-360° (valores reais de 239.95 a 339.95), NAO em
+  -180/180 como o `.ctl` "descreve"** (`.ctl` e um artefato do GrADS,
+  formato diferente do GRIB2 real por baixo). Sem converter, `.sel(longitude=
+  -38.51, method="nearest")` pegava o ponto MAIS PROXIMO NUMERICAMENTE dentro
+  de um array todo positivo (240 a 340) - ou seja, a BORDA OESTE da grade
+  (Pacifico), nao o Brasil. Corrigido usando `longitude % 360` (Python
+  resolve negativo corretamente: -38.51 % 360 = 321.49, testado e confirmado
+  batendo com o ponto certo). **Regra para qualquer script/extractor que ler
+  MERGE**: sempre converter longitude de municipios (-180/180, PostGIS) para
+  0-360 antes de indexar na grade - nao confiar no `.ctl` para a convencao
+  real. Latitude NAO tem esse problema (-60.05 a 32.25, mesma convencao dos
+  dois lados).
+
+  **Resultado apos a correcao (07/07/2026): POC do MERGE PASSOU.** Razao
+  MERGE/INMET entre 0,59 e 2,79 nos 13 municipios com par valido (2 dos 15,
+  Tucuma/Tucurui-PA, sem dado INMET no mes para comparar) - mesma ordem de
+  grandeza, sem viés grosseiro. **Nota metodologica sobre a tendencia de
+  MERGE > INMET em varios casos (ex.: Salvador 2,63x, Rio de Janeiro
+  2,79x)**: NAO e bug, e diferenca de JANELA DE ACUMULACAO - `precipitacao_
+  max_mes` do INMET e o pico de 1 HORA (MAX sobre microdados horarios),
+  enquanto PREC do MERGE e acumulado de 24H (`tdef 1 linear ... 24hr` no
+  `.ctl`); um dia inteiro de chuva tende a somar mais que so a hora mais
+  forte dele, entao MERGE tender a ficar ACIMA do INMET e o sentido
+  ESPERADO dessa assimetria, nao um sinal de erro. Se um extractor de
+  producao for construido, comparar contra o max DIARIO do INMET (nao o max
+  horario) seria a comparacao mais correta - nao feito aqui porque o
+  objetivo desta POC era validar o PIPELINE TECNICO (download, leitura,
+  indexacao espacial), nao a correspondencia estatistica fina entre fontes.
+
+  **CONCLUSAO DA FASE DE PROVA DE CONCEITO (07/07/2026): pipeline tecnico
+  validado para as duas variaveis (chuva via MERGE, vento via ERA5)** -
+  download, leitura GRIB2 (com os 2 gotchas documentados: renomeio de
+  variavel do cfgrib e convencao de longitude), extracao por
+  nearest-point e comparacao com INMET, tudo funcionando fim-a-fim.
+
+  **DECISAO DO USUARIO (07/07/2026): construir zonal statistics real ANTES
+  de escalar** (em vez de escalar com a simplificacao nearest-point
+  primeiro). Feito com `prova_conceito_zonal_statistics_merge_precipitacao.py`,
+  usando `rasterstats` (CONFIRMADO que instala limpo via pip, sem GDAL de
+  sistema - traz `rasterio` com wheels pre-compiladas). **Achado tecnico
+  importante, capturado num teste sintetico ANTES de rodar contra dado
+  real**: o padrao do rasterstats (`all_touched=False`) so conta um pixel se
+  o CENTRO dele cair dentro do poligono - para municipio pequeno (menor que
+  a celula de ~11km do MERGE), isso pode dar `count=0` mesmo com sobreposicao
+  real. Corrigido usando `all_touched=True` (conta qualquer pixel que o
+  poligono tocar) - **regra para qualquer extractor de zonal statistics no
+  projeto, nao so este caso**.
+
+  **Resultado da POC de zonal statistics (jan/2024, 15 municipios):
+  validado.** Checagem de consistencia interna (zonal max >= nearest-point
+  max, que TEM que valer matematicamente se a implementacao estiver correta,
+  ja que o ponto mais proximo do centroide e um dos pixels que entram no
+  zonal) passou 15/15. Os saltos de magnitude entre zonal e nearest-point
+  foram grandes em alguns casos (ex.: Brasilia: 39,75mm nearest-point ->
+  134,44mm zonal) - **NAO e bug**: zonal MAX sobre dezenas de pixels x 31
+  dias tem uma "area de busca" estatistica muito maior que 1 unico ponto x
+  31 dias, e estatistica de MAXIMO e mecanicamente puxada pra cima quanto
+  mais se amostra (mais pixels, mais dias = mais chance de pegar um extremo
+  localizado) - propriedade esperada de estatistica de valores extremos, nao
+  reflete erro de implementacao. **Implicacao pratica importante**: o zonal
+  max do MERGE NAO e diretamente comparavel em magnitude ao pico de UMA
+  unica estacao INMET (sao medidas conceitualmente diferentes - maximo
+  espacial+temporal sobre todo o territorio do municipio vs. maximo temporal
+  de 1 ponto so) - a comparacao com INMET serve para validar ORDEM DE
+  GRANDEZA E DIRECAO (zonal >= nearest, sem valor implausivel), nao para
+  esperar numeros parecidos. Para o proposito real deste indicador (testar
+  correlacao com ressarcimento), zonal max e alias a escolha CONCEITUALMENTE
+  MAIS CORRETA: capta se ALGUM lugar do municipio teve um evento extremo no
+  mes, que e exatamente a exposicao a risco que interessa para dano
+  eletrico em qualquer ponto da rede do municipio, nao so onde a estacao
+  fica.
+
+  **Zonal statistics do ERA5/vento (07/07/2026): replicada com sucesso,
+  mesma logica do MERGE.** `prova_conceito_zonal_statistics_era5_vento.py`
+  reusou sem alteracao a formula de conversao de longitude e o flip de
+  latitude ja validados no MERGE (testados antes contra dado real com um
+  grid sintetico, incluindo o colapso `time`/`step` -> campo 2D de rajada
+  maxima do mes). Checagem de consistencia (zonal >= nearest-point) passou
+  10/10 nos municipios de teste (Nordeste, jan/2024). **Diferenca notavel em
+  relacao ao MERGE**: os saltos de magnitude zonal-vs-nearest foram bem mais
+  MODESTOS para vento (a maioria entre -5,7 e +1,4 m/s de diferenca contra
+  INMET) do que para chuva (que chegou a +90mm em Brasilia) - faz sentido
+  fisicamente: rajada de vento e um campo espacialmente mais suave/
+  homogeneo ao longo de dezenas de km do que chuva convectiva (muito
+  localizada), entao "olhar mais pixels" infla menos o maximo observado.
+  Reforca que o MERGE tende a exigir mais cautela na leitura dos numeros
+  absolutos do que o ERA5.
+
+  **CONCLUSAO: zonal statistics validada para as DUAS variaveis (chuva e
+  vento)** - metodologia pronta e testada, `all_touched=True` confirmado
+  necessario nos dois casos (ainda mais critico no ERA5, celula de ~28km
+  maior que a do MERGE ~11km).
+
+  Proximo passo: decisao do usuario sobre escalar para cobertura nacional
+  real (todos os ~5.573 municipios, 2024-2025) e rodar a correlacao com
+  ressarcimento usando essa cobertura, ao inves da amostra restrita e
+  enviesada de ~571 municipios com estacao
+  INMET propria.
+
+  **DECISAO DO USUARIO (07/07/2026): escalar.** Criados 3 scripts:
+  `escalar_merge_precipitacao_nacional.py` (baixa ~730 dias, 2024-2025, tira
+  o maximo pixel a pixel do mes via numpy ANTES de rodar zonal_stats - so 24
+  chamadas zonais, uma por mes, cobrindo todos os ~5.573 municipios de uma
+  vez, nao 5.573 x 730 - necessario para viabilizar em escala nacional);
+  `escalar_era5_vento_nacional.py` (mesma logica, bbox calculado a partir do
+  territorio real dos municipios via SQL, nao adivinhado); e
+  `investigar_clima_ressarcimento_cobertura_nacional.py` (reusa a logica de
+  ressarcimento/renda ja validada, so troca a fonte do clima pelos parquets
+  nacionais). Os 2 primeiros NAO gravam no Postgres - salvam parquet local
+  (`backend/src/etl/data/raw/clima_nacional/`), mesma postura de "ainda nao e
+  extractor formal" ja adotada no resto desta linha de investigacao -
+  decisao de formalizar (schema Drizzle) fica para depois de confirmar que o
+  sinal se sustenta em escala nacional.
+
+  **CRASH EM PRODUCAO E FIX (08/07/2026):** primeira rodada real (background,
+  nohup) do `escalar_era5_vento_nacional.py` morreu no mes 3 (marco/2024) com
+  `PermissionError: [Errno 13] Permission denied` ao tentar abrir o arquivo
+  `.grib` LOGO APOS o download terminar com sucesso. Causa mais provavel:
+  lock transitorio do OneDrive (a pasta do projeto e sincronizada, mesmo
+  quirk de atraso de sincronizacao ja documentado no CLAUDE.md/ARQUITETURA.md
+  para o par Read-tool/bash) - o arquivo grande (~44MB) provavelmente estava
+  sendo indexado/sincronizado pelo OneDrive no instante em que o script tentou
+  ler. **Falha de design mais grave que o erro em si**: a 1a versao dos 2
+  scripts de escala nacional acumulava TODOS os 24 meses em memoria e so
+  salvava 1 parquet no FINAL - o crash no mes 3 perdeu tambem o trabalho ja
+  feito nos meses 1 e 2 (que nunca tinham sido persistidos). **Corrigido nos
+  2 scripts** (`escalar_merge_precipitacao_nacional.py` e
+  `escalar_era5_vento_nacional.py`): (1) cada mes agora salva seu proprio
+  arquivo parquet assim que fica pronto (`precipitacao_por_mes/AAAA_MM.parquet`,
+  `vento_por_mes/AAAA_MM.parquet`) - rodar de novo PULA os meses ja
+  concluidos, nao perde nada num crash futuro; (2) `abrir_grib_com_retry`
+  tenta reabrir o arquivo ate 6x com espera de 5s entre tentativas antes de
+  desistir - trata o `PermissionError` como transitorio, nao fatal. Criado
+  `consolidar_parquets_climaticos.py` para juntar os parquets por mes num
+  arquivo unico por variavel (rodavel a qualquer momento, mesmo com os 24
+  meses incompletos). **Regra geral para qualquer job longo neste projeto que
+  rode sobre a pasta sincronizada por OneDrive**: sempre persistir progresso
+  incrementalmente (por unidade pequena de trabalho, ex.: por mes) em vez de
+  acumular tudo em memoria ate o final, e tratar erro de leitura logo apos
+  escrita como possivelmente transitorio (retry), nao fatal de imediato.
+
+  Execucao (download + zonal statistics para 2 anos x Brasil inteiro) ainda
+  PENDENTE de terminar - resultado nao disponivel nesta entrada.
+
+  **RESULTADO FINAL - COBERTURA NACIONAL (08/07/2026, os 2 scripts de escala
+  terminaram os 24 meses completos, `investigar_clima_ressarcimento_
+  cobertura_nacional.py` executado): 133.681 combinacoes municipio x mes,
+  5.571 municipios distintos (de 5.573 - cobertura efetivamente nacional,
+  NAO mais os ~571 restritos a estacao INMET propria).**
+
+  | Variavel | rho parcial (renda) | regioes com mesmo sinal | tercis com mesmo sinal |
+  |---|---|---|---|
+  | Precipitacao maxima do mes (MERGE, zonal) | +0,1922 (p<0,001) | 5/5 | 3/3 |
+  | Rajada de vento maxima do mes (ERA5, zonal) | +0,0793 (p<0,001) | 2/5 | 3/3 |
+
+  **Comparacao com a versao restrita a INMET (571 municipios,
+  investigar_clima_ressarcimento_danos_eletricos.py): "precipitacao robusta
+  em todos os cortes, vento robusto em todos os cortes apos corrigir o
+  artefato de painel do Nordeste".**
+
+  - **Precipitacao: sinal CONFIRMADO em escala nacional.** Robusto nas 5
+    regioes e nos 3 tercis de urbanizacao, coeficiente (+0,19) da mesma
+    ordem de grandeza da versao INMET. Boa evidencia de que o vies de
+    amostra (so municipios com estacao propria, tendencialmente maiores/
+    urbanos) NAO estava distorcendo essa conclusao - o efeito parece real e
+    generalizavel.
+  - **Vento: sinal ENFRAQUECE e fica INCONSISTENTE em escala nacional -
+    NAO confirma a robustez vista na amostra INMET.** Coeficiente cai pela
+    metade (+0,08 vs a magnitude da precipitacao) e o sinal por regiao
+    inverte em 3 das 5 (Nordeste -0,116, Norte -0,030, Sul -0,006 negativos;
+    Centro-Oeste +0,026, Sudeste +0,061 positivos) - só 2/5 regioes
+    concordam com o sinal nacional, contra 5/5 da precipitacao. **Leitura
+    mais provavel**: a robustez de vento vista na amostra INMET (so
+    municipios com estacao propria) provavelmente refletia, ao menos em
+    parte, uma caracteristica da AMOSTRA ENVIESADA (cidades maiores/mais
+    urbanizadas, com infraestrutura e padrao de rede diferentes), nao um
+    efeito climatico universal - consistente com a limitacao ja conhecida
+    do ERA5 (rajada localizada mal capturada por reanalise de ~28km) somada
+    a heterogeneidade regional de exposicao a vento severo (ex.: fenomenos
+    convectivos do Sul/Sudeste sao estruturalmente diferentes de ventos do
+    Nordeste).
+
+  **CONCLUSAO GERAL DESTA LINHA DE INVESTIGACAO (iniciada em 03/07/2026 como
+  ideia nao priorizada "Queima de equipamentos", fechada em 08/07/2026)**:
+  a hipotese de clima x ressarcimento por danos eletricos tem suporte SOLIDO
+  e GENERALIZAVEL para PRECIPITACAO (efeito modesto mas real, rho~0,19,
+  robusto em toda regiao/urbanizacao, cobertura nacional via MERGE) e
+  suporte FRACO/NAO CONFIRMADO para VENTO em escala nacional (o resultado
+  antes promissor na amostra INMET nao se sustentou - provavel artefato de
+  amostra enviesada, nao efeito real generalizado). Tratar com cautela
+  qualquer uso futuro do vento (ERA5) como indicador nesta dimensao -
+  precipitacao (MERGE) e a variavel climatica com evidencia mais solida para
+  eventualmente virar indicador formal do Atlas, se o projeto decidir seguir
+  por esse caminho (schema Drizzle, extractor em `loaders/`, ainda NAO
+  feito - toda esta investigacao permanece em `analises/`, exploratoria,
+  como o resto desta linha de trabalho).
+
+  Proximo passo (nao iniciado): decisao do usuario sobre formalizar
+  precipitacao (MERGE) como indicador do Atlas (schema + extractor formal),
+  investigar mais a fundo por que vento diverge por regiao antes de
+  descartar, ou passar para outro item da fila de trabalho.
+
+  **ERA5/vento: prova de conceito completa PASSOU de primeira, sem bug.**
+  10 municipios do Nordeste, jan/2024, razao ERA5/INMET entre 0,65 e 0,98 -
+  o ERA5 sistematicamente ABAIXO do INMET, exatamente o esperado (reanalise
+  a ~28 km borra rajadas localizadas, limitacao ja documentada acima) e sem
+  nenhum caso fisicamente implausivel (perto de zero, negativo, fora de
+  ordem). Sinal de que o pipeline ERA5 (dataset correto, deaccumulo via max
+  com skipna, sel por nearest) esta correto.
+  - **NOVA COMPLEXIDADE**: diferente dos extractors tabulares atuais, isso
+    exige (1) nova dependencia Python para ler GRIB2 (`cfgrib`/`eccodes` ou
+    `pygrib` - nenhuma delas usada no projeto ate agora; **CONFIRMADO nesta
+    sessao que `pip install cfgrib xarray eccodes` funciona sem precisar de
+    conda nem biblioteca de sistema separada**, testado num ambiente Linux
+    limpo) e (2) logica de agregacao
+    espacial (zonal statistics: para cada municipio, achar os pontos de
+    grade que caem dentro do poligono e tomar o maximo) via PostGIS/
+    `rasterstats` - padrao novo, mais parecido com o processamento de
+    territorio/geometrias do que com os extractors tabulares simples.
+  - **Vento/rajada nacional - MAIS FRACO, com atrito real.** Nao existe um
+    "MERGE do vento" brasileiro equivalente. **CORRECAO (08/07/2026): a nota
+    original abaixo estava ERRADA sobre qual produto tem a variavel de
+    rajada — verificado diretamente na documentacao do CDS antes de
+    escrever qualquer script, nao presumido.** ERA5-Land (~9 km) **NAO tem**
+    variavel de rajada — so vento sustentado (componentes u/v a 10m).
+    Rajada instantanea (`fg10`, shortName `i10fg`/`10m_wind_gust_since_
+    previous_post_processing`) so existe no **ERA5 "completo"**
+    (`reanalysis-era5-single-levels`), que tem resolucao MAIS GROSSEIRA:
+    **0,25° (~28 km)**, nao 9 km. Ou seja, a limitacao de sub-escala de
+    grade (explosao de vento localizada, ponto ja levantado abaixo) e ainda
+    mais severa do que o registrado originalmente. MAS: (1) exige CRIAR
+    CONTA no Copernicus Climate Data Store - acao que o usuario precisa
+    fazer pessoalmente, nao delegavel (feito pelo usuario em 07/07/2026);
+    (2) rajada de vento e um fenomeno de sub-escala de grade (explosao
+    localizada) que reanalises como ERA5 sao CONHECIDAS por subestimar - o
+    mesmo ponto fraco que fez a estacao INMET (medicao direta) ser mais
+    confiavel para isso, mesmo com cobertura espacial pior — agravado pela
+    resolucao de 28 km em vez dos 9 km presumidos originalmente.
+  **DIAGNOSTICO ESTAGIO 0 (executado 07/07/2026) - leitura ERA5/rajada
+  confirmada:** `diagnosticar_leitura_era5_rajada_vento.py` baixou com
+  sucesso 1 dia de teste (15/01/2024, Nordeste) via `cdsapi` (conta
+  Copernicus criada e termos aceitos pelo usuario) e leu com
+  `cfgrib`/`xarray` sem erro. Valores de `fg10` (rajada maxima desde o
+  ultimo pos-processamento) plausveis, ~6-11 m/s no recorte testado.
+  **Achado tecnico (nao e bug, e estrutura esperada do ERA5):** os campos
+  "since previous post-processing" vem organizados como `time` (ciclo de
+  previsao-base, 00Z/12Z) x `step` (passo dentro do ciclo) - o cfgrib monta
+  um hipercubo denso dessas duas dimensoes, mas so uma fatia de cada
+  combinacao (time, step) e valida; o resto vem `NaN` de proposito. O
+  horario real de cada valor esta na coordenada `valid_time`, nao em
+  `time`/`step` isolados - a prova de conceito completa precisa selecionar
+  por `valid_time` e descartar NaN antes de agregar (max diario/mensal),
+  nao tirar estatistica direto do array bruto (ver
+  github.com/ecmwf/cfgrib, discussao de campos acumulados/de-acumulacao).
+  Instalacao confirmada no venv real do projeto (nao so no ambiente de
+  teste): `pip install cdsapi cfgrib xarray eccodes` funcionou sem conda.
+
+  - **PLANO PROPOSTO** (original, antes da decisao abaixo): priorizar
+    precipitacao via MERGE primeiro (sem atrito de conta, resultado tecnico
+    mais solido) - fazer uma prova de conceito pequena (poucos dias/
+    municipios, validando contra o que o INMET ja mostrou) antes de
+    comprometer a baixar/processar 2 anos inteiros. Vento nacional ficaria
+    em segundo plano, dependente de decisao do usuario sobre criar conta no
+    Copernicus e aceitar a limitacao conhecida de subestimar picos.
+  - **DECISAO DO USUARIO (07/07/2026): seguir com OS DOIS em paralelo**
+    ("Os dois (chuva + vento)"), nao so precipitacao primeiro. Precipitacao
+    (MERGE) comeca imediatamente pela prova de conceito (sem bloqueio,
+    nenhuma acao pessoal necessaria). Vento (ERA5-Land) precisa que o
+    usuario crie a conta Copernicus CDS pessoalmente (accao que nao pode ser
+    feita em nome dele - ver instrucoes passadas na sessao) antes do script
+    correspondente poder ser escrito/testado; ate la, roda em paralelo mas
+    com inicio defasado.
+
+  **DECISAO DO USUARIO (sessao 07/07/2026): ampliar a hipotese de causa** - nao
+  restringir a raios, incluir tambem chuva (precipitacao) e vento (velocidade/
+  rajada) como possiveis fatores climaticos correlacionados com ressarcimento
+  por danos eletricos, mesmo sabendo que a relacao ficaria INFERIDA (o dado de
+  ressarcimento nao rotula causa, ver acima).
+
+  **PESQUISA DE VIABILIDADE - chuva e vento (sessao 07/07/2026, confirmado via
+  Chrome, inspecao direta da pagina Base dos Dados):**
+  - Fonte: **INMET/BDMEP** (Banco de Dados Meteorologicos para Ensino e Pesquisa),
+    ja disponivel tratado na **Base dos Dados** (`basedosdados.br_inmet_bdmep.*`)
+    - MESMA fonte/mecanismo de acesso ja usado no projeto para RAIS e Mortalidade
+      Infantil (BigQuery via `gcloud auth application-default login`), o que
+      reduz bastante o atrito de integracao comparado a uma fonte nova.
+  - Tabela `basedosdados.br_inmet_bdmep.microdados` (12,20 GB) - granularidade
+    **HORARIA por ESTACAO** (`id_estacao`, `data`, `hora`), NAO por municipio
+    diretamente. Colunas relevantes confirmadas: `precipitacao_total` (horaria),
+    `vento_velocidade` (horaria), `vento_rajada_max`, `vento_direcao` (+ outras
+    variaveis: temperatura, umidade, pressao, radiacao global). Cobertura
+    temporal gratuita: 2000-05 a 2025-12-30; dados de 2026 exigem assinatura BD
+    Pro (paga) - dados gratuitos ja cobrem 25+ anos, mais que suficiente para
+    climatologia ou serie historica.
+  - Tabela `basedosdados.br_inmet_bdmep.estacao` (metadado, 40 KB) - **JA TEM
+    `id_municipio` (IBGE 7 digitos)** por estacao, junto de geolocalizacao e
+    altitude. Ou seja, o join estacao->municipio VEM PRONTO da Base dos Dados,
+    diferente do raster de raios do INPE/ELAT (que exigiria processamento GIS
+    proprio) - esta fonte e tabular de ponta a ponta, mesmo padrao dos
+    extractors BigQuery ja existentes no projeto.
+  - **RESSALVA (mesma natureza da limitacao de raios/INPE)**: estacoes INMET sao
+    pontos (algumas centenas no Brasil), NAO cobrem os 5.573 municipios do Atlas
+    - a maioria dos municipios NAO tem estacao propria. Precisaria decidir entre
+    (a) restringir a analise aos municipios que hospedam uma estacao (cobertura
+    parcial, mais simples), ou (b) atribuir a cada municipio a estacao mais
+    proxima (exige calculo de distancia via PostGIS, mais parecido com o
+    tratamento que o raster de raios exigiria de qualquer forma).
+  - **AVALIACAO GERAL**: chuva/vento (INMET/BDMEP) e MAIS VIAVEL tecnicamente que
+    densidade de raios (INPE/ELAT) para este cruzamento - mesma fonte/mecanismo
+    de acesso ja dominado no projeto (BigQuery), dado tabular (nao raster), e
+    ja vem com id_municipio por estacao. A limitacao de cobertura espacial
+    (nem todo municipio tem estacao) e real, mas e um problema de escopo/
+    metodologia, nao de formato de dado.
+  - **PROXIMO PASSO CONCRETO se priorizado**: decidir a estrategia de cobertura
+    (estacoes dentro do municipio vs. estacao mais proxima), agregar
+    `precipitacao_total`/`vento_rajada_max` por municipio x mes (para casar com
+    a granularidade mensal do `indger-dados-comerciais.csv`), e so entao rodar
+    a correlacao com `QtdSolicRessarcimentoDano` - mesma metodologia (Spearman +
+    parcial) ja validada na linha de investigacao MMGD x indicadores sociais.
+
+  **SCRIPT CRIADO (sessao 07/07/2026), AINDA NAO EXECUTADO**:
+  `backend/src/etl/analises/investigar_clima_ressarcimento_danos_eletricos.py`
+  - implementa exatamente a recomendacao acima: (1) pico mensal de clima, nao
+  media (evento extremo, nao clima medio); (2) restrito a municipios que
+  CONTEM uma estacao INMET (via `id_municipio` ja resolvido pela Base dos
+  Dados, sem atribuicao por proximidade); (3) painel municipio x mes (nao
+  municipio agregado); (4) Spearman bruto + parcial controlando renda,
+  reusando a funcao ja validada de `analisar_correlacao_mmgd_renda.py`. Baixa
+  `indger-dados-comerciais.csv` da ANEEL (cacheado localmente, ~117 MiB) e
+  consulta `basedosdados.br_inmet_bdmep` via BigQuery (mesma credencial
+  `gcloud auth application-default login` ja usada por RAIS/Mortalidade
+  Infantil). Janela temporal: 2024-2025 (sobreposicao INDGER x INMET
+  gratuito).
+
+  **RESULTADO (executado 07/07/2026, apos corrigir 2 bugs reais achados so ao
+  rodar contra o arquivo de verdade - delimitador `;` nao `,`, e
+  `DatReferenciaInformada` em formato de data completa "AAAA-MM-DD" nao
+  "AAAAMM" como no SAMP-Balanco):** painel final de 12.638 combinacoes
+  municipio x mes, 571 municipios distintos (dos 5.573 totais - so os que tem
+  estacao INMET propria, confirma a cobertura direta esperada de ~10%).
+
+  | Variavel climatica (pico do mes) | n | rho bruto | rho parcial (renda) |
+  |---|---|---|---|
+  | Precipitacao maxima do mes | 9.276 | +0,1947 (p<0,001) | +0,1878 (p<0,001) |
+  | Rajada de vento maxima do mes | 9.817 | +0,1594 (p<0,001) | +0,1370 (p<0,001) |
+
+  **Leitura**: correlacao POSITIVA, estatisticamente significativa (p<0,001) e
+  praticamente INSENSIVEL ao controle por renda (rho quase nao muda) - meses
+  com pico de chuva/vento mais forte num municipio tendem a ter mais
+  solicitacoes de ressarcimento por dano eletrico NESSE MESMO MES, mesmo
+  nesta amostra restrita (571 municipios com estacao INMET). Magnitude e
+  MODESTA (rho ~0,14-0,19, nao um preditor dominante) - esperado, dado que
+  `QtdSolicRessarcimentoDano` mistura todas as causas de dano, nao so clima
+  (ver limitacoes no proprio script). O sinal passou no criterio combinado
+  com o usuario ("se aparecer mesmo na amostra limitada, vale considerar
+  buscar cobertura nacional real") - decisao do usuario apos isso: testar
+  robustez por regiao/urbanizacao antes de decidir o proximo passo (mesma
+  metodologia ja usada na linha MMGD x indicadores sociais).
+
+  **TESTE DE ROBUSTEZ (executado 07/07/2026, mesma sessao)** - script
+  estendido com sensibilidade por regiao e por tercil de urbanizacao:
+
+  | Variavel | rho parcial nacional | regioes com mesmo sinal | faixas de urbanizacao com mesmo sinal |
+  |---|---|---|---|
+  | Precipitacao maxima do mes | +0,1878 | 5/5 | 3/3 |
+  | Rajada de vento maxima do mes | +0,1370 | 4/5 | 3/3 |
+
+  **Precipitacao: ROBUSTO** - sinal positivo em TODAS as 5 regioes (Centro-Oeste
+  +0,191, Nordeste +0,216, Norte +0,073, Sudeste +0,254, Sul +0,137, n entre 84
+  e 142 municipios por regiao) e nos 3 tercis de urbanizacao (+0,167 a +0,220).
+  Resultado limpo, sem outlier regional.
+
+  **Vento: quase robusto, com 1 excecao** - Nordeste destoa (rho = -0,087,
+  UNICA regiao com sinal negativo; demais: Centro-Oeste +0,104, Norte +0,094,
+  Sudeste +0,168, Sul +0,130). Robusto nos 3 tercis de urbanizacao (todos
+  positivos). NAO investigado ainda por que o Nordeste destoa para vento
+  especificamente (mesmo tipo de anomalia regional isolada ja visto para
+  outros indicadores no projeto - ver casos Sul/Seguranca da Posse e
+  Centro-Oeste/Irradiacao Solar - mas ainda sem diagnostico dedicado aqui).
+
+  **CONCLUSAO ATE AQUI**: hipotese de clima (chuva/vento) x ressarcimento por
+  danos eletricos tem suporte SOLIDO nesta amostra restrita - precipitacao
+  robusta em todos os cortes, vento robusto em todos os cortes apos corrigir
+  o artefato de painel do Nordeste (ver abaixo). Unica ressalva que continua
+  de pe: a amostra e restrita e enviesada (so 571 municipios com estacao
+  INMET propria, cidades tendencialmente maiores) - proxima decisao real e
+  se vale a pena buscar cobertura nacional (MERGE/CPTEC-INPE) para tirar
+  esse viés antes de tratar como indicador do Atlas.
+
+  **DIAGNOSTICO DEDICADO Nordeste/vento (executado 07/07/2026, 3 lentes -
+  mesmo padrao ja usado nos casos Sul/Centro-Oeste anteriores):**
+  - Colinearidade: rho(renda, rajada_max) cai de +0,133 nacional para +0,003
+    dentro do Nordeste (praticamente nulo) - a relacao renda-vento
+    desaparece localmente, mas isso sozinho nao explica o sinal invertido.
+  - Heterogeneidade por UF: as 9 UFs do Nordeste tem mediana de rajada
+    bastante homogenea (12,4 a 14,4 m/s) e ressarcimento sem padrao claro
+    inversamente relacionado - NAO ha um unico estado isolado puxando o
+    resultado (diferente do caso EQUATORIAL GO no Centro-Oeste, que era
+    limpo e isolado).
+  - Top/bottom municipio-mes por rajada: **achado central** - o TOP 10 (maior
+    rajada do mes) e dominado por poucos municipios com leitura
+    SISTEMATICAMENTE alta em varios meses diferentes (Davinópolis/MA aparece
+    5 das 10 linhas, em meses distintos, sempre com rajada 24,8-24,9 m/s) -
+    isso e assinatura de estacao/microclima com leitura tipicamente ventosa,
+    NAO de evento extremo pontual daquele mes especifico. Casos de rajada
+    verdadeiramente extrema (Araguanã/MA 39,6 m/s; Piranhas/AL 28,9 m/s)
+    tem ressarcimento ZERO no mes. Ja o BOTTOM 10 (rajada mais fraca) tem
+    casos com ressarcimento RELATIVAMENTE ALTO (Itapipoca/CE, rajada 6,9 m/s,
+    ressarc. 0,67 - mais alto que quase todo o TOP 10).
+  - **INTERPRETACAO**: o padrao parece ser um ARTEFATO DO DESENHO EM PAINEL
+    SEM EFEITO FIXO DE MUNICIPIO (limitacao ja documentada no proprio
+    script) - alguns municipios tem leitura de vento estruturalmente mais
+    alta (posicao da estacao, microclima) que se repete mes a mes sem
+    relacao com evento extremo, dominando o topo da distribuicao sem
+    corresponder a mais dano. Isso dilui/inverte a correlacao dentro da
+    regiao, sem que seja necessariamente um efeito social ou de
+    infraestrutura eletrica diferente no Nordeste - mesmo tipo de armadilha
+    metodologica ja neutralizada antes noutros casos do projeto (sentinela
+    DatLim, campos de metadado errados no TSEE).
+  - **CONFIRMADO (executado 07/07/2026, correcao "within-municipio"/demeaning
+    - subtrai a media de cada municipio antes de correlacionar, isolando so
+    a variacao mes a mes, aproxima efeito fixo sem modelo completo):** o
+    sinal do Nordeste **VIRA POSITIVO** (+0,0804, p<0,001, n=2.082) - de
+    -0,087 ("entre municipios", com o viés das leituras estruturalmente
+    ventosas) para +0,080 ("dentro de cada municipio", isolando so o evento
+    do mes). Precipitacao tambem se mantém robusta e ate mais forte nesse
+    corte (nacional +0,2224, Nordeste +0,2148, ambos p<0,001).
+  - **CONCLUSAO FINAL desta excecao: CONFIRMADO ARTEFATO DE DESENHO EM
+    PAINEL, nao uma diferenca social/regional real.** O sinal negativo do
+    Nordeste na analise "entre municipios" era causado por alguns municipios
+    com leitura de vento estruturalmente mais alta (posicao da estacao,
+    microclima) e ressarcimento baixo, sem relacao com evento extremo daquele
+    mes - ao isolar a variacao dentro do mesmo municipio (demeaning), Nordeste
+    passa a concordar com o resto do pais (positivo, significativo). Caso
+    ENCERRADO com explicacao completa, mesmo padrao de rigor ja aplicado a
+    outras armadilhas de dado identificadas no projeto (sentinela DatLim,
+    metadado TSEE) - nao e preciso investigar mais.
 - **Fila/capacidade de conexao de MMGD por distribuidora (grupo Equatorial)** -
   candidato levantado a partir do achado da hipotese de distribuidora/concessionaria
   (ver secao "Hipotese de distribuidora/concessionaria", sessao 06/07/2026): EQUATORIAL
