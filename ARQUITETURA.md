@@ -1181,12 +1181,113 @@ util para o setor de energia solar (integradoras decidem onde vale a pena
 investir/anunciar, consumidores sabem o que esperar da sua distribuidora) e
 poderia ser um diferencial de adocao do Atlas Solar Justo fora do escopo
 original de justica energetica. NAO PRIORIZADO ainda - precisa: (1) baixar
-e processar as 5 regioes (hoje so Centro-Oeste foi baixado/testado), (2)
-decidir se o ranking fica so no eixo tecnico (prazo/conexao) ou tambem
-incorpora justica energetica (cruzar com indicadores sociais dos municipios
-atendidos por cada distribuidora), (3) decidir granularidade de exibicao
-(nacional por distribuidora? por UF?). Registrado como ideia de produto, nao
-como item da fila de dados.
+e processar as 5 regioes (ATUALIZADO 06/07/2026: agora 2 de 5 regioes
+baixadas/testadas - Centro-Oeste e Nordeste, esta ultima via
+`investigar_fila_conexao_mmgd_nordeste.py`, criado para testar o caso
+Equatorial x Vazio de Acesso, ver item 6 da fila de trabalho; faltam Norte,
+Sudeste, Sul), (2) decidir se o ranking fica so no eixo tecnico (prazo/
+conexao) ou tambem incorpora justica energetica (cruzar com indicadores
+sociais dos municipios atendidos por cada distribuidora), (3) decidir
+granularidade de exibicao (nacional por distribuidora? por UF?). Registrado
+como ideia de produto, nao como item da fila de dados.
+
+**ACHADO CRITICO PARA ESTE PRODUTO (sessao 06/07/2026, ver item 6 da fila de
+trabalho):** o campo `DatLim` (prazo regulatorio, base da metrica "% dentro
+do prazo") esta praticamente AUSENTE no recurso do Nordeste para pelo menos 4
+distribuidoras - EQUATORIAL MA (0,0% de preenchimento), EQUATORIAL PI (0,1%),
+EQUATORIAL AL (0,0%) e Energisa Borborema (0,0%) - contra 86,7% a 100% nas
+demais distribuidoras da mesma regiao. Se um ranking publico for construido
+sem tratar isso, essas distribuidoras apareceriam com ~0% de cumprimento de
+prazo, o que e FALSO (e um vazio de dado, nao desempenho ruim) - erro grave
+para um produto que se propoe a ser confiavel/comparativo. Qualquer
+implementacao futura deste ranking PRECISA calcular e expor
+`pct_datlim_presente` por distribuidora, e excluir ou marcar explicitamente
+como "sem dado" as distribuidoras abaixo de um limiar razoavel de
+preenchimento - nao mostrar "0% no prazo" como se fosse um resultado real.
+Recomendado checar se este mesmo problema se repete nas regioes ainda nao
+baixadas (Norte, Sudeste, Sul) antes de priorizar o produto.
+
+**ATUALIZACAO (sessao 06/07/2026): script criado para checar isso, ainda NAO
+EXECUTADO.** Script `backend/src/etl/analises/
+mapear_desempenho_conexao_mmgd_nacional.py` - baixa e processa as 5 regioes
+(reaproveita Centro-Oeste e Nordeste ja baixados, baixa Norte/Sudeste/Sul
+pela primeira vez), calcula por distribuidora `pct_datlim_presente_entre_
+conectados`, `pct_conectado`, `pct_dentro_do_prazo_entre_conectados` e
+mediana de atraso, e sinaliza automaticamente (limiar 50%) quais
+distribuidoras tem o campo DatLim ausente demais para confiar na metrica de
+prazo - mesmo problema achado para EQUATORIAL MA/PI/AL no Nordeste. Exporta
+CSV local (nao versionado) com o resumo nacional completo. Processa uma
+regiao por vez e descarta o DataFrame bruto antes da proxima, para nao
+repetir o erro de OOM ja visto ao processar o Nordeste inteiro de uma vez
+(12,8M linhas). Suporta rodar so uma regiao por vez via variavel de ambiente
+REGIAO_UNICA, se a maquina nao aguentar as 5 em sequencia (Sudeste
+provavelmente e a maior). Ainda NAO EXECUTADO - proximo passo: rodar e
+registrar resultado aqui (Norte/Sudeste/Sul serao baixados pela primeira
+vez, podem demorar).
+
+**RESULTADO (executado 06/07/2026): o problema de DatLim ausente NAO e
+exclusivo do Grupo Equatorial nem do Nordeste - e mais amplo, mas o Grupo
+Equatorial esta desproporcionalmente concentrado nele.** 5 regioes
+processadas, ~54,3M pedidos no total (Centro-Oeste 6,31M, Nordeste 12,80M,
+Norte 3,37M, Sudeste 19,46M, Sul 12,37M). 11 distribuidoras com
+`pct_datlim_presente_entre_conectados` < 50% (limiar de alerta):
+
+| Distribuidora | Regiao | N pedidos | % DatLim presente |
+|---|---|---|---|
+| Cemig-D | Sudeste | 7.403.789 | 0,0% |
+| Equatorial PA | Norte | 1.573.342 | 0,0% |
+| Equatorial MA | Nordeste | 956.861 | 0,0% |
+| Equatorial AL | Nordeste | 681.123 | 0,0% |
+| Energisa Borborema | Nordeste | 71.031 | 0,0% |
+| Equatorial AL | Norte (fatia residual) | 10.478 | 0,0% |
+| Equatorial PI | Nordeste | 917.875 | 0,1% |
+| CEA Equatorial (AP) | Norte | 67.439 | 0,9% |
+| CEEE Equatorial (RS) | Sul | 1.048.471 | 1,0% |
+| Energisa RO | Norte | 466.842 | 26,7% |
+| Celesc-Dis (SC) | Sul | 2.285.765 | 43,5% |
+
+**Achado 1 - Cemig-D (Minas Gerais, Sudeste) e a MAIOR distribuidora do
+dataset inteiro (7,4M pedidos, ~13,6% do total nacional) e tem 0,0% de
+DatLim preenchido - sem NENHUMA relacao com o Grupo Equatorial.** Isso
+mostra que a ausencia de DatLim e um problema de COMPLETUDE DE REPORTE A
+ANEEL mais amplo que a hipotese original (nao e um padrao exclusivo de uma
+distribuidora ou grupo), e que qualquer produto baseado neste dataset
+precisa tratar isso como regra geral, nao excecao pontual.
+
+**Achado 2 - dentro do proprio Grupo Equatorial, ha uma divergencia interna
+marcante: EQUATORIAL GO (Centro-Oeste) tem 100,0% de DatLim preenchido,
+enquanto TODAS as outras subsidiarias do grupo (PA, MA, AL, PI, CEA/AP, CEEE/
+RS) tem entre 0,0% e 1,0%.** Ou seja, das aquisicoes da Equatorial Energia,
+Goias e a UNICA com o campo de prazo bem reportado - as demais (que incluem
+tanto aquisicoes antigas, MA/PI/AL, quanto recentes, CEEE/RS) compartilham o
+mesmo problema de dado, independente de regiao. Isso e consistente com (mas
+nao prova) a hipotese de que o problema esta ligado a integracao de sistemas
+especifica de cada subsidiaria adquirida pela Equatorial, nao a regiao
+geografica - reforca ainda mais que o teste de fila de conexao feito para
+MA/PI/AL (item 6, encerrado como INCONCLUSIVO) realmente nao tinha como dar
+resultado confiavel com este dataset.
+
+**Achado 3 (nota menor, nao investigada a fundo):** algumas combinacoes
+distribuidora x regiao com volume muito baixo (ex.: "Neoenergia Coelba" com
+1.568 pedidos aparecendo em "sudeste", 334 em "centro-oeste", 43 em "sul";
+"Neoenergia Elektro" com 77 em "sul" e 11 em "norte") tem `pct_conectado`
+0,0% e metricas NaN - provavelmente municipios de fronteira classificados no
+arquivo regional errado (a distribuidora "correta" de cada uma dessas e
+outra regiao). Volume irrelevante (dezenas a poucas centenas de pedidos),
+nao afeta nenhuma conclusao, mas fica registrado para nao confundir numa
+leitura futura da tabela completa.
+
+CSV completo salvo localmente (nao versionado) em
+`backend/src/etl/data/raw/aneel_fila_conexao_mmgd/
+desempenho_conexao_mmgd_distribuidoras_nacional.csv`.
+
+**Conclusao para o produto:** o dataset e utilizavel para um ranking
+publico, mas SOMENTE com as 11 distribuidoras acima excluidas ou marcadas
+como "sem dado de prazo" - caso contrario o ranking mostraria Cemig-D e
+metade do Grupo Equatorial como "0% dentro do prazo", o que seria um erro
+grave e enganoso (ausencia de dado, nao desempenho). Continua NAO
+PRIORIZADO como item da fila de dados - registrado aqui como insumo pronto
+para quando o produto for priorizado.
 
 
 ## Manutencao deste documento
