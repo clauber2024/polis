@@ -248,6 +248,74 @@ analise de correlacao abaixo), `0017_indicadores_sociais_rdpc.sql` (`renda_per_c
       tentativas) e marcar os 2 indicadores como "sensivel, sem
       investigacao dedicada, por decisao explicita" para fechar de vez o
       item 1.**
+
+   **PENDENCIA RESOLVIDA (sessao 07/07/2026) - os 2 indicadores acima
+   (Precariedade Habitacional, Taxa de Alfabetizacao) receberam diagnostico
+   dedicado e ambos foram EXPLICADOS (nao apenas fechados por decisao, como
+   o caso Sul):**
+
+   - **Indice de Precariedade Habitacional x Centro-Oeste** - script
+     `backend/src/etl/analises/investigar_precariedade_habitacional_centro_oeste.py`
+     (3 lentes, mesmo padrao do diagnostico Sul/Centro-Oeste anterior, mas Y
+     residencial e foco isolado no par certo). Resultado: rho parcial no
+     Centro-Oeste = +0,006 (praticamente zero) contra -0,15 a -0,28 nas
+     outras 4 regioes. Causa identificada: o indicador esta no PISO em toda
+     a regiao simultaneamente - mediana por UF de 0,01 (MS), 0,02 (MT), 0,01
+     (GO), 0,06 (DF), numa escala 0-1 - sem variancia suficiente para
+     produzir uma correlacao estavel (restricao de variancia/"range
+     restriction"), nao um efeito social diferente. Top/bottom 10 municipios
+     do Centro-Oeste por MMGD residencial confirmam: indice igualmente perto
+     de zero nos dois extremos, sem padrao. Colinearidade renda-indicador
+     tambem mais forte dentro da regiao (+0,256 vs +0,074 nacional),
+     reforcando que o "controle por renda" opera sobre uma faixa estreita e
+     ruidosa ali. **CONCLUSAO: caso explicado - restricao de variancia
+     regional, nao anomalia social real. Fechado, nao precisa nova
+     investigacao salvo se o indicador ganhar mais variancia no Centro-Oeste
+     em atualizacao futura dos dados de origem.**
+   - **Taxa de Alfabetizacao x tercil "Mais urbanizados"** - script
+     `backend/src/etl/analises/investigar_alfabetizacao_urbanizacao.py`.
+     Achado inicial importante: a divergencia NAO e regional (5/5 regioes
+     concordam em sinal com o nacional) - e o tercil de urbanizacao "Mais
+     urbanizados (menor % rural)" que inverte (rho parcial = -0,076 contra
+     +0,35/+0,41 nos outros 2 tercis). Diagnostico revelou 2 candidatos
+     concorrentes: (a) colinearidade renda-alfabetizacao mais forte dentro
+     do tercil (+0,496 vs +0,344 nacional); (b) composicao regional
+     desbalanceada dentro do tercil - Sudeste e 49% da amostra (n=905,
+     alfabetizacao mediana 95,0, MMGD moderado/baixo 130,96), Centro-Oeste
+     so 11% (n=199, MMGD bem maior 277,59, alfabetizacao levemente menor
+     92,77); os 10 piores municipios do tercil por MMGD residencial sao
+     dominados por metropole densa do ABC/litoral paulista (Diadema, Taboao
+     da Serra, Sao Vicente, Santos, Cubatao, Maua - alfabetizacao 95-98%,
+     MMGD 6-10 kW/1.000 hab) mais 3 municipios ribeirinhos do Norte
+     (Amazonas/Para - isolamento, nao densidade - MMGD 1-3 kW/1.000 hab,
+     alfabetizacao 90-94%). Teste direcionado controlando renda +
+     `percentual_apartamento` (em vez de so renda, reaproveitando o
+     mecanismo de tipologia habitacional ja confirmado noutro caso do
+     projeto): sinal dentro do tercil vai de -0,0765 (so renda) para +0,0462
+     (renda+apartamento), **passando a CONCORDAR com o nacional (+0,3468)**.
+     **CONCLUSAO: tipologia habitacional (moradia densa/apartamento, sem
+     telhado proprio) EXPLICA a inversao de sinal - confirmado
+     quantitativamente, mesmo mecanismo ja validado no projeto.** RESSALVA:
+     magnitude pos-controle ainda pequena (+0,046 vs +0,35 nacional) -
+     apartamento explica a MUDANCA DE SINAL, nao restaura a forca total da
+     correlacao; os 3 municipios ribeirinhos do Norte na lista de piores
+     nao sao apartamento-denso (isolamento/infraestrutura de rede, nao
+     tipologia habitacional, provavelmente um segundo mecanismo residual
+     sobreposto). Nao investigar esse residuo especifico a menos que surja
+     evidencia nova - mesmo criterio de nao perseguir hipoteses ad-hoc
+     indefinidamente ja aplicado aos casos Sul e Equatorial/Nordeste.
+
+   **Com isso, a pendencia de 06/07/2026 esta encerrada**: dos 6 indicadores
+   originalmente classificados como "sensivel" na tabela de robustez
+   nacional (IVS, Precariedade de Infraestrutura, Precariedade Habitacional,
+   Seguranca da Posse, Taxa de Alfabetizacao, Irradiacao Solar), os 4 casos
+   que motivaram investigacao dedicada isolada (Seguranca da Posse/Sul,
+   Irradiacao Solar/Centro-Oeste, Precariedade Habitacional/Centro-Oeste,
+   Alfabetizacao/urbanizacao) tem todos diagnostico ou decisao de
+   encerramento registrados. IVS e Precariedade de Infraestrutura seguem
+   sem diagnostico isolado proprio, mas ja foram tocados indiretamente pelo
+   pacote de 3 lentes do caso Sul (`diagnosticar_outliers_regionais.py`) -
+   nao abrir nova linha de investigacao para eles sem motivo especifico.
 2. ~~Atualizar README e CLAUDE.md (Estado Real) com os dados das sessoes de Moradia,
    INDQUAL, DEC/FEC real, Capital Humano e Irradiacao Solar~~ - FEITO (sessao
    06/07/2026): CLAUDE.md ja estava majoritariamente atualizado (verificado, incluia
