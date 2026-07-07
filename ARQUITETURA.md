@@ -200,7 +200,12 @@ analise de correlacao abaixo), `0017_indicadores_sociais_rdpc.sql` (`renda_per_c
    explicacao descartadas (renda, agronegocio/irrigacao, tipologia habitacional,
    distribuidora, validade de constructo rural/urbano, regularizacao fundiaria/
    ambiental) - ver secao "Caso Sul x Seguranca da Posse encerrado" abaixo. NAO
-   retomar sem fonte/evidencia nova que justifique reabrir.**
+   retomar sem fonte/evidencia nova que justifique reabrir.** **Grupo
+   Equatorial x Vazio de Acesso no Nordeste: caso tambem ENCERRADO por decisao
+   do usuario (sessao 06/07/2026) apos 3 mecanismos testados (renda
+   enfraquecida, tarifa rejeitada na direcao oposta, fila de conexao
+   inconclusiva por bloqueio de dado) - ver itens 4-6 abaixo. NAO retomar sem
+   fonte/evidencia nova.**
 2. ~~Atualizar README e CLAUDE.md (Estado Real) com os dados das sessoes de Moradia,
    INDQUAL, DEC/FEC real, Capital Humano e Irradiacao Solar~~ - FEITO (sessao
    06/07/2026): CLAUDE.md ja estava majoritariamente atualizado (verificado, incluia
@@ -256,6 +261,188 @@ analise de correlacao abaixo), `0017_indicadores_sociais_rdpc.sql` (`renda_per_c
    Arquivo `vazios_de_acesso_municipios.csv` gerado localmente (todos os
    5.569 municipios classificados, nao versionado - dado derivado,
    reproduzivel a partir do banco).
+
+4. **Grupo Equatorial explica a concentracao de Vazios de Acesso no Nordeste?
+   - sessao 06/07/2026, EXECUTADO.** Motivacao: a hipotese de
+   distribuidora ja CONFIRMOU (secao "Hipotese de distribuidora/concessionaria")
+   que EQUATORIAL GO tem MMGD residencial per capita menos da metade de EMS/EMT
+   no Centro-Oeste apesar de irradiacao semelhante. O grupo Equatorial tambem
+   opera distribuidoras em Maranhao, Piaui e Alagoas - 3 dos estados que mais
+   aparecem no topo do ranking de Vazio de Acesso (item 3 acima). Script criado:
+   `backend/src/etl/analises/investigar_distribuidora_vazios_nordeste.py` -
+   reaproveita o mapeamento municipio->distribuidora do INDQUAL (ja usado na
+   hipotese de distribuidora) e a classificacao de quadrante de
+   `identificar_vazios_de_acesso.py`, compara taxa de Vazio de Acesso e MMGD
+   residencial mediano por distribuidora dentro do Nordeste, com destaque
+   separado para distribuidoras com "EQUATORIAL" no nome. RESSALVA JA
+   INCORPORADA NO SCRIPT: mesmo que o padrao geografico se confirme, o
+   MECANISMO (fila de conexao vs. tarifa) precisaria do mesmo teste
+   quantitativo ja feito para Centro-Oeste - la, fila de conexao NAO se
+   sustentou nos dados 2021-2024 (foi tarifa historica que explicou).
+
+   **RESULTADO (executado 06/07/2026):** Y usado
+   `mmgd_potencia_residencial_per_1000_hab` (mediana nacional 111,29 kW/1.000
+   hab, consistente com item 3). Agregado Nordeste, Grupo Equatorial (MA+PI+AL,
+   n=543) vs. demais distribuidoras (n=1.251): **Equatorial tem MMGD residencial
+   mediano PIOR** (69,86 vs. 79,14 kW/1.000 hab) e **% Vazio de Acesso PIOR**
+   (70,2% vs. 59,3%), apesar de potencial solar mediano praticamente IDENTICO
+   (5,455 vs. 5,477 kWh/m2.dia) e de renda mediana domiciliar MAIOR no grupo
+   Equatorial (R$ 2.898 vs. R$ 2.722) - isto e, Equatorial performa pior mesmo
+   partindo de uma base de renda mais favoravel, o que enfraquece "renda"
+   como explicacao alternativa para esta comparacao especifica e fortalece o
+   padrao ja visto em EQUATORIAL GO (Centro-Oeste): mesmo potencial solar,
+   adocao MMGD sistematicamente mais baixa.
+
+   RESSALVA a partir do corte por distribuidora individual (n>=5 municipios):
+   o padrao NAO e uniforme dentro do grupo Equatorial nem exclusivo dele. As
+   duas piores distribuidoras isoladas do Nordeste sao NAO-Equatorial (SULGIPE,
+   100% vazio, MMGD 28,6; EPB, 83,3% vazio, MMGD 45,9) - piores que qualquer
+   distribuidora Equatorial individualmente (EQUATORIAL MA 64,5%/50,7;
+   EQUATORIAL AL 80,2%/68,8; EQUATORIAL PI 71,9%/80,9). Do lado oposto, COSERN
+   (RN, nao-Equatorial) tem o MELHOR desempenho de longe (28,5% vazio, MMGD
+   157,7) com o MAIOR potencial solar do grupo (5,77) - mediana puxada por bons
+   desempenhos fora da Equatorial, nao so por maus desempenhos dentro dela.
+   Ou seja: o efeito agregado Equatorial-pior e real nos dados, mas e mais
+   fraco/mais heterogeneo que o caso EQUATORIAL GO no Centro-Oeste (que era
+   quase um caso isolado e limpo).
+
+   **Conclusao:** padrao geografico PARCIALMENTE confirmado (agregado
+   Equatorial pior que a media, controlando visualmente por potencial solar e
+   renda) mas MAIS FRACO e menos uniforme que Centro-Oeste. MECANISMO CAUSAL
+   AINDA NAO TESTADO - proximo passo, se a fila de trabalho priorizar isto, e
+   repetir para Equatorial MA/PI/AL o mesmo teste quantitativo de tarifa
+   historica ja feito para Centro-Oeste (onde fila de conexao foi descartada e
+   tarifa confirmada) antes de declarar causa. Nao presumir que o mesmo
+   mecanismo (tarifa) se repete so pela coincidencia de grupo economico.
+
+5. **Teste do mecanismo tarifa (TUSD+TE) para Equatorial no Nordeste -
+   sessao 06/07/2026, EXECUTADO.** Continuacao direta do item 4: repete para o
+   Nordeste o mesmo teste que confirmou tarifa como mecanismo regional no
+   Centro-Oeste (ver "Teste do mecanismo tarifa - TUSD+TE" abaixo). Script:
+   `backend/src/etl/analises/investigar_tarifa_nordeste_equatorial.py` -
+   compara serie historica de tarifa total (TUSD+TE, Residencial/Convencional/
+   Tarifa de Aplicacao) entre EQUATORIAL MA/PI/AL e as demais distribuidoras do
+   Nordeste (COSERN, COELBA, EPB, ENEL CE, Neoenergia PE, ESE, SULGIPE).
+   Nomes antigos pre-aquisicao (CEMAR/CEPISA/CEAL) NAO apareceram no arquivo -
+   as 3 distribuidoras Equatorial ja constam com o nome atual desde 2010,
+   diferente do caso Centro-Oeste (onde "Enel GO" era o nome usado no dataset
+   de conexoes ate 2024).
+
+   **RESULTADO: hipotese de tarifa REJEITADA para o Nordeste - direcao OPOSTA
+   a do Centro-Oeste.** Media historica de tarifa total (TUSD+TE, R$/MWh,
+   2010-2024, mesma janela usada no veredito do Centro-Oeste), do menor para o
+   maior:
+
+   | Distribuidora | Media 2010-2024 (R$/MWh) |
+   |---|---|
+   | EPB | 437,6 |
+   | COSERN | 441,3 |
+   | ESE | 450,2 |
+   | Neoenergia PE | 469,1 |
+   | ENEL CE | 481,3 |
+   | COELBA | 492,4 |
+   | SULGIPE | 499,3 |
+   | EQUATORIAL AL | 506,9 |
+   | EQUATORIAL MA | 509,8 |
+   | **EQUATORIAL PI** | **528,9** |
+
+   As 3 distribuidoras Equatorial (AL, MA, PI) tem as tarifas MAIS ALTAS das
+   10 comparadas no periodo 2010-2024, nao as mais baixas - o oposto do que a
+   hipotese de tarifa preveria (tarifa mais baixa -> menos incentivo -> menos
+   MMGD, como confirmado para EQUATORIAL GO no Centro-Oeste). Se a economia da
+   tarifa fosse o mecanismo, o Equatorial nordestino deveria ter MAIS adocao
+   residencial que a media da regiao, nao menos - o oposto do observado no
+   item 4 (MMGD residencial mediano PIOR no grupo Equatorial). **Isso
+   CONFIRMA o alerta previo do teste nacional por regiao** (rho parcial/renda
+   Nordeste = -0,018, praticamente nulo e sinal errado vs. +0,466 no
+   Centro-Oeste) com um teste especifico e descritivo, na mesma metodologia
+   que validou o caso Centro-Oeste.
+
+   **Conclusao:** tarifa NAO explica o padrao Equatorial no Nordeste - ao
+   contrario, torna-o mais intrigante (adocao mais baixa APESAR de tarifa mais
+   alta, que deveria incentivar mais, nao menos). O mecanismo de fila de
+   conexao (unico ainda nao testado para esta regiao - ver "Teste quantitativo
+   do mecanismo 'fila de conexao'" abaixo, feito ate agora so para
+   Centro-Oeste) e o proximo candidato natural, mas requer baixar o dataset
+   ANEEL de atendimento a pedidos de conexao MMGD especificamente para os
+   estados MA/PI/AL (nao baixado ainda). Registrado como MECANISMO AINDA NAO
+   IDENTIFICADO para o Nordeste - padrao geografico do item 4 continua real,
+   mas nem tarifa nem (por enquanto) qualquer outra causa concreta foi
+   confirmada.
+
+6. **Teste do mecanismo fila de conexao para Equatorial no Nordeste - NOVO,
+   sessao 06/07/2026, script criado, ainda NAO EXECUTADO.** Ultimo mecanismo ja
+   cotado (ver "Hipotese de distribuidora/concessionaria") ainda sem teste
+   quantitativo para esta regiao - renda e tarifa ja descartados (itens 4/5).
+   Script criado: `backend/src/etl/analises/
+   investigar_fila_conexao_mmgd_nordeste.py` - mesmo dataset ANEEL do
+   Centro-Oeste ("Atendimento a pedidos de conexoes MMGD - pos Lei 14300"),
+   mas usando o recurso especifico da regiao Nordeste (arquivo separado por
+   regiao no portal - URL confirmada via pagina do dataset, nao suposta a
+   partir do padrao do Centro-Oeste). Compara % conectado e % dentro do prazo
+   regulatorio entre EQUATORIAL MA/PI/AL e as demais distribuidoras
+   (COSERN, COELBA, EPB, ENEL CE, Neoenergia PE, ESE, SULGIPE). Requer NOVO
+   DOWNLOAD (arquivo regional do Nordeste, nao baixado ainda - diferente do
+   dataset de tarifas do item 5, que ja existia localmente do teste do
+   Centro-Oeste).
+
+   NOTA JA REGISTRADA NO PROPRIO SCRIPT: se este teste tambem vier negativo,
+   os 3 mecanismos ja cotados (renda, tarifa, fila de conexao) terao sido
+   descartados para o Nordeste - decisao sugerida (a confirmar com o usuario
+   na hora) e encerrar o caso sem mecanismo identificado, mesmo tratamento
+   dado ao caso "Sul x Seguranca da Posse" (ver secao propria), em vez de
+   continuar testando hipoteses ad-hoc indefinidamente.
+
+   **RESULTADO (executado 06/07/2026): INCONCLUSIVO por bloqueio de dado -
+   campo DatLim (prazo regulatorio) esta praticamente AUSENTE para o Grupo
+   Equatorial no dataset.** % de pedidos conectados com DatLim de fato
+   preenchida (`pct_datlim_presente_entre_conectados`, checagem adicionada
+   apos a 1a rodada mostrar 0,0%/0,1% de "dentro do prazo" - extremo demais
+   pra ser confiado sem checar):
+   - EQUATORIAL MA: 0,0% | EQUATORIAL PI: 0,1% | EQUATORIAL AL: 0,0% |
+     Energisa Borborema (fora do grupo, mas mesmo padrao): 0,0%
+   - Todas as demais distribuidoras do Nordeste: 86,7% a 100,0%
+
+   Ou seja, os numeros de "% dentro do prazo" e "mediana de dias de atraso"
+   NAO refletem desempenho real da Equatorial - refletem um campo que a
+   ANEEL simplesmente nao recebeu/registrou para essas distribuidoras neste
+   dataset. Mesmo tipo de armadilha de dado ja visto antes neste projeto
+   (sentinela DatInj 2099-12-31 no Centro-Oeste, campos de metadado errados
+   no INDQUAL/TSEE) - identificado e neutralizado antes de virar conclusao
+   falsa.
+
+   **Metrica alternativa que NAO depende de DatLim** (`pct_conectado` - taxa
+   de conclusao do pedido, independente de prazo): EQUATORIAL MA 79,7%,
+   EQUATORIAL PI 83,2% - ambas ACIMA da mediana do grupo comparado; EQUATORIAL
+   AL 68,9% - abaixo da mediana mas empatada com COELBA (68,3%) e Energisa PB
+   (70,5%), longe do pior caso (Sulgipe, 50,6%). Motivo de nao-conexao mais
+   comum para o Grupo Equatorial e "Documentacao incompleta" (48-64% dos nao
+   conectados) + "Desistencia do consumidor" (~25%) - padrao diferente do
+   resto da regiao (onde "Outras nao conformidades" domina em Coelba/Cosern/
+   Neoenergia PE/Sulgipe), mas nao interpretavel diretamente como capacidade
+   administrativa pior (pode refletir perfil de cliente/regiao, nao
+   distribuidora).
+
+   **Conclusao:** fila de conexao NAO PODE ser testada de forma conclusiva
+   para o Grupo Equatorial no Nordeste com este dataset (bloqueio de dado, nao
+   ausencia de efeito). A metrica alternativa disponivel (taxa de conclusao)
+   nao mostra Equatorial sistematicamente pior. Com isso, dos 3 mecanismos
+   cotados para o padrao do item 4 (renda, tarifa, fila de conexao): renda
+   enfraquecida (item 4, Equatorial tem renda MAIOR mas MMGD pior), tarifa
+   REJEITADA na direcao oposta (item 5), fila de conexao INCONCLUSIVA por
+   bloqueio de dado (este item). NENHUM mecanismo concreto foi confirmado.
+
+   **CASO ENCERRADO por decisao do usuario (sessao 06/07/2026), mesmo
+   tratamento do caso "Sul x Seguranca da Posse" (ver secao propria): o
+   padrao geografico (Grupo Equatorial com MMGD residencial e % Vazio de
+   Acesso piores que o resto do Nordeste, item 4) continua real e
+   documentado, mas nenhum dos 3 mecanismos cotados (renda, tarifa, fila de
+   conexao) foi confirmado - renda enfraquecida, tarifa rejeitada na direcao
+   oposta, fila de conexao bloqueada por ausencia do campo DatLim para
+   Equatorial no dataset ANEEL usado. NAO RETOMAR sem fonte/evidencia nova
+   que justifique reabrir (ex.: dataset alternativo com prazo de conexao
+   preenchido para MA/PI/AL, ou nova hipotese de mecanismo ainda nao
+   cotada).**
 
 ## Bloqueado (aguardando dado externo)
 
