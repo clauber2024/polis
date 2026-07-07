@@ -632,6 +632,227 @@ analise de correlacao abaixo), `0017_indicadores_sociais_rdpc.sql` (`renda_per_c
     metodologia de desagregacao municipal (nao um extractor simples de upsert
     direto como os demais).
 
+  **INVESTIGACAO INICIADA (sessao 08/07/2026) - CAMINHO DE RESOLUCAO MELHOR
+  ENCONTRADO: join por CNPJ, nao por nome.** Ao reler `schema_qualidade.sql` e
+  `etl_indqual.py` (template ja usado para resolver municipio->distribuidora na
+  tarifa residencial), foi descoberto que `qualidade_conjuntos` tem tanto
+  `sig_agente` QUANTO `num_cnpj VARCHAR(20)` (populado de `NumCNPJ` do INDQUAL).
+  Como o SAMP-Balanco tem `NumCPFCNPJ` (CNPJ exato da distribuidora), o join
+  fica por CNPJ - EXATO, sem a ambiguidade textual que a tarifa precisou
+  resolver via `SigAgente` (nomes de distribuidora nem sempre batem
+  caractere-a-caractere entre datasets ANEEL diferentes).
+
+  Reconfirmado ao vivo via `datastore_search` (nao so a documentacao da sessao
+  anterior): estrutura e valores batem exatamente com o ja registrado acima.
+  Descoberta nova: `sort=AnmCompetenciaBalanco desc` mostra que a competencia
+  mais recente com dado e **202605** (mai/2026) - nao necessariamente toda
+  distribuidora reporta no mes mais recente (defasagem de reporte e normal
+  neste tipo de dataset regulatorio).
+
+  Script exploratorio escrito (`backend/src/etl/analises/
+  investigar_perdas_nao_tecnicas_renda.py`, somente leitura): baixa o Parquet
+  do SAMP-Balanco (recurso `cffe3c15-9d3e-4187-ae63-e097cf88c0af`, ~3,8 MB -
+  bem menor que o CSV de 132 MB), filtra `DscModalidadeBalanco` = "Perdas na
+  Distribuicao (valor medido)" e `DscCctBalanco` em
+  {"Perdas Tecnicas","Perdas Nao-Tecnicas"} na competencia mais recente,
+  calcula `percentual_perdas_nao_tecnicas` = NaoTecnicas/(Tecnicas+NaoTecnicas)
+  por distribuidora (normalizado em % para nao confundir tamanho de mercado
+  com qualidade da distribuidora), resolve municipio->CNPJ via
+  `qualidade_conjunto_municipio`/`qualidade_conjuntos` (mesmo criterio da
+  tarifa: municipio com multiplas distribuidoras fica sem valor unico), e
+  testa a hipotese via Spearman (bruta + por regiao) contra
+  `renda_media_domiciliar`.
+
+  **CAUTELA REGISTRADA NO PROPRIO SCRIPT, AINDA NAO VERIFICADA**: nao ha
+  confirmacao nesta sessao de que o formato de CNPJ em `qualidade_conjuntos.
+  num_cnpj` (vindo do INDQUAL) bate exatamente com o formato em
+  `SAMP-Balanco.NumCPFCNPJ` (podem divergir em pontuacao/zeros a esquerda,
+  sao fontes ANEEL diferentes). O script normaliza (mantem so digitos) dos
+  dois lados antes do join e imprime um alerta explicito se a taxa de
+  casamento ficar abaixo de 30% - **o resultado da correlacao so deve ser
+  confiado se essa taxa vier razoavel (a maioria dos municipios com CNPJ
+  unico conseguindo casar)**.
+
+  **PENDENTE (download)**: o download do Parquet direto da ANEEL foi bloqueado
+  no sandbox proprio desta sessao (mesma restricao de allowlist ja vista com
+  `ftp.cptec.inpe.br` - `403 Forbidden`/`X-Proxy-Error: blocked-by-allowlist`),
+  entao o script foi desenhado para rodar no terminal do usuario. O usuario
+  rodou e o arquivo (~3,8MB) ficou salvo em
+  `backend/src/etl/data/raw/aneel_samp_balanco/samp-balanco.parquet` (dentro
+  da pasta do projeto, sincronizada via OneDrive) - isso permitiu inspecionar
+  o arquivo real diretamente no sandbox desta sessao (leitura de arquivo local
+  ja baixado nao esbarra na restricao de allowlist, so o download direto da
+  ANEEL esbarrava).
+
+  **2 BUGS REAIS ENCONTRADOS E CORRIGIDOS (08/07/2026), so descobertos ao
+  rodar contra o arquivo de producao (nao apareceriam so lendo a API
+  `datastore_search`, que serve os dados via uma camada JSON com tipos
+  diferentes do Parquet bruto):**
+  1. **`AnmCompetenciaBalanco` e int64 no Parquet, nao string.** A 1a
+     tentativa do usuario (`MES_REFERENCIA="202605"` comparado como string)
+     deu 0 linhas - falha SILENCIOSA (sem erro, sem match). Corrigido
+     comparando com `int(MES_REFERENCIA)`.
+  2. **`NumCPFCNPJ` tambem e int64, nao string - perde zero a esquerda.**
+     CNPJs cujo 1o digito e "0" (ex.: Energisa Acre, "04065033000170")
+     viram inteiros de 13 digitos (4065033000170) ao serem lidos do Parquet.
+     Confirmado contra o arquivo real: **15 de 54 distribuidoras (28%)**
+     tem CNPJ comecando com zero na competencia testada - sem correcao, o
+     join por CNPJ teria uma taxa de erro enorme e silenciosa. Corrigido
+     com `zfill(14)` dentro de `normalizar_cnpj()` (seguro aplicar aos dois
+     lados do join - CNPJ ja completo fica inalterado).
+
+  **ACHADO SUBSTANTIVO (nao e bug, e caracteristica real do dataset) - LAG DE
+  PROCESSAMENTO, NAO DE DISPONIBILIDADE**: o mes mais recente (202605,
+  mai/2026) tem so 16 linhas de "Perdas na Distribuicao (valor medido)" e
+  NENHUMA delas e "Perdas Tecnicas"/"Perdas Nao-Tecnicas" (so "Perdas
+  Totais"). A cobertura por distribuidora da quebra fina (tecnica x
+  nao-tecnica) cai de forma continua e acentuada: ~57 (baseline 2024) ->
+  54/52/52/51/47 (jan-jul/2025) -> despenca para 26/23/24/23/23/22/21/20
+  (ago/2025-mar/2026) -> 0 (abr-mai/2026). Ou seja, a granularidade fina
+  demora MUITO mais para ser processada/publicada do que o agregado "Perdas
+  Totais". **Mes escolhido para a 1a rodada: 202503 (mar/2025), com 54 de
+  ~57 distribuidoras historicas (~95% de cobertura)** - o mes mais recente
+  com cobertura essencialmente completa. Reavaliar esse valor em sessoes
+  futuras (o lag de processamento pode diminuir com o tempo).
+
+  **ACHADO SUBSTANTIVO ADICIONAL - VALORES NEGATIVOS DE "PERDAS NAO-TECNICAS"
+  no modo "valor medido"**: confirmado contra o arquivo real (competencia
+  202503) que **11 de 53 distribuidoras (~21%)** tem "Perdas Nao-Tecnicas"
+  NEGATIVA (ex.: -31.803.169 kWh), gerando percentuais fisicamente
+  impossiveis (de -436% a +784%). Interpretacao: reflete a metodologia de
+  calculo RESIDUAL da ANEEL para perdas nao-tecnicas (perdas totais menos
+  perdas tecnicas ESTIMADAS por modelo tecnico - quando a estimativa tecnica
+  excede o total medido no periodo, o residuo da negativo). Nao e erro deste
+  script nem do dataset em si - e uma limitacao conhecida de metodologias de
+  perda residual, mas teria distorcido gravemente a correlacao se nao
+  filtrado. Corrigido: o script agora exclui do painel qualquer percentual
+  fora do range fisicamente valido [0,100]%, com aviso explicito de quantas
+  distribuidoras foram excluidas.
+
+  **RESULTADO FINAL (08/07/2026, competencia 202503, apos os 3 fixes acima)
+  - HIPOTESE NAO CONFIRMADA, SINAL FRACO E NAO ROBUSTO POR REGIAO:**
+  - Taxa de casamento CNPJ: 2.098 de 4.783 municipios com CNPJ unico
+    conseguiram percentual de perdas (~44%) - acima do limiar de alerta de
+    30%, join funcionando razoavelmente (nao e um problema de formato de
+    CNPJ, e sim de cobertura: das ~57 distribuidoras historicas so 54
+    tinham dado nesta competencia, e cada distribuidora cobre um numero
+    diferente de municipios).
+  - **Correlacao bruta nacional: rho = -0,0457, p = 0,036, n = 2.098** - na
+    direcao prevista pela hipotese (renda mais alta -> % perdas nao-tecnicas
+    mais baixo), estatisticamente significativa, mas com magnitude
+    NEGLIGENCIAVEL (compare com precipitacao x ressarcimento: rho parcial
+    +0,19 - a chuva teve efeito ~4x maior). Nota: esta e uma correlacao
+    BRUTA, nao parcial (nao controlada por urbanizacao/regiao como foi feito
+    na investigacao de clima) - o efeito real, se existir, provavelmente e
+    ainda menor.
+  - **Sensibilidade por regiao - NAO ROBUSTO** (usando o mesmo criterio de
+    robustez estabelecido na investigacao de clima: mesmo sinal em todas as
+    regioes validas):
+    - Centro-Oeste: rho = **+0,3500**, p = 9,7e-08, n=220 - **FORTEMENTE NA
+      DIRECAO OPOSTA** a hipotese (renda mais alta -> MAIS perdas
+      nao-tecnicas, nao menos).
+    - Nordeste: rho = -0,0646, p=0,024, n=1.218 - direcao prevista, fraco.
+    - Norte: rho = -0,1243, p=0,039, n=276 - direcao prevista, fraco-moderado.
+    - Sudeste: rho = -0,1781, p=0,0006, n=366 - direcao prevista, o mais forte
+      dos que confirmam.
+    - Sul: rho = NaN, n=18 - amostra pequena demais para calcular (poucos
+      municipios do Sul tem CNPJ unico + dado nesta competencia).
+  - **CONCLUSAO**: apenas 3 de 5 regioes validas concordam em direcao com a
+    hipotese (Nordeste, Norte, Sudeste - todas fracas), Centro-Oeste diverge
+    fortemente e na direcao oposta, Sul e inconclusivo por amostra pequena.
+    Isso NAO passa no criterio de robustez usado no resto do projeto (a
+    precipitacao teve 5/5 regioes E 3/3 tercis concordantes antes de ser
+    formalizada). Hipoteses possiveis para a divergencia do Centro-Oeste (nao
+    testadas): grandes propriedades rurais/agronegocio com padrao de consumo
+    e fiscalizacao diferentes do resto do pais; ou efeito de 1 unico mes
+    (ruido), ja que este teste usou so uma competencia, nao uma media de 12
+    meses como planejado originalmente na cautela do proprio script.
+  - **DECISAO**: NAO formalizar como indicador do Atlas neste estado - sinal
+    fraco demais e nao robusto para justificar um novo schema/coluna. Se
+    revisitado no futuro, os proximos passos naturais seriam (nenhum feito
+    ainda): (1) trocar 1 mes por media de 12 meses para reduzir ruido, (2)
+    rodar correlacao PARCIAL controlando renda+urbanizacao (como no script de
+    clima), (3) investigar especificamente por que Centro-Oeste diverge antes
+    de descartar ou aceitar a hipotese.
+
+  **APROFUNDAMENTO EM ANDAMENTO (08/07/2026, por decisao do usuario)**: os 3
+  proximos passos listados acima foram todos escritos em
+  `backend/src/etl/analises/aprofundar_perdas_nao_tecnicas_12meses.py`
+  (somente leitura): (1) janela de 12 meses (202404-202503, mesma janela
+  confirmada com cobertura completa na 1a rodada) SOMANDO
+  perdas_tecnicas/nao_tecnicas antes de calcular o percentual (nao faz media
+  de percentuais mensais); (2) correlacao parcial controlando
+  `percentual_populacao_rural` (mesma variavel de urbanizacao ja usada em
+  `analisar_correlacao_mmgd_renda.py`), nacional e por regiao, mais
+  sensibilidade por tercil de urbanizacao; (3) diagnostico dedicado do
+  Centro-Oeste testando a hipotese do confundidor rural/agronegocio (renda x
+  %rural e %rural x %perdas, dentro da propria regiao, mais a correlacao
+  parcial renda x perdas controlando %rural SO dentro do Centro-Oeste).
+
+  Validado contra o arquivo de producao ja baixado (mesmo Parquet da 1a
+  rodada, ja em cache local): **58 distribuidoras** aparecem em pelo menos 1
+  mes da janela (vs. 54 na competencia unica testada antes), **50 delas**
+  com os 12 meses completos. A soma de 12 meses **reduziu mas NAO eliminou**
+  o problema de perdas-nao-tecnicas negativa visto na 1a rodada: **9 de 58
+  distribuidoras (~15%)** ainda ficam com percentual fora do range [0,100]%
+  mesmo apos somar o ano inteiro (vs. 11 de 53, ~21%, em 1 mes so) - ou seja,
+  para essas 9 distribuidoras especificas o desequilibrio parece ser
+  SISTEMATICO (nao so ruido de 1 mes), o script exclui essas do painel com
+  aviso explicito.
+
+  **1a EXECUCAO COMPLETA (08/07/2026) - ACHADO METODOLOGICO DECISIVO:
+  PSEUDORREPLICACAO EXPLICA TODO O SINAL ANTERIOR, INCLUINDO A DIVERGENCIA DO
+  CENTRO-OESTE.** O teste em nivel de municipio reproduziu o padrao da 1a
+  rodada de forma ainda mais forte (bruta nacional rho=-0,226, p=3e-30,
+  n=2.488; Centro-Oeste rho=+0,36 a +0,37, p~1e-8, n=221) - forte o
+  suficiente para levantar suspeita antes de aceitar. Causa raiz confirmada:
+  o indicador e medido por DISTRIBUIDORA, e cada municipio so HERDA o valor
+  da sua distribuidora - **os "n" municipios de qualquer correlacao NAO sao
+  observacoes independentes**. Nacionalmente, 2.488 municipios com
+  percentual valido vêm de so **29 distribuidoras distintas** (razao media
+  85,8 municipios/distribuidora). Por regiao, a razao e ainda mais extrema:
+  Centro-Oeste 221 municipios / **so 4 distribuidoras**, Nordeste 1.231/7,
+  Norte 276/5, Sudeste 366/6, Sul 394/8.
+
+  **A divergencia do Centro-Oeste, especificamente, e um artefato de n=3**:
+  apos excluir 1 das 4 distribuidoras por percentual invalido, sobram
+  exatamente 3 distribuidoras distintas gerando os 221 municipios (141 + 74
+  + 1, aproximadamente = 221): CNPJ ...199 (renda R$3.469, 39,4% perdas nao
+  tec., 141 municipios), CNPJ ...150 (renda R$3.149, 32,9%, 74 municipios),
+  CNPJ ...192 (renda R$6.659, 42,9%, so 1 municipio no painel). Essas 3
+  distribuidoras estao PERFEITAMENTE ordenadas (quanto maior a renda, maior
+  o % de perdas) - com exatamente 3 pontos, isso da rho=+1,0 TRIVIALMENTE
+  (confirmado por calculo direto: `spearmanr([3148.6,3469.7,6658.8],
+  [32.9,39.4,42.9])` = rho=+1,0000, p=0) - qualquer conjunto de 3 pontos
+  pode ser perfeitamente ordenado por acaso, isso nao e evidencia de nada.
+  O "p=1e-8" visto no teste municipal era so esse mesmo padrao de n=3
+  REPLICADO ~74 a 141 vezes cada, inflando artificialmente a significancia.
+
+  **Teste corrigido, em nivel de distribuidora (n = observacoes reais
+  independentes)**: nacional n=29 - abaixo do minimo de 30 amostras que o
+  proprio projeto usa como criterio de confiabilidade em toda parte
+  (`N_MINIMO_AMOSTRA`, ver `analisar_correlacao_mmgd_renda.py`) - o script
+  corretamente retorna NaN em vez de reportar um rho enganoso. Por regiao,
+  os n's sao ainda menores (Centro-Oeste=3, Norte=5, Sudeste=6, Nordeste=7,
+  Sul=8) - nenhum chega perto do minimo para qualquer inferencia estatistica
+  valida.
+
+  **CONCLUSAO DEFINITIVA**: nao e "sinal fraco" nem "nao robusto por
+  regiao" como a 1a rodada sugeriu - e que o SAMP-Balanco, na granularidade
+  real em que e publicado (por distribuidora, ~29 a 58 distribuidoras
+  distintas com dado utilizavel em todo o Brasil), simplesmente NAO TEM
+  poder estatistico suficiente para testar esta hipotese com o rigor que o
+  resto do Atlas exige (n>=30, robustez por regiao/tercil). Isso nao e um
+  problema de metodologia deste script (ja corrigido 3 vezes: tipos int64,
+  valores negativos, agora pseudorreplicacao) - e um limite estrutural do
+  proprio dataset nesta granularidade. Qualquer aumento de "n" municipal
+  (testar mais meses, testar mais variaveis) NAO aumenta o numero real de
+  distribuidoras independentes, que e o teto real desta analise.
+  **DECISAO**: encerrar esta linha de investigacao - nao formalizar como
+  indicador do Atlas. Reabrir soh se surgir uma fonte de dado com
+  granularidade municipal NATIVA de perdas nao-tecnicas (nao existe
+  atualmente, ver 1a pesquisa de viabilidade acima).
+
 - **Queima de equipamentos** (transformadores/eletrodomesticos por sobretensao) -
   tende a concentrar onde a rede tem pouca protecao (para-raios, aterramento)
   combinado com alta incidencia de raios (densidade de descargas atmosfericas maior
@@ -940,6 +1161,23 @@ analise de correlacao abaixo), `0017_indicadores_sociais_rdpc.sql` (`renda_per_c
   precipitacao (MERGE) como indicador do Atlas (schema + extractor formal),
   investigar mais a fundo por que vento diverge por regiao antes de
   descartar, ou passar para outro item da fila de trabalho.
+
+  **FORMALIZADO (08/07/2026): precipitacao (MERGE) agora e indicador oficial
+  do Atlas.** Criados: schema `indicadores_climaticos.ts` (referencia
+  `unidades_espaciais.id`, mesmo padrao de `mmgd_indicadores`), migration
+  `0019_criacao_indicadores_climaticos.sql`, extractor formal
+  `backend/src/etl/loaders/extrair_precipitacao_mensal_merge.py` (reusa a
+  logica ja validada de `escalar_merge_precipitacao_nacional.py`, com
+  checkpoint no proprio banco em vez de parquet - verifica por mes se todos
+  os municipios ja foram gravados antes de reprocessar). Migration aplicada
+  e extractor executado com sucesso: 133.752 linhas (5.573 municipios x 24
+  meses), 0 nulos, valores entre 0 e 296,75mm, media 35,73mm - padrao sazonal
+  conferido manualmente para Sao Paulo (mais chuva no verao jan-mar, menos
+  no inverno jun-jul), consistente com o clima real da regiao. Vento (ERA5)
+  CONTINUA nao formalizado - fica em `analises/` como exploratorio, dado o
+  sinal fraco/inconsistente em escala nacional (ver acima). CLAUDE.md
+  atualizado (migrations 0000-0019, 20 extractors, nota de 9a dimensao nao
+  prevista no DRF original).
 
   **ERA5/vento: prova de conceito completa PASSOU de primeira, sem bug.**
   10 municipios do Nordeste, jan/2024, razao ERA5/INMET entre 0,65 e 0,98 -
