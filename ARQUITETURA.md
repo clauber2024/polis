@@ -206,6 +206,48 @@ analise de correlacao abaixo), `0017_indicadores_sociais_rdpc.sql` (`renda_per_c
    enfraquecida, tarifa rejeitada na direcao oposta, fila de conexao
    inconclusiva por bloqueio de dado) - ver itens 4-6 abaixo. NAO retomar sem
    fonte/evidencia nova.**
+
+   **PENDENCIA REAL para retomar este item (identificada em 06/07/2026,
+   ainda NAO investigada): a tabela de robustez nacional ("Analise de
+   correlacao MMGD x Indicadores Sociais" abaixo) classifica 6 indicadores
+   como "sensivel" (sinal muda entre regioes/faixas de urbanizacao) - IVS,
+   Indice de Precariedade de Infraestrutura, Indice de Precariedade
+   Habitacional, Indice de Seguranca da Posse, Taxa de Alfabetizacao,
+   Irradiacao Solar. Só 2 desses 6 (Seguranca da Posse/Sul, Irradiacao
+   Solar/Centro-Oeste) receberam investigacao dedicada de qual regiao causa
+   a instabilidade e por que (ambos ja encerrados/explicados, ver acima).
+   **Indice de Precariedade Habitacional e Taxa de Alfabetizacao NUNCA
+   tiveram esse mesmo tratamento** - permanecem so como "sensivel" na
+   tabela agregada, sem saber se ha uma unica regiao/estado dirigindo a
+   inconsistencia (como Sul e Centro-Oeste dirigiam os outros 2 casos) ou
+   se e ruido espalhado sem padrao.
+
+   **RESSALVA IMPORTANTE (verificado em 06/07/2026): `diagnosticar_
+   outliers_regionais.py` NAO pode ser rodado direto para isso - esta
+   hardcoded para a analise ANTIGA** (`COLUNA_Y =
+   "mmgd_potencia_per_1000_hab"`, TOTAL, nao residencial; e
+   `REGIOES_INDICADORES_FOCO` fixo em Sul=[ivs, indice_seguranca_posse,
+   indice_precariedade_infraestrutura, taxa_alfabetizacao] e
+   Centro-Oeste=[taxa_mortalidade_infantil, irradiacao_media_kwh_m2_dia] -
+   a lista de ANTES da correcao Residencial x Rural que resolveu IVS/
+   Infraestrutura/Mortalidade Infantil, ver "Analise de correlacao MMGD x
+   Indicadores Sociais" abaixo). PASSO A PASSO CORRETO para retomar:
+   1. Rodar `analisar_correlacao_mmgd_renda.py` (o script principal, ja usa
+      Y residencial por padrao) e olhar o resumo de robustez por regiao/
+      urbanizacao especificamente para `indice_precariedade_moradia` e
+      `taxa_alfabetizacao` - identificar QUAL regiao(oes) causa(m) a
+      inversao de sinal hoje (pode nao ser mais Sul, a lista antiga pode
+      estar desatualizada).
+   2. So depois de saber a regiao certa, atualizar `COLUNA_Y` para
+      `mmgd_potencia_residencial_per_1000_hab` e `REGIOES_INDICADORES_FOCO`
+      em `diagnosticar_outliers_regionais.py` (ou copiar para um script
+      novo, mesmo padrao ja usado varias vezes nesta linha de
+      investigacao) antes de rodar o diagnostico de 3 lentes.
+   3. Alternativa mais simples: decidir de saida que o esforco adicional
+      nao compensa (mesmo raciocinio ja aplicado ao caso Sul apos 6
+      tentativas) e marcar os 2 indicadores como "sensivel, sem
+      investigacao dedicada, por decisao explicita" para fechar de vez o
+      item 1.**
 2. ~~Atualizar README e CLAUDE.md (Estado Real) com os dados das sessoes de Moradia,
    INDQUAL, DEC/FEC real, Capital Humano e Irradiacao Solar~~ - FEITO (sessao
    06/07/2026): CLAUDE.md ja estava majoritariamente atualizado (verificado, incluia
