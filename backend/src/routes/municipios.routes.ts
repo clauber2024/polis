@@ -2,11 +2,13 @@ import { Router } from 'express';
 import {
   listarMunicipiosController,
   buscarMunicipioController,
+  compararMunicipiosController,
 } from '../controllers/municipios.controller.js';
 import { validateRequest } from '../middlewares/validateRequest.js';
 import {
   listarMunicipiosQuerySchema,
   buscarMunicipioParamsSchema,
+  compararMunicipiosQuerySchema,
 } from '../schemas/municipios.schema.js';
 
 export const municipiosRouter = Router();
@@ -26,6 +28,25 @@ municipiosRouter.get(
   '/municipios',
   validateRequest({ query: listarMunicipiosQuerySchema }),
   listarMunicipiosController,
+);
+
+/**
+ * GET /api/municipios/comparar (RF-049, RF-050)
+ *
+ * Comparação lado a lado de 2 a 10 municípios (Painel Analítico,
+ * Cruzamento de Variáveis). IMPORTANTE: esta rota precisa vir ANTES de
+ * '/municipios/:codigoIbge' no registro — como "comparar" tem o mesmo
+ * formato de path que um código IBGE (um segmento após /municipios),
+ * se a rota de parâmetro fosse registrada primeiro o Express tentaria
+ * casar "comparar" como se fosse um codigoIbge.
+ *
+ * Query params: codigos (obrigatório) — string única separada por vírgula,
+ * ex: ?codigos=3550308,3106200 — ver schemas/municipios.schema.ts.
+ */
+municipiosRouter.get(
+  '/municipios/comparar',
+  validateRequest({ query: compararMunicipiosQuerySchema }),
+  compararMunicipiosController,
 );
 
 /**

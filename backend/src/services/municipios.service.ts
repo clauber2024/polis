@@ -138,6 +138,22 @@ async function buscarMunicipioBruto(codigoIbge: string): Promise<LinhaBruta | nu
   return (resultado.rows[0] as unknown as LinhaBruta) ?? null;
 }
 
+async function buscarMunicipiosBrutoPorCodigos(codigos: string[]): Promise<LinhaBruta[]> {
+  // NOTA: `= ANY(${codigos})` (array como parâmetro único) falha em runtime —
+  // "op ANY/ALL (array) requires array on right side" — o driver `pg` não
+  // serializa o array JS do jeito que o Postgres espera dentro do template
+  // `sql` do drizzle. `IN (...)` com `sql.join` constrói cada código como
+  // parâmetro bindado separado ($1, $2, ...), forma testada e que funciona.
+  const listaCodigos = sql.join(
+    codigos.map((codigo) => sql`${codigo}`),
+    sql`, `,
+  );
+  const resultado = await db.execute(
+    sql`${SELECT_BASE} WHERE m.codigo_ibge IN (${listaCodigos}) ORDER BY m.codigo_ibge;`,
+  );
+  return resultado.rows as unknown as LinhaBruta[];
+}
+
 /**
  * Calcula população estimada (densidade x área — mesmo método já usado em
  * vaziosDeAcesso.service.ts e na migration 0014, já que o Atlas não guarda
@@ -270,4 +286,39 @@ export async function buscarMunicipioPorCodigoIbge(
     throw new AppError(404, `Município não encontrado para o código IBGE: ${codigoIbge}`);
   }
   return calcularDerivados(linha);
+}
+
+export interface CompararMunicipiosResultado {
+  codigosSolicitados: string[];
+  codigosNaoEncontrados: string[];
+  resultados: MunicipioComIndicadores[];
+}
+
+/**
+ * RF-049/RF-050: comparação lado a lado de 2+ municípios (Painel Analítico,
+ * Cruzamento de Variáveis). Diferente de buscarMunicipioPorCodigoIbge, NÃO
+ * lança 404 para códigos individuais não encontrados — reporta em
+ * `codigosNaoEncontrados` e segue com os demais, já que o objetivo é
+ * comparar o que existe, não falhar a comparação inteira por um código
+ * inválido/inexistente entre vários.
+ */
+export async function compararMunicipios(codigos: string[]): Promise<CompararMunicipiosResultado> {
+  const linhasBrutas = await buscarMunicipiosBrutoPorCodigos(codigos);
+  const encontrados = linhasBrutas.map(calcularDerivados);
+  const porCodigo = new Map(encontrados.map((m) => [m.codigoIbge, m]));
+
+  // Preserva a ordem pedida pelo cliente (o SQL retorna ordenado por
+  // codigo_ibge, não necessariamente na ordem da query string) — importa
+  // pra comparação lado a lado manter a ordem que o usuário escolheu.
+  const resultados = codigos
+    .map((codigo) => porCodigo.get(codigo))
+    .filter((municipio): municipio is MunicipioComIndicadores => municipio !== undefined);
+
+  const codigosNaoEncontrados = codigos.filter((codigo) => !porCodigo.has(codigo));
+
+  return {
+    codigosSolicitados: codigos,
+    codigosNaoEncontrados,
+    resultados,
+  };
 }

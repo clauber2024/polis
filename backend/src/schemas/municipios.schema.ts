@@ -1,5 +1,6 @@
 /**
- * SCHEMA (zod): query/params de GET /api/municipios e GET /api/municipios/:codigoIbge
+ * SCHEMA (zod): query/params de GET /api/municipios, GET /api/municipios/comparar
+ * e GET /api/municipios/:codigoIbge
  * --------------------------------------------------------------------------
  * Mesmo padrão de vaziosDeAcesso.schema.ts (validação via middleware
  * dedicado, CLAUDE.md Seção 4). Reaproveita REGIOES_VALIDAS de lá para não
@@ -74,3 +75,29 @@ export const buscarMunicipioParamsSchema = z.object({
 });
 
 export type BuscarMunicipioParams = z.infer<typeof buscarMunicipioParamsSchema>;
+
+/**
+ * RF-049/RF-050: Cruzamento de Variáveis / comparação de "dois ou mais
+ * municípios simultaneamente". Aceita `?codigos=3550308,3106200,...` — string
+ * única separada por vírgula (não array de query params) pra manter a URL
+ * simples de montar/copiar/colar no frontend. Deduplica antes de validar
+ * tamanho mínimo, pra não deixar o cliente burlar o mínimo de 2 repetindo o
+ * mesmo código.
+ */
+export const compararMunicipiosQuerySchema = z.object({
+  codigos: z
+    .string()
+    .trim()
+    .min(1, 'informe pelo menos 2 códigos IBGE separados por vírgula (ex: "3550308,3106200").')
+    .transform((valor) =>
+      Array.from(new Set(valor.split(',').map((codigo) => codigo.trim()).filter((codigo) => codigo.length > 0))),
+    )
+    .pipe(
+      z
+        .array(z.string().regex(/^\d{7}$/, 'cada código IBGE deve ter exatamente 7 dígitos numéricos.'))
+        .min(2, 'informe pelo menos 2 códigos IBGE distintos para comparar.')
+        .max(10, 'no máximo 10 municípios por comparação.'),
+    ),
+});
+
+export type CompararMunicipiosQuery = z.infer<typeof compararMunicipiosQuerySchema>;
