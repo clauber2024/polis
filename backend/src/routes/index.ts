@@ -5,7 +5,9 @@
 
 import { Router } from 'express';
 import { vaziosDeAcessoRouter } from './vaziosDeAcesso.routes.js';
+import { municipiosRouter } from './municipios.routes.js';
 
 export const router = Router();
 
 router.use(vaziosDeAcessoRouter);
+router.use(municipiosRouter);
