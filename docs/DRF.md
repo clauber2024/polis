@@ -14,16 +14,24 @@ sub-municipais.
 
 ---
 
-## 2. PERFIS DE USUÁRIO
+## 2. PAPÉIS DE ACESSO (RBAC)
 
-| ID | Perfil | Nível de acesso |
+> ⚠️ **Revisado em 08/07/2026.** A versão original desta seção descrevia 6 perfis
+> (P1-P6). Reavaliação: P1 (Usuário Público), P2 (Pesquisador/Analista) e P3
+> (Gestor Público) nunca escreviam dado algum — diferiam só em quais
+> painéis/telas apareciam, o que é roteamento de UI/feature, não fronteira de
+> RBAC. As únicas fronteiras de permissão reais são as que envolvem escrita:
+> P4 (Parceiro Técnico) e P5 (Equipe do Projeto) — que foram fundidos abaixo em
+> **Colaborador** — e P6 (Administrador). Onde as seções 8 a 13 abaixo ainda
+> dizem "P1", "P2" ou "P3", leia-se **Público**; "P4"/"P5" leem-se
+> **Colaborador**; "P6" lê-se **Administrador**. A numeração dos RF-XXX não
+> muda — só o mapeamento de papel.
+
+| ID | Papel | Nível de acesso |
 |---|---|---|
-| P1 | Usuário Público | Visualização pública, sem dados administrativos |
-| P2 | Pesquisador/Analista | Visualização + cruzamento avançado de variáveis |
-| P3 | Gestor Público | Visualização + priorização territorial |
-| P4 | Parceiro Técnico | Revisão metodológica e validação de dados |
-| P5 | Equipe do Projeto | Gestão de bases, notas metodológicas, comunicação |
-| P6 | Administrador | Controle total da plataforma |
+| Público | Público | Todas as telas de visualização e análise (dashboard, cruzamento de variáveis, ranking de municípios, priorização territorial/vazios de acesso) e exports (CSV, GeoJSON, XLSX, PDF) — sem autenticação |
+| Colaborador | Colaborador | Login necessário. Escrita: observações sobre inconsistências, sugestões de melhoria em indicadores, notas metodológicas com histórico de revisão, status de materiais de comunicação em produção |
+| Administrador | Administrador | Login necessário. Controle total: upload/validação de bases de dados, aprovação de indicadores, publicação de versões, gestão de usuários internos |
 
 ---
 
@@ -49,15 +57,19 @@ sub-municipais.
 
 ## 4. REQUISITOS FUNCIONAIS — AUTENTICAÇÃO
 
+> Nota (08/07/2026): a tela de login abaixo só se aplica aos papéis
+> **Colaborador** e **Administrador** (ver Seção 2). O papel **Público** não
+> autentica — acessa diretamente as telas de visualização.
+
 **RF-009.** O sistema deve apresentar uma tela de login com campos de e-mail/usuário e senha, e botão "Entrar".
 
 **RF-010.** O sistema deve oferecer um link "Esqueci minha senha" na tela de login.
 
-**RF-011.** O sistema deve exibir, na tela de login, um painel de "Acesso de demonstração" listando os seis perfis de usuário disponíveis, cada um com ícone, nome do perfil, e-mail de exemplo e botão de preenchimento automático das credenciais.
+**RF-011.** O sistema deve exibir, na tela de login, um painel de "Acesso de demonstração" listando os dois papéis autenticados disponíveis (Colaborador e Administrador), cada um com ícone, nome do papel, e-mail de exemplo e botão de preenchimento automático das credenciais.
 
-**RF-012.** O sistema deve preencher automaticamente os campos de e-mail e senha do formulário de login ao clicar em qualquer perfil de demonstração, sem exigir digitação manual.
+**RF-012.** O sistema deve preencher automaticamente os campos de e-mail e senha do formulário de login ao clicar em qualquer papel de demonstração, sem exigir digitação manual.
 
-**RF-013.** O sistema deve autenticar o usuário e redirecioná-lo à interface correspondente ao seu perfil após login bem-sucedido.
+**RF-013.** O sistema deve autenticar o usuário e redirecioná-lo à interface correspondente ao seu papel (Colaborador ou Administrador) após login bem-sucedido.
 
 **RF-014.** O sistema deve oferecer funcionalidade de logout, disponível a partir do avatar do usuário no header.
 
@@ -137,17 +149,17 @@ sub-municipais.
 
 ---
 
-## 8. REQUISITOS FUNCIONAIS — DASHBOARD PÚBLICO (P1 — Usuário Público)
+## 8. REQUISITOS FUNCIONAIS — DASHBOARD PÚBLICO (Público)
 
-**RF-046.** O sistema deve exibir, para o perfil Usuário Público, painel lateral de filtros com opções de estado, região, faixa de potência instalada e período.
+**RF-046.** O sistema deve exibir, para o papel Público, painel lateral de filtros com opções de estado, região, faixa de potência instalada e período.
 
 **RF-047.** O sistema deve oferecer botão de download de dados públicos nos formatos CSV e GeoJSON.
 
-**RF-048.** O sistema não deve exibir, para o perfil Usuário Público, qualquer botão de acesso ao painel administrativo.
+**RF-048.** O sistema não deve exibir, para o papel Público, qualquer botão de acesso ao painel administrativo.
 
 ---
 
-## 9. REQUISITOS FUNCIONAIS — PAINEL ANALÍTICO (P2 — Pesquisador/Analista)
+## 9. REQUISITOS FUNCIONAIS — PAINEL ANALÍTICO (Público)
 
 **RF-049.** O sistema deve oferecer painel de Cruzamento de Variáveis, permitindo combinar os indicadores: MMGD solar, Renda, CadÚnico, Tarifa Social, IVS, Potencial Solar e Índice de Pobreza Energética Regional.
 
@@ -163,7 +175,7 @@ sub-municipais.
 
 ---
 
-## 10. REQUISITOS FUNCIONAIS — PAINEL DE GESTÃO PÚBLICA (P3 — Gestor Público)
+## 10. REQUISITOS FUNCIONAIS — PAINEL DE GESTÃO PÚBLICA (Público)
 
 **RF-055.** O sistema deve exibir uma seção de "Territórios Prioritários", destacando municípios com alto potencial solar e baixo acesso à MMGD, com badge "Vazio de Acesso".
 
@@ -175,7 +187,7 @@ sub-municipais.
 
 ---
 
-## 11. REQUISITOS FUNCIONAIS — PAINEL DO PARCEIRO TÉCNICO (P4)
+## 11. REQUISITOS FUNCIONAIS — PAINEL DO PARCEIRO TÉCNICO (Colaborador)
 
 **RF-059.** O sistema deve exibir lista de bases de dados com status de revisão metodológica, classificadas por badges: "Em revisão", "Validado", "Inconsistência encontrada".
 
@@ -187,7 +199,7 @@ sub-municipais.
 
 ---
 
-## 12. REQUISITOS FUNCIONAIS — PAINEL DA EQUIPE DO PROJETO (P5)
+## 12. REQUISITOS FUNCIONAIS — PAINEL DA EQUIPE DO PROJETO (Colaborador)
 
 **RF-063.** O sistema deve exibir dashboard de status de cada base de dados primária (ANEEL, IBGE, CadÚnico, TSEE, IVS/IPEA, INPE), com indicador de progresso.
 
@@ -201,9 +213,9 @@ sub-municipais.
 
 ---
 
-## 13. REQUISITOS FUNCIONAIS — PAINEL ADMINISTRATIVO (P6 — Administrador)
+## 13. REQUISITOS FUNCIONAIS — PAINEL ADMINISTRATIVO (Administrador)
 
-**RF-068.** O sistema deve exibir, exclusivamente para o perfil Administrador, um botão fixo no canto superior direito do header, com ícone de engrenagem/escudo, dando acesso à área administrativa.
+**RF-068.** O sistema deve exibir, exclusivamente para o papel Administrador, um botão fixo no canto superior direito do header, com ícone de engrenagem/escudo, dando acesso à área administrativa.
 
 **RF-069.** O sistema deve apresentar, na área administrativa, navegação lateral com as seções: Gestão de Bases de Dados, Revisão de Metadados, Aprovação de Indicadores, Publicação de Versões e Gerenciamento de Usuários.
 
@@ -241,7 +253,7 @@ sub-municipais.
 
 **RT-002.** O sistema deve ser responsivo em todos os componentes, com sidebar colapsável, mapas adaptáveis, tabelas com rolagem horizontal e painéis de filtro convertidos em bottom sheet em telas pequenas.
 
-**RT-003.** O sistema deve utilizar senha padrão "123456" para todas as contas de demonstração, restritas a ambiente de prototipagem.
+**RT-003.** O sistema deve utilizar senha padrão "123456" para todas as contas de demonstração (Colaborador e Administrador — Público não autentica), restritas a ambiente de prototipagem.
 
 **RT-004.** O sistema deve priorizar alto contraste visual para dados e indicadores numéricos, utilizando amarelo solar ou verde energia sobre fundos claros/glass.
 

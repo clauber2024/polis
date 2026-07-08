@@ -2,7 +2,8 @@
  * SERVICE: Relatório-resumo em PDF do território (RF-058)
  * ============================================================================
  * "Botão para geração de relatório-resumo exportável (PDF) do território
- * selecionado" — Painel de Gestão Pública (P3), ligado à seção de
+ * selecionado" — Painel de Gestão Pública (papel Público, ver DRF Seção 2 —
+ * revisado 08/07/2026, antigo P3), ligado à seção de
  * "Territórios Prioritários" (RF-055 a RF-057). O "território" aqui é um
  * município (unidade de análise principal do Atlas, ver DRF Seção 1) — o
  * relatório combina os indicadores consolidados já expostos em

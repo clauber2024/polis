@@ -3,7 +3,8 @@
  * ============================================================================
  * RF-063: "dashboard de status de cada base de dados primária (ANEEL, IBGE,
  * CadÚnico, TSEE, IVS/IPEA, INPE), com indicador de progresso" — Painel da
- * Equipe do Projeto (P5). Este service calcula cobertura (% de municípios
+ * Equipe do Projeto (papel Colaborador, ver DRF Seção 2 — revisado 08/07/2026,
+ * antigo P5). Este service calcula cobertura (% de municípios
  * com o dado presente) e a data do snapshot mais recente diretamente do
  * banco, sem depender de nenhuma tabela de controle manual — não existe
  * ainda workflow de revisão/aprovação (RF-059, RF-070 — Parceiro Técnico e
