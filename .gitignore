@@ -31,6 +31,7 @@ env/
 # Logs
 logs/
 *.log
+log_*.txt
 
 # OS files
 .DS_Store

@@ -20,7 +20,7 @@ urbana, CEP ou bairro) conforme novas fontes de dados se tornem disponíveis —
 
 ---
 
-## Estado atual dos dados (atualizado em 06/07/2026)
+## Estado atual dos dados (atualizado em 08/07/2026)
 
 | Dimensão | Cobertura | Fonte | Status |
 |---|---|---|---|
@@ -34,6 +34,7 @@ urbana, CEP ou bairro) conforme novas fontes de dados se tornem disponíveis —
 | Irradiação solar | 5.569 municípios, GHI médio anual (média climatológica 1999-2015) | Atlas Brasileiro de Energia Solar (LABREN/CCST/INPE, 2ª ed. 2017) | ✅ Completo |
 | Tarifa de Energia Residencial | 4.724/5.540 municípios (TUSD+TE), 116 distribuidoras | ANEEL, Tarifas de Aplicação das Distribuidoras | ✅ Completo — variável de interesse regional (Centro-Oeste), não indicador nacional robusto (ver ARQUITETURA.md) |
 | IVS Consolidado (índice próprio) | ~5.571 municípios, média de 3 blocos (Infraestrutura, Renda e Trabalho, Capital Humano) | `vw_ivs_consolidado`, normalização min-max sobre dados já carregados | ✅ Completo |
+| Precipitação máxima mensal (`indicadores_climaticos`) | 5.573 municípios x 24 meses (jan/2024–dez/2025), máximo zonal (não comparável ao pico de 1 estação) | MERGE/CPTEC-INPE (GPM-IMERG V07B), migration 0019 | ✅ Completo — 9ª dimensão, fora das 8 originais do DRF, nascida da investigação "Queima de equipamentos" (ver ARQUITETURA.md) |
 | TSEE / baixa renda (`percentual_tsee`) | — | ANEEL, Beneficiários da CDE | 🔒 Bloqueado — aguardando dado de jan/2026+ (nova subclasse "Desconto Social") e resolução de bug de infraestrutura no portal ANEEL |
 
 Os índices de Infraestrutura Urbana, Renda e Trabalho, Capital Humano, Moradia e o IVS
@@ -180,6 +181,16 @@ docker compose exec -T postgres psql -U atlas -d atlas_solar_justo < backend/src
 # Analise exploratoria (opcional, so leitura - nao faz parte da carga de dados,
 # requer scipy: pip install scipy --break-system-packages, ver ARQUITETURA.md):
 python3 backend/src/etl/analises/analisar_correlacao_mmgd_renda.py
+
+# migration 0019 (indicadores_climaticos - precipitacao maxima mensal, MERGE/CPTEC-INPE,
+# primeiro indicador climatico formal do Atlas, ver ARQUITETURA.md "RESULTADO FINAL -
+# COBERTURA NACIONAL") + extractor formal, que reusa a logica ja validada em
+# analises/escalar_merge_precipitacao_nacional.py. Requer cfgrib, xarray, eccodes,
+# rasterstats (pip install, sem conda - ver docstring do script). Idempotente com
+# checkpoint por mes no banco (roda de novo pula meses ja completos); rodada inicial
+# completa (2024-2025, todos os municipios) pode levar cerca de 1h:
+docker compose exec -T postgres psql -U atlas -d atlas_solar_justo < backend/src/db/migrations/0019_criacao_indicadores_climaticos.sql
+python3 backend/src/etl/loaders/extrair_precipitacao_mensal_merge.py
 
 # migration 0020 (persiste a quebra MMGD Residencial - necessaria para o
 # endpoint de Vazios de Acesso abaixo) + re-executar o extractor de MMGD:
