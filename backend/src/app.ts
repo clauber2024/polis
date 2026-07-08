@@ -5,10 +5,13 @@
  * chamar .listen()), o que facilita testar a app depois (supertest etc.)
  * sem precisar abrir uma porta real. src/index.ts é quem sobe o servidor.
  *
- * ESCOPO DESTA SESSÃO (07/07/2026): autenticação/JWT/RBAC/6 personas
- * continuam PLANEJADO (CLAUDE.md, Seção 1) — não implementados aqui de
- * propósito. Este app só tem a estrutura mínima para o endpoint de Vazios
- * de Acesso rodar.
+ * ATUALIZADO 08/07/2026: fundação de autenticação/RBAC implementada
+ * (POST /api/auth/login, /logout — ver routes/auth.routes.ts,
+ * middlewares/auth.ts). Só 3 papéis reais (Público sem login, Colaborador,
+ * Administrador — ver DRF.md Seção 2). Os ENDPOINTS DE ESCRITA que dependem
+ * disso (observações/sugestões do Colaborador, painel completo do
+ * Administrador) continuam PLANEJADOS — ver CLAUDE.md, "Estado Real do
+ * Projeto".
  * --------------------------------------------------------------------------
  */
 

@@ -31,4 +31,16 @@ export const env = {
   ),
   porta: Number(process.env.PORT ?? 3000),
   ambiente: process.env.NODE_ENV ?? 'development',
+
+  /**
+   * JWT_SECRET tem um default de DEV LOCAL pelo mesmo motivo do DATABASE_URL
+   * acima: o projeto ainda não tem deploy de produção (CLAUDE.md, Seção 8 —
+   * PLANEJADO). Este default NUNCA deve ser usado fora de ambiente local —
+   * definir JWT_SECRET de verdade em backend/.env antes de qualquer deploy.
+   */
+  jwtSecret: obrigatoria(
+    'JWT_SECRET',
+    'dev-secret-local-nao-usar-em-producao-ver-backend-env-example',
+  ),
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '8h',
 };

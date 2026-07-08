@@ -7,9 +7,11 @@ import { Router } from 'express';
 import { vaziosDeAcessoRouter } from './vaziosDeAcesso.routes.js';
 import { municipiosRouter } from './municipios.routes.js';
 import { basesDeDadosRouter } from './basesDeDados.routes.js';
+import { authRouter } from './auth.routes.js';
 
 export const router = Router();
 
 router.use(vaziosDeAcessoRouter);
 router.use(municipiosRouter);
 router.use(basesDeDadosRouter);
+router.use(authRouter);

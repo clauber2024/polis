@@ -38,8 +38,8 @@ um WebGIS analítico que depende de:
 - **ETL Python** para extração de fontes governamentais (ANEEL, IBGE/SIDRA, RAIS via
   BigQuery), com scripts isolados por fonte.
 - **Backend Node.js/Express + Drizzle ORM (TypeScript)** — schema e migrations
-  implementados; rotas/controllers **em construção** (1 endpoint real desde
-  07/07/2026 — ver Estado Real do Projeto, abaixo).
+  implementados; endpoints de leitura + fundação de auth/RBAC implementados,
+  endpoints de escrita **em construção** (ver Estado Real do Projeto, abaixo).
 
 Por isso, esta é uma exceção justificada e documentada, nos termos previstos pelo próprio
 Official Project Standard ("seguido em todos os projetos, salvo exceção justificada e
@@ -49,7 +49,7 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
 
 ---
 
-## Estado Real do Projeto (atualizado em 07/07/2026)
+## Estado Real do Projeto (atualizado em 08/07/2026)
 
 **Implementado e validado com dados reais:**
 - **Backend Node/Express — primeiro endpoint real (07/07/2026):**
@@ -61,8 +61,7 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   `src/{index,app}.ts`, `src/config/env.ts`, `src/db/client.ts`,
   `src/{routes,controllers,services,schemas,middlewares,utils}/`. Zod para
   validacao de query params, tratamento de erro central (`errorHandler.ts`,
-  formato `{ erro: { mensagem, detalhes? } }`). Autenticacao/JWT/RBAC/6
-  personas continuam **PLANEJADO** - fora do escopo desta sessao.
+  formato `{ erro: { mensagem, detalhes? } }`).
   **Bloqueio real encontrado e resolvido**: a metodologia validada usa MMGD
   RESIDENCIAL per capita (nao o total), mas essa quebra por classe de
   consumo so existia em memoria no script Python (lida direto do Parquet
@@ -82,13 +81,36 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   Drift semelhante em `taxa_mortalidade_infantil` (migration 0012) **NAO foi
   corrigido** (fora do escopo desta sessao, nao usado pelo endpoint novo) -
   ciente para quando for necessario.
+- **Fundacao de autenticacao/RBAC (08/07/2026):** o DRF.md foi revisado na
+  mesma sessao, reduzindo os 6 perfis originais (P1-P6) a 3 papeis reais -
+  `Publico` (sem login), `Colaborador` (funde antigos P4 Parceiro Tecnico +
+  P5 Equipe do Projeto) e `Administrador` (antigo P6) - ver DRF.md Secao 2
+  para o raciocinio completo (so P4/P5/P6 tinham escrita real; P1/P2/P3 so
+  diferiam em quais telas apareciam). Implementado: migration 0022
+  (`usuarios`, com CHECK `papel IN ('colaborador','administrador')` em vez de
+  enum nativo do Postgres), `POST /api/auth/login` e `/logout`
+  (`src/routes/auth.routes.ts`), middlewares `requireAutenticacao`/
+  `requirePapel` (`src/middlewares/auth.ts`), hash de senha via `bcryptjs`
+  (custo 10, nao `bcrypt` nativo - evita dependencia de compilacao nativa/
+  node-gyp num projeto que ja teve dor de cabeca com `node_modules`
+  corrompido), JWT via `jsonwebtoken` (`JWT_SECRET`/`JWT_EXPIRES_IN` em
+  `src/config/env.ts`, com default de dev local pelo mesmo motivo do
+  `DATABASE_URL` - projeto ainda sem deploy de producao). Seed de 2 contas de
+  demonstracao (`colaborador@atlassolarjusto.dev` /
+  `admin@atlassolarjusto.dev`, senha `123456` conforme RT-003 do DRF) direto
+  na migration, idempotente via `ON CONFLICT (email) DO UPDATE`.
+  **Escopo desta sessao foi só a fundacao** - os endpoints de escrita que
+  dependem disso (observacoes/sugestoes/notas do Colaborador, upload de
+  base/aprovacao de indicador/gestao de usuario do Administrador) continuam
+  **PLANEJADO**, ver bloco "NAO implementado ainda" abaixo.
 - Schema do banco: `municipios`, `unidades_espaciais`, `mmgd_indicadores`,
-  `indicadores_sociais`, `irradiacao_solar`, `indicadores_climaticos` via Drizzle
-  (`backend/src/db/schema/`) + tabelas `qualidade_conjuntos`, `qualidade_indicadores`,
+  `indicadores_sociais`, `irradiacao_solar`, `indicadores_climaticos`, `usuarios`
+  (fundacao de auth, migration 0022) via Drizzle (`backend/src/db/schema/`) + tabelas
+  `qualidade_conjuntos`, `qualidade_indicadores`,
   `qualidade_conjunto_municipio` criadas FORA do Drizzle, via
   `backend/src/etl/schema_qualidade.sql` (ver nota de inconsistencia arquitetural na
   Secao 2)
-- Migrations incrementais 0000 a 0020 - ver `backend/src/db/migrations/`. Numeracao
+- Migrations incrementais 0000 a 0022 - ver `backend/src/db/migrations/`. Numeracao
   formal NAO cobre o schema de qualidade (criado fora do sistema de migrations ate a
   migration 0011, que so adiciona as views DEC/FEC "real" em cima do schema ja existente).
   0014-0017: indices compostos + views consolidadas (`vw_indicadores_sociais_consolidado`,
@@ -108,6 +130,9 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   sinal nao se sustentou em escala nacional, permanece exploratorio em `analises/`.
   0020: `potencia_residencial_kw` e `numero_ucs_residencial` em
   `mmgd_indicadores` (sessao 07/07/2026, ver bloco "Backend Node/Express" acima).
+  0021: seed piloto de setores censitarios de Sao Paulo (RF-045). 0022: tabela
+  `usuarios` (fundacao de auth/RBAC, ver bloco "Fundacao de autenticacao/RBAC"
+  acima).
 - 20 extractors Python funcionais em `backend/src/etl/loaders/` (territorio, MMGD/ANEEL,
   Infraestrutura Urbana/Censo, Renda e Trabalho/RAIS via BigQuery, Alfabetizacao/Censo,
   Mortalidade Infantil/SIM+SINASC via BigQuery, Moradia/Censo, Tipo de Domicilio/Censo,
@@ -129,15 +154,20 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   historico completo. Nao remover das 8 originais do DRF nem misturar com elas.
 
 **NAO implementado ainda** (apesar de descrito em secoes deste documento como padrao):
-- Backend Node/Express: **1 endpoint real** (`GET /api/vazios-de-acesso`, ver acima) -
-  demais rotas/controllers do DRF (RF-001 a RF-080), autenticacao JWT, RBAC e as 6
-  personas continuam nao implementados
+- Backend Node/Express: endpoints de LEITURA implementados (`GET /api/vazios-de-acesso`,
+  `/api/municipios` + variantes, `/api/bases-de-dados`, export CSV/GeoJSON/XLSX, relatorio
+  PDF) + fundacao de auth (`POST /api/auth/login`/`logout`, RBAC 3 papeis - ver acima) -
+  ainda faltam os ENDPOINTS DE ESCRITA do DRF: Painel Admin completo (upload de bases,
+  aprovacao de indicadores, gestao de usuarios) e as partes de escrita do papel
+  Colaborador (observacoes, sugestoes, notas metodologicas com historico - hoje
+  `/api/bases-de-dados` so cobre leitura de status)
 - Frontend React - nao iniciado
 - Makefile - nao existe; todos os comandos deste documento (`make up`, `make etl`, etc.)
   sao **especificacao para quando o backend for construido**, nao comandos reais hoje
 - Deploy/producao (Nginx, certbot, scheduler, `docker-compose.prod.yml`) - arquitetura
   especificada mas nunca implementada nem testada
-- Autenticacao, 6 personas, RBAC - existem so no DRF como requisito, sem codigo
+- RBAC: fundacao implementada (login/logout, 3 papeis - ver acima), mas os endpoints que
+  ela protege (escrita do Colaborador/Administrador) ainda nao existem
 - Cruzamento MMGD x indicadores sociais (identificacao de "vazios de acesso") -
   classificacao/ranking (item 3) ja tem endpoint real (acima); RF-057 (painel tipo
   heatmap) continua pendente - e exibicao/frontend, nao calculo
@@ -151,16 +181,18 @@ backend via `cd backend && npm install && npm run dev` (requer `backend/.env` co
 
 ## 1️⃣ Stack Oficial do Projeto
 
-### 🔹 Backend (schema implementado; 1 endpoint real desde 07/07/2026; demais rotas/controllers PLANEJADOS)
+### 🔹 Backend (schema implementado; endpoints de leitura + fundação de auth desde 08/07/2026; endpoints de escrita PLANEJADOS)
 - Node.js 20+ (LTS)
 - TypeScript 5+
 - Express
 - Drizzle ORM
 - Zod (validação de request, middleware dedicado)
 - PostgreSQL 16 + PostGIS 3.4
-- JWT (autenticação) — PLANEJADO, não implementado
-- REST JSON API — parcial: `GET /api/vazios-de-acesso` implementado, demais rotas do
-  DRF PLANEJADAS
+- JWT (autenticação) — IMPLEMENTADO (fundação, 08/07/2026): `jsonwebtoken` + `bcryptjs`,
+  3 papéis (Público sem login, Colaborador, Administrador — ver Estado Real do Projeto)
+- REST JSON API — parcial: endpoints de leitura (`vazios-de-acesso`, `municipios`,
+  `bases-de-dados`, exports) + `POST /api/auth/login`/`logout` implementados, endpoints
+  de escrita do DRF PLANEJADOS
 
 ### 🔹 ETL (implementado)
 - Python 3.12+
@@ -219,8 +251,10 @@ backend via `cd backend && npm install && npm run dev` (requer `backend/.env` co
 │       │   │   ├── indicadores_sociais.ts (+ percentualPobrezaCadunico, drift da migration 0013 corrigido 07/07/2026)
 │       │   │   ├── irradiacao_solar.ts
 │       │   │   ├── indicadores_climaticos.ts
+│       │   │   ├── usuarios.ts     (NOVO 08/07/2026 - fundacao de auth/RBAC,
+│       │   │   │   papel via CHECK 'colaborador'|'administrador', migration 0022)
 │       │   │   └── index.ts
-│       │   └── migrations/        (SQL incremental - IMPLEMENTADO, 0000 a 0020)
+│       │   └── migrations/        (SQL incremental - IMPLEMENTADO, 0000 a 0022)
 │       │       ├── 0000_criacao_tabelas.sql
 │       │       ├── 0001_extensoes_e_indices_espaciais.sql
 │       │       ├── ... (0002 a 0010: infraestrutura, renda, capital humano,
@@ -235,21 +269,33 @@ backend via `cd backend && npm install && npm run dev` (requer `backend/.env` co
 │       │       ├── 0017_indicadores_sociais_rdpc.sql
 │       │       ├── 0018_indicadores_sociais_tarifa_residencial.sql
 │       │       ├── 0019_criacao_indicadores_climaticos.sql
-│       │       └── 0020_mmgd_indicadores_residencial.sql  (NOVO 07/07/2026 - ver "Backend
-│       │           Node/Express" em Estado Real do Projeto)
+│       │       ├── 0020_mmgd_indicadores_residencial.sql  (NOVO 07/07/2026 - ver "Backend
+│       │       │   Node/Express" em Estado Real do Projeto)
+│       │       ├── 0021_seed_piloto_setores_censitarios_sp.sql
+│       │       └── 0022_criacao_usuarios_auth.sql  (NOVO 08/07/2026 - fundacao de
+│       │           auth/RBAC, ver "Fundacao de autenticacao/RBAC" em Estado Real do Projeto)
+│       ├── types/
+│       │   └── express.d.ts        (NOVO 08/07/2026 - augmentation de `Request.usuario`)
 │       ├── middlewares/            (IMPLEMENTADO 07/07/2026)
 │       │   ├── validateRequest.ts  (validação zod genérica, por query/body/params)
-│       │   └── errorHandler.ts     (JSON de erro consistente + notFoundHandler)
+│       │   ├── errorHandler.ts     (JSON de erro consistente + notFoundHandler)
+│       │   └── auth.ts             (NOVO 08/07/2026 - requireAutenticacao/requirePapel)
 │       ├── routes/                 (IMPLEMENTADO 07/07/2026)
 │       │   ├── index.ts            (agrega routers sob /api)
-│       │   └── vaziosDeAcesso.routes.ts
+│       │   ├── vaziosDeAcesso.routes.ts
+│       │   ├── municipios.routes.ts
+│       │   ├── basesDeDados.routes.ts
+│       │   └── auth.routes.ts      (NOVO 08/07/2026 - POST /auth/login, /logout)
 │       ├── controllers/            (IMPLEMENTADO 07/07/2026)
-│       │   └── vaziosDeAcesso.controller.ts
+│       │   ├── vaziosDeAcesso.controller.ts
+│       │   └── auth.controller.ts  (NOVO 08/07/2026)
 │       ├── services/                (IMPLEMENTADO 07/07/2026 - lógica de negócio isolada aqui)
-│       │   └── vaziosDeAcesso.service.ts  (RF-055/056/057 - ver docstring do arquivo
-│       │       para a metodologia completa)
+│       │   ├── vaziosDeAcesso.service.ts  (RF-055/056/057 - ver docstring do arquivo
+│       │   │   para a metodologia completa)
+│       │   └── auth.service.ts      (NOVO 08/07/2026 - bcryptjs + jsonwebtoken)
 │       ├── schemas/                 (IMPLEMENTADO 07/07/2026 - contratos zod)
-│       │   └── vaziosDeAcesso.schema.ts
+│       │   ├── vaziosDeAcesso.schema.ts
+│       │   └── auth.schema.ts       (NOVO 08/07/2026 - loginSchema)
 │       └── utils/
 │           └── AppError.ts
 │       └── etl/
@@ -388,11 +434,14 @@ stack tecnológica, estrutura de pastas, convenções de código, tratamento de 
 - Services isolados em `/services`, nenhuma chamada `fetch` direta em componentes
 - Componentes de mapa isolados de lógica de negócio
 
-### 🔹 Backend (Node/Express) — PLANEJADO (schema existe, rotas não)
+### 🔹 Backend (Node/Express) — parcialmente implementado (leitura + fundação de auth; escrita PLANEJADA)
 - Controllers devem retornar JSON consistente
 - Validação via middleware dedicado (ex: zod)
 - Lógica de negócio em Services, nunca no controller
 - Acesso a dados isolado via Drizzle
+- Rotas que exigem papel: `requireAutenticacao` seguido de `requirePapel(...)` na cadeia
+  da rota (`src/middlewares/auth.ts`) — nunca checar `req.usuario.papel` manualmente
+  dentro do controller
 
 ### 🔹 ETL (Python) — IMPLEMENTADO, com padrão real observado nesta fase
 - Cada fonte primária tem extractor próprio em `backend/src/etl/loaders/`

@@ -196,15 +196,30 @@ python3 backend/src/etl/loaders/extrair_precipitacao_mensal_merge.py
 # endpoint de Vazios de Acesso abaixo) + re-executar o extractor de MMGD:
 docker compose exec -T postgres psql -U atlas -d atlas_solar_justo < backend/src/db/migrations/0020_mmgd_indicadores_residencial.sql
 python3 backend/src/etl/loaders/extrair_mmgd_aneel.py
+
+# migration 0022 (tabela usuarios - fundacao de autenticacao/RBAC, 3 papeis:
+# Publico sem login, Colaborador, Administrador - ver CLAUDE.md "Fundacao de
+# autenticacao/RBAC"). Ja semeia as 2 contas de demonstracao (ver secao
+# "Acesso de demonstracao" abaixo), idempotente via ON CONFLICT:
+docker compose exec -T postgres psql -U atlas -d atlas_solar_justo < backend/src/db/migrations/0022_criacao_usuarios_auth.sql
 ```
 
 ### Backend (Node/Express)
 
 ```bash
 cd backend
-cp .env.example .env   # ajuste DATABASE_URL se necessario
+cp .env.example .env   # ajuste DATABASE_URL e defina JWT_SECRET se necessario
 npm install
-npm run dev             # http://localhost:3000 - GET /api/vazios-de-acesso, GET /health
+npm run dev             # http://localhost:3000 - GET /health, GET /api/vazios-de-acesso,
+                         # GET /api/municipios, GET /api/bases-de-dados,
+                         # POST /api/auth/login, POST /api/auth/logout
+```
+
+Testar o login (requer migration 0022 aplicada):
+```bash
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@atlassolarjusto.dev","senha":"123456"}'
 ```
 
 Requer a migration 0020 aplicada e `extrair_mmgd_aneel.py` executado (ver acima) para o
@@ -213,9 +228,10 @@ endpoint `GET /api/vazios-de-acesso` refletir os numeros ja validados em ARQUITE
 de MMGD anterior a migration 0020 ficam fora da classificacao (ver campo
 `avisos.totalPrecisaReextrairMmgd` na resposta).
 
-O frontend ainda não foi implementado nesta fase do projeto. O backend tem, até aqui, 1
-endpoint real — o trabalho anterior se concentrou em construir e validar a camada de dados
-(schema + ETL).
+O frontend ainda não foi implementado nesta fase do projeto. O backend tem endpoints de
+leitura (`vazios-de-acesso`, `municipios`, `bases-de-dados`, exports) e a fundação de
+autenticação/RBAC (`POST /api/auth/login`/`logout`, 3 papéis) — os endpoints de escrita
+(Painel Admin, escrita do Colaborador) ainda não existem.
 
 Para a etapa de RAIS via BigQuery, é necessária autenticação prévia:
 ```bash
@@ -230,8 +246,16 @@ implementados).
 
 ## Acesso de demonstração
 
-Em ambiente de prototipagem, todos os perfis usam a senha `123456`. Ver a tela de login para a
-lista completa de e-mails de demonstração por perfil.
+O papel Público não autentica (ver CLAUDE.md, DRF.md Seção 2). As 2 contas autenticadas,
+semeadas pela migration 0022, usam a senha `123456` (RT-003 do DRF):
+
+| Papel | E-mail |
+|---|---|
+| Colaborador | `colaborador@atlassolarjusto.dev` |
+| Administrador | `admin@atlassolarjusto.dev` |
+
+Não há tela de login ainda (frontend não implementado) — testar via `POST /api/auth/login`
+(ver exemplo `curl` acima).
 
 ⚠️ Credenciais de demonstração nunca devem ser usadas em ambiente de produção.
 
