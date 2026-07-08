@@ -101,3 +101,32 @@ export const compararMunicipiosQuerySchema = z.object({
 });
 
 export type CompararMunicipiosQuery = z.infer<typeof compararMunicipiosQuerySchema>;
+
+/**
+ * RF-047: download de dados públicos em CSV/GeoJSON (Dashboard Público).
+ * Reaproveita os mesmos filtros/ordenação de listarMunicipiosQuerySchema,
+ * removendo paginação de propósito — exportação sempre traz TODOS os
+ * municípios que casarem o filtro, não uma página.
+ */
+export const exportarMunicipiosQuerySchema = listarMunicipiosQuerySchema
+  .omit({ pagina: true, porPagina: true })
+  .extend({
+    formato: z.enum(['csv', 'geojson'], {
+      errorMap: () => ({ message: 'formato deve ser "csv" ou "geojson".' }),
+    }),
+  });
+
+export type ExportarMunicipiosQuery = z.infer<typeof exportarMunicipiosQuerySchema>;
+
+/**
+ * RF-052: exportação de tabelas do Painel Analítico (CSV/XLSX) — mesma
+ * comparação de compararMunicipiosQuerySchema, só adicionando o formato de
+ * saída.
+ */
+export const exportarComparacaoQuerySchema = compararMunicipiosQuerySchema.extend({
+  formato: z.enum(['csv', 'xlsx'], {
+    errorMap: () => ({ message: 'formato deve ser "csv" ou "xlsx".' }),
+  }),
+});
+
+export type ExportarComparacaoQuery = z.infer<typeof exportarComparacaoQuerySchema>;

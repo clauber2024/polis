@@ -17,9 +17,11 @@
  */
 
 import { sql } from 'drizzle-orm';
+import ExcelJS from 'exceljs';
 import { db } from '../db/client.js';
 import { AppError } from '../utils/AppError.js';
-import type { ListarMunicipiosQuery } from '../schemas/municipios.schema.js';
+import { paraCsv } from '../utils/csv.js';
+import type { ListarMunicipiosQuery, ExportarMunicipiosQuery } from '../schemas/municipios.schema.js';
 
 export interface MunicipioComIndicadores {
   codigoIbge: string;
@@ -227,9 +229,15 @@ export interface ListarMunicipiosResultado {
   resultados: MunicipioComIndicadores[];
 }
 
-export async function listarMunicipios(
-  query: ListarMunicipiosQuery,
-): Promise<ListarMunicipiosResultado> {
+/**
+ * Filtro compartilhado por listarMunicipios (que pagina) e as funções de
+ * exportação abaixo (que NUNCA paginam — exportação sempre traz todos os
+ * municípios que casarem o filtro). Extraído aqui pra não duplicar a lógica
+ * de filtro/ordenação entre os dois casos de uso.
+ */
+async function buscarEFiltrarMunicipios(
+  query: Pick<ListarMunicipiosQuery, 'uf' | 'regiao' | 'nome' | 'ordenarPor' | 'ordem'>,
+): Promise<MunicipioComIndicadores[]> {
   const linhasBrutas = await buscarPainelBruto();
   let municipios = linhasBrutas.map(calcularDerivados);
 
@@ -246,7 +254,13 @@ export async function listarMunicipios(
     municipios = municipios.filter((m) => m.nome.toLocaleLowerCase('pt-BR').includes(termo));
   }
 
-  const ordenado = ordenarMunicipios(municipios, query.ordenarPor, query.ordem);
+  return ordenarMunicipios(municipios, query.ordenarPor, query.ordem);
+}
+
+export async function listarMunicipios(
+  query: ListarMunicipiosQuery,
+): Promise<ListarMunicipiosResultado> {
+  const ordenado = await buscarEFiltrarMunicipios(query);
 
   const totalResultados = ordenado.length;
   const totalPaginas = Math.max(1, Math.ceil(totalResultados / query.porPagina));
@@ -321,4 +335,103 @@ export async function compararMunicipios(codigos: string[]): Promise<CompararMun
     codigosNaoEncontrados,
     resultados,
   };
+}
+
+/**
+ * RF-047: download de dados públicos (Dashboard Público) em CSV.
+ */
+export async function exportarMunicipiosCsv(query: ExportarMunicipiosQuery): Promise<string> {
+  const municipios = await buscarEFiltrarMunicipios(query);
+  return paraCsv(municipios as unknown as Record<string, unknown>[]);
+}
+
+interface FeatureMunicipio {
+  type: 'Feature';
+  geometry: unknown;
+  properties: MunicipioComIndicadores;
+}
+
+export interface FeatureCollectionMunicipios {
+  type: 'FeatureCollection';
+  features: FeatureMunicipio[];
+}
+
+/**
+ * Geometria (GeoJSON) de um conjunto de municípios, via ST_AsGeoJSON nativo
+ * do PostGIS — evita reimplementar conversão de geometria em JS. Usa o mesmo
+ * padrão `IN (...) + sql.join` de buscarMunicipiosBrutoPorCodigos (NÃO
+ * `ANY(array)`, que falha em runtime — ver nota lá).
+ */
+async function buscarGeometriasPorCodigos(codigos: string[]): Promise<Map<string, unknown>> {
+  if (codigos.length === 0) return new Map();
+
+  const listaCodigos = sql.join(
+    codigos.map((codigo) => sql`${codigo}`),
+    sql`, `,
+  );
+  const resultado = await db.execute(sql`
+    SELECT codigo_ibge AS "codigoIbge", ST_AsGeoJSON(geom) AS "geojson"
+    FROM municipios
+    WHERE codigo_ibge IN (${listaCodigos});
+  `);
+
+  const mapa = new Map<string, unknown>();
+  for (const linha of resultado.rows as Array<{ codigoIbge: string; geojson: string | null }>) {
+    mapa.set(linha.codigoIbge, linha.geojson ? JSON.parse(linha.geojson) : null);
+  }
+  return mapa;
+}
+
+/**
+ * RF-047: download de dados públicos (Dashboard Público) em GeoJSON — cada
+ * município vira um Feature, com a geometria (SIRGAS 2000/EPSG:4674, mesma
+ * projeção usada em todo o Atlas — ver CLAUDE.md Seção 5) e os indicadores
+ * consolidados como `properties`.
+ */
+export async function exportarMunicipiosGeoJson(
+  query: ExportarMunicipiosQuery,
+): Promise<FeatureCollectionMunicipios> {
+  const municipios = await buscarEFiltrarMunicipios(query);
+  const geometrias = await buscarGeometriasPorCodigos(municipios.map((m) => m.codigoIbge));
+
+  return {
+    type: 'FeatureCollection',
+    features: municipios.map((municipio) => ({
+      type: 'Feature',
+      geometry: geometrias.get(municipio.codigoIbge) ?? null,
+      properties: municipio,
+    })),
+  };
+}
+
+/**
+ * RF-052: exportação da tabela de comparação do Painel Analítico em CSV.
+ * Reaproveita compararMunicipios (mesma lógica/ordem/codigosNaoEncontrados
+ * já validada) — só serializa `resultados` como CSV.
+ */
+export async function exportarComparacaoCsv(codigos: string[]): Promise<string> {
+  const { resultados } = await compararMunicipios(codigos);
+  return paraCsv(resultados as unknown as Record<string, unknown>[]);
+}
+
+/**
+ * RF-052: exportação da tabela de comparação do Painel Analítico em XLSX
+ * (biblioteca `exceljs` — ver package.json). Uma única planilha, cabeçalho
+ * na primeira linha com os mesmos nomes de campo do JSON da API (consistência
+ * com o CSV e com o contrato do endpoint /comparar).
+ */
+export async function exportarComparacaoXlsx(codigos: string[]): Promise<ExcelJS.Buffer> {
+  const { resultados } = await compararMunicipios(codigos);
+
+  const workbook = new ExcelJS.Workbook();
+  const planilha = workbook.addWorksheet('Comparação de Municípios');
+
+  if (resultados.length > 0) {
+    const colunas = Object.keys(resultados[0]) as Array<keyof MunicipioComIndicadores>;
+    planilha.columns = colunas.map((coluna) => ({ header: coluna, key: coluna, width: 22 }));
+    resultados.forEach((municipio) => planilha.addRow(municipio));
+    planilha.getRow(1).font = { bold: true };
+  }
+
+  return workbook.xlsx.writeBuffer();
 }

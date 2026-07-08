@@ -414,3 +414,43 @@ function ordenarMunicipios(
     return valorA < valorB ? -1 * fator : valorA > valorB ? 1 * fator : 0;
   });
 }
+
+export interface ClassificacaoMunicipioIndividual {
+  quadrante: Quadrante | null;
+  quadranteRotulo: string | null;
+  irradiacaoMediaKwhM2Dia: number | null;
+  mmgdResidencialPer1000Hab: number | null;
+  medianaNacional: {
+    potencialSolarKwhM2Dia: number;
+    mmgdResidencialPer1000Hab: number;
+  };
+}
+
+/**
+ * RF-058: classificação de vazio de acesso de UM único município, para uso
+ * no relatório-resumo em PDF (relatorioTerritorio.service.ts). Reaproveita
+ * buscarPainelBruto/classificarPainel (as mesmas funções do endpoint de
+ * listagem) porque a classificação depende de MEDIANAS NACIONAIS — não dá
+ * pra calcular o quadrante de um município isolado sem primeiro calcular o
+ * painel completo. Retorna null se o código IBGE não existir na base
+ * territorial (o chamador decide como tratar isso).
+ */
+export async function classificarMunicipioIndividual(
+  codigoIbge: string,
+): Promise<ClassificacaoMunicipioIndividual | null> {
+  const linhasBrutas = await buscarPainelBruto();
+  const painel = classificarPainel(linhasBrutas);
+  const municipio = painel.municipios.find((m) => m.codigoIbge === codigoIbge);
+  if (!municipio) return null;
+
+  return {
+    quadrante: municipio.quadrante,
+    quadranteRotulo: municipio.quadranteRotulo,
+    irradiacaoMediaKwhM2Dia: municipio.irradiacaoMediaKwhM2Dia,
+    mmgdResidencialPer1000Hab: municipio.mmgdResidencialPer1000Hab,
+    medianaNacional: {
+      potencialSolarKwhM2Dia: painel.medianaIrradiacao,
+      mmgdResidencialPer1000Hab: painel.medianaMmgdResidencialPerCapita,
+    },
+  };
+}
