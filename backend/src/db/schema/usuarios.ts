@@ -15,7 +15,7 @@
  * --------------------------------------------------------------------------
  */
 
-import { pgTable, integer, varchar, text, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, integer, varchar, text, boolean, timestamp } from 'drizzle-orm/pg-core';
 
 export const usuarios = pgTable('usuarios', {
   id: integer('id').primaryKey().generatedAlwaysAsIdentity(),
@@ -30,6 +30,13 @@ export const usuarios = pgTable('usuarios', {
 
   /** 'colaborador' | 'administrador' — ver CHECK na migration 0022. */
   papel: varchar('papel', { length: 20 }).notNull(),
+
+  /**
+   * RF-076 (migration 0024) — usuário inativo não consegue autenticar (ver
+   * auth.service.ts). "Remover" (RF-076) é DELETE de verdade; "inativar" é
+   * reversível via este campo.
+   */
+  ativo: boolean('ativo').default(true).notNull(),
 
   criadoEm: timestamp('criado_em', { withTimezone: true }).defaultNow().notNull(),
 });

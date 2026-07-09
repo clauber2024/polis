@@ -202,6 +202,12 @@ python3 backend/src/etl/loaders/extrair_mmgd_aneel.py
 # autenticacao/RBAC"). Ja semeia as 2 contas de demonstracao (ver secao
 # "Acesso de demonstracao" abaixo), idempotente via ON CONFLICT:
 docker compose exec -T postgres psql -U atlas -d atlas_solar_justo < backend/src/db/migrations/0022_criacao_usuarios_auth.sql
+
+# migration 0023 (escrita do Colaborador - RF-059 a RF-067) e 0024 (Painel
+# Admin - RF-070 a RF-077 + usuarios.ativo). Ver CLAUDE.md "Endpoints de
+# escrita do Colaborador e Painel Admin":
+docker compose exec -T postgres psql -U atlas -d atlas_solar_justo < backend/src/db/migrations/0023_colaborador_escrita.sql
+docker compose exec -T postgres psql -U atlas -d atlas_solar_justo < backend/src/db/migrations/0024_admin_escrita.sql
 ```
 
 ### Backend (Node/Express)
@@ -222,6 +228,27 @@ curl -X POST http://localhost:3000/api/auth/login \
   -d '{"email":"admin@atlassolarjusto.dev","senha":"123456"}'
 ```
 
+Testar escrita do Colaborador/Admin (requer migrations 0023/0024 aplicadas — guarde o
+`token` retornado pelo login acima em `$TOKEN`):
+```bash
+TOKEN="<token retornado pelo login>"
+
+# RF-059/060 — status de revisão + observação (Colaborador ou Admin)
+curl http://localhost:3000/api/bases-de-dados/revisoes
+curl -X PUT http://localhost:3000/api/bases-de-dados/aneel/revisao \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"status":"validado"}'
+curl -X POST http://localhost:3000/api/bases-de-dados/aneel/observacoes \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"mensagem":"Teste de observação"}'
+
+# RF-076 — gestão de usuários (só Administrador)
+curl http://localhost:3000/api/admin/usuarios -H "Authorization: Bearer $TOKEN"
+```
+
+Testar com token do papel Colaborador em uma rota só-Admin (ex: `GET /api/admin/usuarios`)
+deve retornar `403`.
+
 Requer a migration 0020 aplicada e `extrair_mmgd_aneel.py` executado (ver acima) para o
 endpoint `GET /api/vazios-de-acesso` refletir os numeros ja validados em ARQUITETURA.md
 (secao "Identificacao e ranking de Vazios de Acesso") — sem isso, municipios com snapshot
@@ -229,9 +256,12 @@ de MMGD anterior a migration 0020 ficam fora da classificacao (ver campo
 `avisos.totalPrecisaReextrairMmgd` na resposta).
 
 O frontend ainda não foi implementado nesta fase do projeto. O backend tem endpoints de
-leitura (`vazios-de-acesso`, `municipios`, `bases-de-dados`, exports) e a fundação de
-autenticação/RBAC (`POST /api/auth/login`/`logout`, 3 papéis) — os endpoints de escrita
-(Painel Admin, escrita do Colaborador) ainda não existem.
+leitura (`vazios-de-acesso`, `municipios`, `bases-de-dados`, exports), autenticação/RBAC
+(`POST /api/auth/login`/`logout`, 3 papéis) e escrita do Colaborador/Admin (RF-059 a
+RF-077 — revisão de bases, observações, sugestões, notas metodológicas, materiais de
+comunicação, metadados técnicos, aprovação de indicadores, versionamento, gestão de
+usuários). Upload de arquivo real (RF-070) não foi implementado — decisão do projeto foi
+manter a carga de dado só via ETL Python, com a API cobrindo apenas o workflow/status.
 
 Para a etapa de RAIS via BigQuery, é necessária autenticação prévia:
 ```bash

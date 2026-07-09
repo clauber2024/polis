@@ -50,6 +50,13 @@ export async function autenticar({ email, senha }: LoginInput): Promise<LoginRes
     throw new AppError(401, MENSAGEM_CREDENCIAL_INVALIDA);
   }
 
+  // Checado DEPOIS da senha conferir (RF-076, migration 0024) — só revelamos
+  // "conta desativada" pra quem já provou saber a senha; antes disso, erro
+  // genérico de credencial inválida, para não vazar quais e-mails existem.
+  if (!linha.ativo) {
+    throw new AppError(401, 'Esta conta foi desativada. Fale com um administrador.');
+  }
+
   const papel = linha.papel as PapelUsuario;
   const usuario: UsuarioAutenticado = {
     id: linha.id,
@@ -58,9 +65,13 @@ export async function autenticar({ email, senha }: LoginInput): Promise<LoginRes
     papel,
   };
 
-  const token = jwt.sign({ sub: linha.id, papel }, env.jwtSecret, {
-    expiresIn: env.jwtExpiresIn,
-  });
+  // jsonwebtoken@9 tipa `expiresIn` como `number | StringValue` (template
+  // literal type da lib `ms`, ex: "8h"), não `string` genérico — env.jwtExpiresIn
+  // vem de process.env (string solta), por isso o cast pontual abaixo.
+  const opcoesToken: jwt.SignOptions = {
+    expiresIn: env.jwtExpiresIn as jwt.SignOptions['expiresIn'],
+  };
+  const token = jwt.sign({ sub: linha.id, papel }, env.jwtSecret, opcoesToken);
 
   return { token, usuario };
 }

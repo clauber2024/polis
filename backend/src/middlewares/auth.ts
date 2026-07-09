@@ -43,7 +43,10 @@ export function requireAutenticacao(req: Request, _res: Response, next: NextFunc
   }
 
   try {
-    const payload = jwt.verify(token, env.jwtSecret) as PayloadJwt;
+    // jwt.verify() retorna `string | JwtPayload` — cast via `unknown` porque
+    // `JwtPayload` (tipo genérico da lib) não compartilha campos suficientes
+    // com nosso payload específico ({ sub, papel }) para o TS aceitar direto.
+    const payload = jwt.verify(token, env.jwtSecret) as unknown as PayloadJwt;
     req.usuario = { id: payload.sub, papel: payload.papel };
     next();
   } catch {

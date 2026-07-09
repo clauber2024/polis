@@ -99,18 +99,43 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   demonstracao (`colaborador@atlassolarjusto.dev` /
   `admin@atlassolarjusto.dev`, senha `123456` conforme RT-003 do DRF) direto
   na migration, idempotente via `ON CONFLICT (email) DO UPDATE`.
-  **Escopo desta sessao foi só a fundacao** - os endpoints de escrita que
-  dependem disso (observacoes/sugestoes/notas do Colaborador, upload de
-  base/aprovacao de indicador/gestao de usuario do Administrador) continuam
-  **PLANEJADO**, ver bloco "NAO implementado ainda" abaixo.
+  **Escopo daquela sessao foi só a fundacao** - os endpoints de escrita
+  seguiram em sessao separada, ver bloco abaixo.
+- **Endpoints de escrita do Colaborador e Painel Admin (08/07/2026):**
+  migrations 0023 (Colaborador: `revisoes_bases_dados` RF-059,
+  `observacoes_bases_dados` RF-060, `sugestoes_indicadores` RF-061,
+  `notas_metodologicas` RF-064/065/066 com historico via multiplas linhas,
+  `materiais_comunicacao` RF-067) e 0024 (Admin: `metadados_bases_dados`
+  RF-071/072/073, `aprovacoes_indicadores` RF-074, `versoes_publicadas`
+  RF-075, `usuarios.ativo` RF-076). Rotas: `src/routes/colaborador.routes.ts`
+  e `admin.routes.ts`, protegidas por `requireAutenticacao` +
+  `requirePapel(...)`. Leituras (`GET`) sao publicas (papel Publico ve tudo,
+  ver DRF.md Secao 2); somente escrita exige login.
+  **Decisao do usuario sobre RF-070** ("upload de bases"): implementado so
+  como workflow/status (metadados + aprovacao + versionamento) - NAO
+  recebimento de arquivo via API, porque a carga real de dado sempre passa
+  pelos scripts Python (`extrair_*.py`, fora da API Node). Se um dia for
+  necessario aceitar upload de arquivo de verdade, isso e um escopo
+  separado (nova dependencia tipo multer + storage), nao implementado aqui.
+  **Guard de "ultimo administrador"** em `admin.service.ts`
+  (`garantirNaoUltimoAdministrador`): nenhuma operacao de
+  `PATCH`/`DELETE /admin/usuarios` pode deixar o sistema sem nenhum
+  administrador ativo, nem um usuario pode remover a propria conta.
+  **AINDA NAO VALIDADO** no ambiente do usuario nesta sessao - ver bloco
+  "Como rodar o que existe hoje" para os passos de migration/typecheck/teste
+  pendentes antes de considerar isso pronto.
 - Schema do banco: `municipios`, `unidades_espaciais`, `mmgd_indicadores`,
   `indicadores_sociais`, `irradiacao_solar`, `indicadores_climaticos`, `usuarios`
-  (fundacao de auth, migration 0022) via Drizzle (`backend/src/db/schema/`) + tabelas
+  (fundacao de auth, migration 0022), `revisoes_bases_dados`,
+  `observacoes_bases_dados`, `sugestoes_indicadores`, `notas_metodologicas`,
+  `materiais_comunicacao` (escrita Colaborador, migration 0023),
+  `metadados_bases_dados`, `aprovacoes_indicadores`, `versoes_publicadas`
+  (escrita Admin, migration 0024) via Drizzle (`backend/src/db/schema/`) + tabelas
   `qualidade_conjuntos`, `qualidade_indicadores`,
   `qualidade_conjunto_municipio` criadas FORA do Drizzle, via
   `backend/src/etl/schema_qualidade.sql` (ver nota de inconsistencia arquitetural na
   Secao 2)
-- Migrations incrementais 0000 a 0022 - ver `backend/src/db/migrations/`. Numeracao
+- Migrations incrementais 0000 a 0024 - ver `backend/src/db/migrations/`. Numeracao
   formal NAO cobre o schema de qualidade (criado fora do sistema de migrations ate a
   migration 0011, que so adiciona as views DEC/FEC "real" em cima do schema ja existente).
   0014-0017: indices compostos + views consolidadas (`vw_indicadores_sociais_consolidado`,
@@ -132,7 +157,9 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   `mmgd_indicadores` (sessao 07/07/2026, ver bloco "Backend Node/Express" acima).
   0021: seed piloto de setores censitarios de Sao Paulo (RF-045). 0022: tabela
   `usuarios` (fundacao de auth/RBAC, ver bloco "Fundacao de autenticacao/RBAC"
-  acima).
+  acima). 0023: tabelas de escrita do Colaborador (RF-059 a RF-067). 0024:
+  tabelas do Admin + `usuarios.ativo` (RF-070 a RF-077) - ver bloco "Endpoints
+  de escrita do Colaborador e Painel Admin" acima.
 - 20 extractors Python funcionais em `backend/src/etl/loaders/` (territorio, MMGD/ANEEL,
   Infraestrutura Urbana/Censo, Renda e Trabalho/RAIS via BigQuery, Alfabetizacao/Censo,
   Mortalidade Infantil/SIM+SINASC via BigQuery, Moradia/Censo, Tipo de Domicilio/Censo,
@@ -154,20 +181,21 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   historico completo. Nao remover das 8 originais do DRF nem misturar com elas.
 
 **NAO implementado ainda** (apesar de descrito em secoes deste documento como padrao):
-- Backend Node/Express: endpoints de LEITURA implementados (`GET /api/vazios-de-acesso`,
-  `/api/municipios` + variantes, `/api/bases-de-dados`, export CSV/GeoJSON/XLSX, relatorio
-  PDF) + fundacao de auth (`POST /api/auth/login`/`logout`, RBAC 3 papeis - ver acima) -
-  ainda faltam os ENDPOINTS DE ESCRITA do DRF: Painel Admin completo (upload de bases,
-  aprovacao de indicadores, gestao de usuarios) e as partes de escrita do papel
-  Colaborador (observacoes, sugestoes, notas metodologicas com historico - hoje
-  `/api/bases-de-dados` so cobre leitura de status)
+- Backend Node/Express: endpoints de LEITURA (`GET /api/vazios-de-acesso`,
+  `/api/municipios` + variantes, `/api/bases-de-dados`, export CSV/GeoJSON/XLSX,
+  relatorio PDF), fundacao de auth (`POST /api/auth/login`/`logout`, RBAC 3 papeis) e
+  endpoints de ESCRITA do Colaborador/Admin (RF-059 a RF-077, migrations 0023/0024 - ver
+  acima) implementados, mas **ainda nao validados no ambiente do usuario nesta sessao**.
+  RF-070 ("upload de bases") implementado so como workflow/status, NAO recebimento de
+  arquivo via API - decisao explicita do usuario, ver bloco acima.
 - Frontend React - nao iniciado
 - Makefile - nao existe; todos os comandos deste documento (`make up`, `make etl`, etc.)
   sao **especificacao para quando o backend for construido**, nao comandos reais hoje
 - Deploy/producao (Nginx, certbot, scheduler, `docker-compose.prod.yml`) - arquitetura
   especificada mas nunca implementada nem testada
-- RBAC: fundacao implementada (login/logout, 3 papeis - ver acima), mas os endpoints que
-  ela protege (escrita do Colaborador/Administrador) ainda nao existem
+- Upload de arquivo real (multer/storage) para o Painel Admin - decisao explicita do
+  usuario foi NAO implementar isso agora (ver bloco acima); carga de dado continua via
+  ETL Python
 - Cruzamento MMGD x indicadores sociais (identificacao de "vazios de acesso") -
   classificacao/ranking (item 3) ja tem endpoint real (acima); RF-057 (painel tipo
   heatmap) continua pendente - e exibicao/frontend, nao calculo
@@ -181,7 +209,7 @@ backend via `cd backend && npm install && npm run dev` (requer `backend/.env` co
 
 ## 1️⃣ Stack Oficial do Projeto
 
-### 🔹 Backend (schema implementado; endpoints de leitura + fundação de auth desde 08/07/2026; endpoints de escrita PLANEJADOS)
+### 🔹 Backend (schema, leitura, auth e escrita do Colaborador/Admin implementados — ver Estado Real do Projeto)
 - Node.js 20+ (LTS)
 - TypeScript 5+
 - Express
@@ -190,9 +218,9 @@ backend via `cd backend && npm install && npm run dev` (requer `backend/.env` co
 - PostgreSQL 16 + PostGIS 3.4
 - JWT (autenticação) — IMPLEMENTADO (fundação, 08/07/2026): `jsonwebtoken` + `bcryptjs`,
   3 papéis (Público sem login, Colaborador, Administrador — ver Estado Real do Projeto)
-- REST JSON API — parcial: endpoints de leitura (`vazios-de-acesso`, `municipios`,
-  `bases-de-dados`, exports) + `POST /api/auth/login`/`logout` implementados, endpoints
-  de escrita do DRF PLANEJADOS
+- REST JSON API — leitura (`vazios-de-acesso`, `municipios`, `bases-de-dados`, exports),
+  auth (`login`/`logout`) e escrita do Colaborador/Admin (RF-059 a RF-077) implementados;
+  upload de arquivo real (RF-070) PLANEJADO (decisão: só workflow/status por enquanto)
 
 ### 🔹 ETL (implementado)
 - Python 3.12+
@@ -252,9 +280,18 @@ backend via `cd backend && npm install && npm run dev` (requer `backend/.env` co
 │       │   │   ├── irradiacao_solar.ts
 │       │   │   ├── indicadores_climaticos.ts
 │       │   │   ├── usuarios.ts     (NOVO 08/07/2026 - fundacao de auth/RBAC,
-│       │   │   │   papel via CHECK 'colaborador'|'administrador', migration 0022)
+│       │   │   │   papel via CHECK 'colaborador'|'administrador', migration 0022;
+│       │   │   │   + coluna ativo na migration 0024)
+│       │   │   ├── revisoes_bases_dados.ts    (NOVO 08/07/2026 - RF-059, migration 0023)
+│       │   │   ├── observacoes_bases_dados.ts (NOVO 08/07/2026 - RF-060, migration 0023)
+│       │   │   ├── sugestoes_indicadores.ts   (NOVO 08/07/2026 - RF-061, migration 0023)
+│       │   │   ├── notas_metodologicas.ts     (NOVO 08/07/2026 - RF-064/065/066, migration 0023)
+│       │   │   ├── materiais_comunicacao.ts   (NOVO 08/07/2026 - RF-067, migration 0023)
+│       │   │   ├── metadados_bases_dados.ts   (NOVO 08/07/2026 - RF-071/072/073, migration 0024)
+│       │   │   ├── aprovacoes_indicadores.ts  (NOVO 08/07/2026 - RF-074, migration 0024)
+│       │   │   ├── versoes_publicadas.ts      (NOVO 08/07/2026 - RF-075, migration 0024)
 │       │   │   └── index.ts
-│       │   └── migrations/        (SQL incremental - IMPLEMENTADO, 0000 a 0022)
+│       │   └── migrations/        (SQL incremental - IMPLEMENTADO, 0000 a 0024)
 │       │       ├── 0000_criacao_tabelas.sql
 │       │       ├── 0001_extensoes_e_indices_espaciais.sql
 │       │       ├── ... (0002 a 0010: infraestrutura, renda, capital humano,
@@ -272,8 +309,11 @@ backend via `cd backend && npm install && npm run dev` (requer `backend/.env` co
 │       │       ├── 0020_mmgd_indicadores_residencial.sql  (NOVO 07/07/2026 - ver "Backend
 │       │       │   Node/Express" em Estado Real do Projeto)
 │       │       ├── 0021_seed_piloto_setores_censitarios_sp.sql
-│       │       └── 0022_criacao_usuarios_auth.sql  (NOVO 08/07/2026 - fundacao de
-│       │           auth/RBAC, ver "Fundacao de autenticacao/RBAC" em Estado Real do Projeto)
+│       │       ├── 0022_criacao_usuarios_auth.sql  (NOVO 08/07/2026 - fundacao de
+│       │       │   auth/RBAC, ver "Fundacao de autenticacao/RBAC" em Estado Real do Projeto)
+│       │       ├── 0023_colaborador_escrita.sql    (NOVO 08/07/2026 - RF-059 a RF-067)
+│       │       └── 0024_admin_escrita.sql          (NOVO 08/07/2026 - RF-070 a RF-077
+│       │             + usuarios.ativo)
 │       ├── types/
 │       │   └── express.d.ts        (NOVO 08/07/2026 - augmentation de `Request.usuario`)
 │       ├── middlewares/            (IMPLEMENTADO 07/07/2026)
@@ -285,19 +325,30 @@ backend via `cd backend && npm install && npm run dev` (requer `backend/.env` co
 │       │   ├── vaziosDeAcesso.routes.ts
 │       │   ├── municipios.routes.ts
 │       │   ├── basesDeDados.routes.ts
-│       │   └── auth.routes.ts      (NOVO 08/07/2026 - POST /auth/login, /logout)
+│       │   ├── auth.routes.ts      (NOVO 08/07/2026 - POST /auth/login, /logout)
+│       │   ├── colaborador.routes.ts (NOVO 08/07/2026 - RF-059 a RF-067)
+│       │   └── admin.routes.ts       (NOVO 08/07/2026 - RF-070 a RF-077)
 │       ├── controllers/            (IMPLEMENTADO 07/07/2026)
 │       │   ├── vaziosDeAcesso.controller.ts
-│       │   └── auth.controller.ts  (NOVO 08/07/2026)
+│       │   ├── auth.controller.ts    (NOVO 08/07/2026)
+│       │   ├── colaborador.controller.ts (NOVO 08/07/2026)
+│       │   └── admin.controller.ts       (NOVO 08/07/2026)
 │       ├── services/                (IMPLEMENTADO 07/07/2026 - lógica de negócio isolada aqui)
 │       │   ├── vaziosDeAcesso.service.ts  (RF-055/056/057 - ver docstring do arquivo
 │       │   │   para a metodologia completa)
-│       │   └── auth.service.ts      (NOVO 08/07/2026 - bcryptjs + jsonwebtoken)
+│       │   ├── auth.service.ts      (NOVO 08/07/2026 - bcryptjs + jsonwebtoken)
+│       │   ├── colaborador.service.ts (NOVO 08/07/2026)
+│       │   └── admin.service.ts       (NOVO 08/07/2026 - inclui guard de
+│       │       "ultimo administrador", ver Estado Real do Projeto)
 │       ├── schemas/                 (IMPLEMENTADO 07/07/2026 - contratos zod)
 │       │   ├── vaziosDeAcesso.schema.ts
-│       │   └── auth.schema.ts       (NOVO 08/07/2026 - loginSchema)
+│       │   ├── auth.schema.ts       (NOVO 08/07/2026 - loginSchema)
+│       │   ├── colaborador.schema.ts (NOVO 08/07/2026)
+│       │   └── admin.schema.ts       (NOVO 08/07/2026)
 │       └── utils/
-│           └── AppError.ts
+│           ├── AppError.ts
+│           └── basesDeDadosCanonicas.ts (NOVO 08/07/2026 - 6 IDs de base
+│               reaproveitados de basesDeDados.service.ts + IDs de metadados)
 │       └── etl/
 │           ├── venv/               (ambiente Python isolado - nao versionado)
 │           ├── data/raw/           (shapefiles/CSVs baixados - nao versionado,
@@ -434,7 +485,7 @@ stack tecnológica, estrutura de pastas, convenções de código, tratamento de 
 - Services isolados em `/services`, nenhuma chamada `fetch` direta em componentes
 - Componentes de mapa isolados de lógica de negócio
 
-### 🔹 Backend (Node/Express) — parcialmente implementado (leitura + fundação de auth; escrita PLANEJADA)
+### 🔹 Backend (Node/Express) — leitura, auth e escrita do Colaborador/Admin implementados (upload de arquivo real PLANEJADO)
 - Controllers devem retornar JSON consistente
 - Validação via middleware dedicado (ex: zod)
 - Lógica de negócio em Services, nunca no controller
