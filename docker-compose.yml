@@ -1,3 +1,12 @@
+# Nome de projeto FIXO: por padrão o Compose usa o nome da pasta, e o projeto
+# já viveu em pastas diferentes ("Polis" no OneDrive até 09/07/2026, depois
+# ~/projetos/atlas-solar-justo no WSL). Sem isso, mudar a pasta faz o Compose
+# tentar criar um segundo container/volume do zero (conflito com
+# "polis_postgres" e risco de apontar para um volume NOVO E VAZIO em vez do
+# volume com os dados reais). "polis" casa com o projeto original — é o nome
+# sob o qual o volume polis_polis_postgres_data (com todos os dados) existe.
+name: polis
+
 services:
   postgres:
     image: postgis/postgis:16-3.4

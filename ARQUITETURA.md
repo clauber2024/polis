@@ -2,7 +2,7 @@
 > Complemento ao [`CLAUDE.md`](./CLAUDE.md) (padroes tecnicos) e ao [`README.md`](./README.md).
 > Este documento cobre o que muda com frequencia: estado dos dados, decisoes de fontes
 > e fila de trabalho. Padroes de codigo, banco e Git estao no CLAUDE.md - nao duplicar aqui.
-> Ultima atualizacao: 06/07/2026.
+> Ultima atualizacao: 09/07/2026.
 
 ## Estado dos dados (pos-sessao DEC/FEC real, jul/2026)
 
@@ -577,6 +577,23 @@ analise de correlacao abaixo), `0017_indicadores_sociais_rdpc.sql` (`renda_per_c
    que justifique reabrir (ex.: dataset alternativo com prazo de conexao
    preenchido para MA/PI/AL, ou nova hipotese de mecanismo ainda nao
    cotada).**
+
+7. **Comunicar o motivo do "sem dado" na interface do mapa - NOVO, registrado
+   na sessao de validacao do frontend (09/07/2026), NAO INICIADO.** Na
+   validacao do mapa choropleth, o usuario estranhou municipios em cinza no
+   indicador de tarifa residencial (concentrados em Norte, Sudeste e Sul).
+   Nao e bug: e cobertura real da base (ver secao "Extensao do teste de
+   tarifa para todas as distribuidoras") - 753 municipios excluidos de
+   proposito por area de concessao dividida entre multiplas distribuidoras
+   (padrao comum no Sul, dezenas de cooperativas de eletrificacao rural ao
+   lado das grandes) + 63 sem tarifa homologada no periodo. O mapa exibe
+   "sem dado" corretamente, mas a interface nao explica POR QUE - e a mesma
+   situacao vai se repetir com outros indicadores de cobertura parcial
+   (ex.: percentual_tsee quando desbloquear). Melhoria proposta: tooltip/
+   nota na legenda ou no painel de detalhe do municipio explicando o motivo
+   da ausencia por indicador (exige expor o motivo da exclusao na API ou
+   manter um catalogo de notas de cobertura no frontend, a decidir).
+   Prioridade baixa - exibicao/UX, nao dado.
 
 ## Bloqueado (aguardando dado externo)
 
