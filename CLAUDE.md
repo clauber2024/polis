@@ -49,7 +49,7 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
 
 ---
 
-## Estado Real do Projeto (atualizado em 08/07/2026)
+## Estado Real do Projeto (atualizado em 09/07/2026)
 
 **Implementado e validado com dados reais:**
 - **Backend Node/Express — primeiro endpoint real (07/07/2026):**
@@ -179,6 +179,54 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   mensal) e uma 9a dimensao NAO prevista no DRF original, nascida de uma investigacao
   organica (clima x ressarcimento por danos eletricos) - ver ARQUITETURA.md para o
   historico completo. Nao remover das 8 originais do DRF nem misturar com elas.
+- **Makefile de desenvolvimento (09/07/2026):** criado na raiz do projeto, empacotando
+  os comandos ate entao so documentados manualmente no README ("Como rodar
+  localmente") - `make up`/`down`/`db`/`migrate`/`seed`/`etl`/`etl-source
+  SOURCE=<nome>`/`fresh`/`dev`/`typecheck`/`build`. `make migrate` reproduz a ordem
+  exata do README, incluindo aplicar `schema_qualidade.sql` antes da migration 0011
+  (ver nota de inconsistencia arquitetural na Secao 2). `make etl` roda os 22
+  extractors de `loaders/` na ordem documentada, mas nao cobre os pre-requisitos
+  manuais (auth `gcloud`, download do CSV do INPE) - eles seguem exigindo
+  intervencao manual, so ficaram documentados como comentario no Makefile. Escopo
+  desta sessao foi **so os comandos de desenvolvimento** - `up-prod`/`deploy`/
+  `deploy-rebuild`/`deploy-first`/`shell`/`lint` continuam NAO implementados (ver
+  Secao 7 e Secao 8, que continuam so especificacao). **AINDA NAO VALIDADO** no
+  ambiente do usuario nesta sessao (bash sandbox nao consegue montar o caminho WSL
+  do projeto) - pedir para o usuario rodar `make help`, `make migrate` e
+  `make typecheck` no WSL dele antes de considerar isso pronto.
+- **Frontend — fundação + mapa interativo (09/07/2026):** primeira sessão do
+  frontend. Scaffold Vite + React 19 + TypeScript + Tailwind v4 (via
+  `@tailwindcss/vite`) + React Router em `frontend/`, com estrutura sob
+  `frontend/src/` (`pages/`, `components/`, `services/`, `types/`, `utils/` —
+  as pastas vazias que existiam direto em `frontend/` foram substituídas por
+  essa estrutura padrão do Vite; podem ser removidas, git nunca as versionou).
+  Implementado: mapa MapLibre GL (RF-016/017 parcial) com choropleth por
+  indicador (8 indicadores, classes por quintis calculadas no cliente),
+  destaque do quadrante Vazio de Acesso (RF-055/056 — contorno roxo, dado
+  buscado paginado do endpoint, ~8 requisições de 200), painel de detalhe do
+  município clicado (RF-025, direto das properties do GeoJSON, sem nova
+  requisição) e legenda. Decisões: (1) geometria vem de
+  `GET /api/municipios/exportar?formato=geojson` (RF-047) — payload nacional
+  único, aceitável porque o seed já simplifica a ~10 m
+  (TOLERANCIA_SIMPLIFICACAO); se a carga ficar lenta, o caminho é tile
+  vetorial/endpoint dedicado, não paginação; (2) classificação de vazios
+  SEMPRE do backend, nunca recalculada no cliente (depende de medianas
+  nacionais + regras de exclusão); (3) sem basemap externo (fundo neutro) —
+  evita dependência de servidor de tiles de terceiros nesta fase; (4) tipos da
+  API espelhados manualmente em `frontend/src/types/api.ts` (sem geração
+  automática — reavaliar se divergir); (5) proxy `/api` → localhost:3000 no
+  Vite (`vite.config.ts`); (6) dois bugs reais encontrados na validação, com
+  correção no frontend: colunas `numeric` do Postgres chegam como STRING no
+  JSON da API (driver `pg` não converte `numeric`, só `float8`) →
+  normalização numérica central em `municipios.service.ts`
+  (`normalizarMunicipio`); e o MapLibre descarta properties NULAS na
+  conversão interna GeoJSON→tile vetorial → o clique no mapa devolve só o
+  `codigoIbge` e a página resolve o município no GeoJSON original (nunca ler
+  indicadores das properties de um feature clicado). Makefile ganhou
+  `front`/`front-typecheck`/`front-build`. **AINDA NAO VALIDADO** no ambiente do usuario (bash sandbox
+  nao acessa o caminho WSL): pedir para rodar `cd frontend && npm install`,
+  `make front-typecheck` e `make front` (com `make dev` em outro terminal)
+  antes de considerar pronto.
 
 **NAO implementado ainda** (apesar de descrito em secoes deste documento como padrao):
 - Backend Node/Express: endpoints de LEITURA (`GET /api/vazios-de-acesso`,
@@ -188,9 +236,15 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   acima) implementados, mas **ainda nao validados no ambiente do usuario nesta sessao**.
   RF-070 ("upload de bases") implementado so como workflow/status, NAO recebimento de
   arquivo via API - decisao explicita do usuario, ver bloco acima.
-- Frontend React - nao iniciado
-- Makefile - nao existe; todos os comandos deste documento (`make up`, `make etl`, etc.)
-  sao **especificacao para quando o backend for construido**, nao comandos reais hoje
+- Frontend React - INICIADO em 09/07/2026 (fundação + mapa, ver bloco acima), mas ainda
+  falta a maior parte: landing page, painel analítico/comparação (RF-049/050), busca por
+  município na interface, telas de login e painéis Colaborador/Admin (consumindo a auth
+  já existente), export/relatório pela interface, drill-down de setores censitários
+  (RF-043/045) e o painel tipo heatmap (RF-057)
+- Makefile de deploy/producao - `make up-prod`, `make deploy`, `make deploy-rebuild`,
+  `make deploy-first`, `make shell`, `make lint` continuam **especificacao**, nao
+  implementados (ver Secao 7). Os comandos de desenvolvimento (`make up`, `make
+  migrate`, `make etl`, etc.) foram implementados em 09/07/2026 - ver bloco acima.
 - Deploy/producao (Nginx, certbot, scheduler, `docker-compose.prod.yml`) - arquitetura
   especificada mas nunca implementada nem testada
 - Upload de arquivo real (multer/storage) para o Painel Admin - decisao explicita do
@@ -201,9 +255,11 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   heatmap) continua pendente - e exibicao/frontend, nao calculo
 
 **Como rodar o que existe hoje:** ver `README.md`, secao "Como rodar localmente" - ETL via
-execucao direta de scripts Python (`python3 backend/src/etl/loaders/extrair_X.py`);
-backend via `cd backend && npm install && npm run dev` (requer `backend/.env` com
-`DATABASE_URL` e as migrations ja aplicadas - ver README). Nao ha Makefile ainda.
+execucao direta de scripts Python (`python3 backend/src/etl/loaders/extrair_X.py`) ou
+`make etl`; backend via `make dev` (requer `backend/.env` com `DATABASE_URL` e as
+migrations ja aplicadas - ver README); frontend via `make front` (dev server Vite na
+porta 5173, com o backend rodando na 3000). Makefile de desenvolvimento existe desde
+09/07/2026 (ver Secao 7).
 
 ---
 
@@ -236,12 +292,12 @@ backend via `cd backend && npm install && npm run dev` (requer `backend/.env` co
 - Logging via `print()` estruturado nos scripts atuais — `loguru` é a meta declarada,
   ainda não adotada na prática
 
-### 🔹 Frontend (não iniciado)
+### 🔹 Frontend (fundação + mapa implementados em 09/07/2026 — ver Estado Real do Projeto)
 - React 19
 - TypeScript 5+
 - Vite
-- Tailwind CSS
-- React Router
+- Tailwind CSS v4 (plugin `@tailwindcss/vite`, sem tailwind.config — tema default)
+- React Router (react-router-dom v7)
 - **MapLibre GL JS** — decisão já tomada (não Leaflet): WebGL lida melhor com os ~5.570
   municípios simultâneos e com a sobreposição choropleth+heatmap exigida pelo DRF
   (RF-017, RF-022, RF-024)
@@ -253,7 +309,8 @@ backend via `cd backend && npm install && npm run dev` (requer `backend/.env` co
 - Nginx, Cloudflare, certbot — PLANEJADOS, parte da arquitetura de deploy ainda não
   construída
 - Git (implementado)
-- Makefile — PLANEJADO, não existe ainda
+- Makefile — comandos de desenvolvimento implementados (09/07/2026, ver Seção 7);
+  comandos de deploy/produção continuam PLANEJADOS
 
 ---
 
@@ -419,12 +476,32 @@ backend via `cd backend && npm install && npm run dev` (requer `backend/.env` co
 │               ├── extrair_tarifa_distribuidoras.py
 │               ├── validar_aneel_real.py
 │               └── extrair_precipitacao_mensal_merge.py
-├── frontend/                       (estrutura de pastas existe, vazia - NAO INICIADO)
-│   ├── pages/
-│   ├── components/
-│   ├── services/
-│   ├── hooks/
-│   └── utils/
+├── frontend/                       (INICIADO 09/07/2026 - fundação + mapa interativo)
+│   ├── package.json                (React 19, react-router-dom 7, maplibre-gl 5,
+│   │                                Tailwind v4. Scripts: dev/build/typecheck/preview)
+│   ├── vite.config.ts              (plugins react + tailwindcss; proxy /api → :3000)
+│   ├── tsconfig.json / tsconfig.app.json / tsconfig.node.json  (strict, project refs)
+│   ├── index.html
+│   └── src/
+│       ├── main.tsx                (entrypoint - StrictMode + BrowserRouter)
+│       ├── App.tsx                 (rotas + cabeçalho; só "/" → PaginaMapa por ora)
+│       ├── index.css               (@import "tailwindcss" + altura 100%)
+│       ├── pages/
+│       │   └── PaginaMapa.tsx      (busca dados via services, estado da página)
+│       ├── components/
+│       │   └── mapa/               (isolados de lógica de negócio - CLAUDE.md Seção 4)
+│       │       ├── MapaMunicipios.tsx  (MapLibre: choropleth + destaque de vazios)
+│       │       ├── Legenda.tsx
+│       │       └── PainelMunicipio.tsx (detalhe do município clicado, RF-025)
+│       ├── services/               (todo fetch passa por aqui, nunca em componente)
+│       │   ├── http.ts             (cliente central, trata { erro: { mensagem } })
+│       │   ├── municipios.service.ts
+│       │   └── vaziosDeAcesso.service.ts
+│       ├── types/
+│       │   └── api.ts              (espelho manual dos contratos do backend)
+│       └── utils/
+│           ├── formatadores.ts     (Intl pt-BR)
+│           └── indicadores.ts      (catálogo de camadas choropleth + quintis)
 ├── docker/                         (PLANEJADO - Dockerfiles de producao nao existem)
 ├── docs/
 │   ├── DRF.md
@@ -437,6 +514,11 @@ backend via `cd backend && npm install && npm run dev` (requer `backend/.env` co
 ├── ARQUITETURA.md                   (estado dos dados, decisoes de fonte, fila de trabalho)
 ├── CLAUDE.md
 ├── README.md
+├── Makefile                          (NOVO 09/07/2026 - comandos de desenvolvimento
+│                                       implementados: up/down/db/migrate/seed/etl/
+│                                       etl-source/fresh/dev/typecheck/build. Deploy/
+│                                       up-prod/shell/lint continuam PLANEJADOS, ver
+│                                       Secao 7)
 ├── docker-compose.yml               (so servico `postgres` - IMPLEMENTADO)
 └── .gitignore
 ```
@@ -480,10 +562,18 @@ stack tecnológica, estrutura de pastas, convenções de código, tratamento de 
 > código real do repositório e as armadilhas já encontradas. Consultar antes de
 > escrever um extractor novo, um endpoint novo, ou uma tabela com geometria.
 
-### 🔹 React — PLANEJADO (frontend não iniciado)
+### 🔹 React — IMPLEMENTADO (fundação + mapa, 09/07/2026)
 - Apenas componentes funcionais, hooks, props tipadas via `interface`
-- Services isolados em `/services`, nenhuma chamada `fetch` direta em componentes
-- Componentes de mapa isolados de lógica de negócio
+- Services isolados em `src/services/`, nenhuma chamada `fetch` direta em componentes
+  (cliente central em `src/services/http.ts`, que converte o formato de erro do backend
+  `{ erro: { mensagem } }` em exceção tipada `ErroDeApi`)
+- Componentes de mapa isolados de lógica de negócio: `MapaMunicipios.tsx` só renderiza o
+  que recebe por props (GeoJSON, indicador, quebras de classe, códigos a destacar) —
+  busca de dado e metodologia ficam na página/services
+- Nomes de arquivos/componentes/variáveis em português, mesmo padrão do backend
+  (`PaginaMapa`, `buscarTodosVaziosDeAcesso`)
+- Tipos da API espelhados manualmente em `src/types/api.ts` — atualizar JUNTO com
+  qualquer mudança de contrato no backend
 
 ### 🔹 Backend (Node/Express) — leitura, auth e escrita do Colaborador/Admin implementados (upload de arquivo real PLANEJADO)
 - Controllers devem retornar JSON consistente
@@ -591,30 +681,53 @@ Nunca usar inserts estáticos que quebrem idempotência.
 
 ---
 
-## 7️⃣ Makefile — PLANEJADO, NÃO IMPLEMENTADO
+## 7️⃣ Makefile — comandos de desenvolvimento IMPLEMENTADOS (09/07/2026); deploy continua PLANEJADO
 
-⚠️ Nenhum dos comandos abaixo existe hoje. Esta seção registra a **especificação
-desejada** para quando o backend Node/Express for construído — até então, todo comando
-de ETL é executado diretamente via `python3 backend/src/etl/loaders/<script>.py`, e
-todo comando de banco via `docker compose exec -T postgres psql ...` (ver README.md).
+⚠️ Os comandos de **deploy/produção** abaixo (`up-prod`, `deploy`, `deploy-rebuild`,
+`deploy-first`) continuam sem implementação — dependem de servidor/domínio de produção
+que ainda não existe (ver Seção 8). `shell` e `lint` também não existem: o backend não é
+containerizado hoje (roda via `npm run dev` direto no host) e não há ferramenta de lint
+configurada no projeto. `send` (commit/push interativo) também não foi implementado.
+
+Os comandos de **desenvolvimento** abaixo existem de fato no `Makefile` da raiz do
+projeto e reproduzem os passos antes só documentados manualmente no README ("Como rodar
+localmente"):
 
 ```
-make up            # ambiente de desenvolvimento (hot reload)
-make up-prod        # ambiente de produção
-make down
-make migrate        # aplica migrations Drizzle
-make seed
-make fresh           # reseta banco + roda migrations + seed
-make etl             # executa pipeline ETL completo (todos os extractors)
-make etl-source SOURCE=aneel   # executa um extractor específico
+make up                              # sobe o Postgres/PostGIS local (docker compose)
+make down                            # derruba os containers (mantém o volume)
+make db                              # abre client psql interativo no container
+make migrate                         # aplica as migrations 0000-0024 na ordem certa
+                                      # (inclui schema_qualidade.sql antes da 0011 -
+                                      # ver Seção 2, "INCONSISTÊNCIA ARQUITETURAL")
+make seed                            # popula o território (seed_municipios.py)
+make etl                             # roda a pipeline ETL completa, ordem do README
+make etl-source SOURCE=mmgd_aneel    # roda um extractor específico (casa por substring)
+make fresh                           # reseta o banco (down -v + up + migrate + seed)
+make dev                             # roda o backend em modo watch (npm run dev)
+make typecheck                       # roda tsc --noEmit no backend
+make build                           # builda o backend (tsc)
+make front                           # roda o frontend em modo dev (Vite, porta 5173)
+make front-typecheck                 # roda tsc -b no frontend
+make front-build                     # builda o frontend (tsc -b && vite build)
+```
+
+Ainda **não implementados** (ver justificativa acima e Seção 8):
+```
+make up-prod
 make deploy
 make deploy-rebuild
 make deploy-first
-make send            # pergunta o comentário do commit antes de enviar e dar push
-make db              # abre client psql dentro do container do banco
-make shell           # abre shell no container do backend
+make send
+make shell
 make lint
 ```
+
+**Limitação conhecida de `make etl`:** não cobre pré-requisitos manuais já documentados
+no README — autenticação `gcloud application-default login` (RAIS e mortalidade
+infantil, via BigQuery) e download manual do CSV de irradiação solar do INPE antes de
+`extrair_irradiacao_solar_inpe.py`. Esses passos continuam exigindo intervenção manual;
+o Makefile só os documenta em comentário, não os automatiza.
 
 ---
 

@@ -255,13 +255,29 @@ endpoint `GET /api/vazios-de-acesso` refletir os numeros ja validados em ARQUITE
 de MMGD anterior a migration 0020 ficam fora da classificacao (ver campo
 `avisos.totalPrecisaReextrairMmgd` na resposta).
 
-O frontend ainda não foi implementado nesta fase do projeto. O backend tem endpoints de
-leitura (`vazios-de-acesso`, `municipios`, `bases-de-dados`, exports), autenticação/RBAC
-(`POST /api/auth/login`/`logout`, 3 papéis) e escrita do Colaborador/Admin (RF-059 a
-RF-077 — revisão de bases, observações, sugestões, notas metodológicas, materiais de
-comunicação, metadados técnicos, aprovação de indicadores, versionamento, gestão de
-usuários). Upload de arquivo real (RF-070) não foi implementado — decisão do projeto foi
-manter a carga de dado só via ETL Python, com a API cobrindo apenas o workflow/status.
+### Frontend (React + Vite)
+
+Iniciado em 09/07/2026 — mapa interativo (MapLibre GL) com choropleth de indicadores por
+município (RF-016/017) e destaque do quadrante Vazio de Acesso (RF-055/056), consumindo
+os endpoints de leitura do backend. Requer o backend rodando na porta 3000 (o Vite faz
+proxy de `/api` — ver `frontend/vite.config.ts`).
+
+```bash
+cd frontend
+npm install
+npm run dev             # http://localhost:5173
+npm run typecheck       # tsc -b
+npm run build           # tsc -b && vite build
+```
+
+Telas de login/painéis (Colaborador/Admin), landing page e painel analítico ainda não
+existem no frontend. O backend tem endpoints de leitura (`vazios-de-acesso`,
+`municipios`, `bases-de-dados`, exports), autenticação/RBAC (`POST /api/auth/login`/
+`logout`, 3 papéis) e escrita do Colaborador/Admin (RF-059 a RF-077 — revisão de bases,
+observações, sugestões, notas metodológicas, materiais de comunicação, metadados
+técnicos, aprovação de indicadores, versionamento, gestão de usuários). Upload de
+arquivo real (RF-070) não foi implementado — decisão do projeto foi manter a carga de
+dado só via ETL Python, com a API cobrindo apenas o workflow/status.
 
 Para a etapa de RAIS via BigQuery, é necessária autenticação prévia:
 ```bash
@@ -269,8 +285,12 @@ gcloud auth application-default login --no-launch-browser
 gcloud auth application-default set-quota-project <seu-projeto-gcp>
 ```
 
-Ver `CLAUDE.md` para a lista completa de comandos do Makefile (planejados, ainda não todos
-implementados).
+Desde 09/07/2026 há um `Makefile` na raiz do projeto com os comandos de desenvolvimento
+acima já empacotados: `make up`, `make down`, `make db`, `make migrate`, `make seed`,
+`make etl`, `make etl-source SOURCE=<nome>`, `make fresh`, `make dev`, `make typecheck`,
+`make build`, `make front`, `make front-typecheck`, `make front-build`. Ver `CLAUDE.md`,
+Seção 7, para o detalhe de cada um e para os comandos de deploy/produção que continuam
+só especificação (`up-prod`, `deploy*`, `shell`, `lint`).
 
 ---
 

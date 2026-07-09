@@ -1,0 +1,8 @@
+@import 'tailwindcss';
+
+/* O mapa ocupa a altura toda da viewport menos o cabeçalho — ver PaginaMapa. */
+html,
+body,
+#root {
+  height: 100%;
+}
