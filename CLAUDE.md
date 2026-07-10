@@ -271,10 +271,8 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   de MMGD) e `percentualCadunico` (cobertura, métrica 1 do extractor, já
   existia na view consolidada mas não no SELECT) — novas linhas no painel
   RF-025 ("População (estimada)" no grupo Território e "População no
-  CadÚnico" nos sociais, ambas com descricao). **AINDA NAO
-  VALIDADO** no ambiente do usuario: rodar `make front-typecheck` e testar no
-  navegador (busca, voo, painel, deep-link, repetir a mesma busca, notas de
-  ausência em 5101837 e na linha TSEE) antes de considerar pronto.
+  CadÚnico" nos sociais, ambas com descricao). VALIDADO no ambiente do
+  usuario e commitado em 09/07/2026.
 
 - **Frontend — painel de ranking estadual (09/07/2026, RF-030 a RF-036):**
   `frontend/src/components/mapa/PainelRanking.tsx` (só renderização, dado via
@@ -290,7 +288,7 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   período" NÃO implementado (a API só serve o snapshot mais recente de cada
   indicador; exigiria endpoint histórico); RF-037 (bloco IPER do estado) NÃO
   implementado — depende do RF-080, bloqueado pelo TSEE (ver ARQUITETURA.md).
-  **AINDA NAO VALIDADO** no ambiente do usuario.
+  VALIDADO no ambiente do usuario e commitado em 09/07/2026.
 
 **NAO implementado ainda** (apesar de descrito em secoes deste documento como padrao):
 - Backend Node/Express: endpoints de LEITURA (`GET /api/vazios-de-acesso`,
