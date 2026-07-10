@@ -858,6 +858,115 @@ oficial conhecida antes de considerar um extractor validado.
 
 ---
 
+## 🔟 Fluxo de Trabalho do Assistente de IA
+
+### Princípio geral
+Aja como responsável técnico da tarefa, não apenas como quem dá instruções para o
+usuário executar. Leia arquivos, pesquise o código, edite e rode comandos diretamente
+sempre que tiver acesso e segurança para isso — não peça para o usuário fazer
+manualmente o que você pode fazer.
+
+**Exceção confirmada neste projeto:** comandos de `git`, `make migrate`/`typecheck`/
+`build`/`etl` e afins devem ser pedidos para o usuário rodar no WSL dele — o bash
+sandbox não consegue montar o caminho WSL do projeto
+(`\\wsl.localhost\ubuntu\home\clauber\projetos\atlas-solar-justo`, erro "UNC paths are
+not supported"), confirmado em múltiplas sessões. O `Read`/`Edit`/`Write` de arquivos
+funciona normalmente nesse caminho — só `git`/build/migrations via shell é que não. Fora
+essa exceção, prefira agir diretamente.
+
+Antes de uma alteração relevante, explique em poucas linhas: o que vai fazer, quais
+arquivos serão afetados, riscos, e como vai validar. Para ações destrutivas ou
+irreversíveis, credenciais, produção, exclusão de dados ou migrations, peça confirmação
+antes de executar.
+
+### Início de sessão
+Além da checagem de sincronização obrigatória (topo deste arquivo): leia este
+`CLAUDE.md`, consulte `ARQUITETURA.md` / `docs/PLANO_ATUAL.md` / `DESAFIOS.md` conforme
+a tarefa, e examine a estrutura real do projeto antes de propor mudanças. Não assuma que
+uma informação antiga (inclusive deste próprio arquivo) continua válida sem conferir o
+estado atual do código.
+
+Em tarefas com várias etapas, mantenha `docs/PLANO_ATUAL.md` atualizado: objetivo,
+decisões tomadas, arquivos modificados, etapas concluídas, próximo passo, bloqueios e
+comandos de validação. Atualize ao concluir etapas relevantes, sem registrar detalhes
+desnecessários da conversa.
+
+### Sessões longas
+Sugira iniciar uma nova sessão quando uma etapa importante for concluída, o assunto
+mudar claramente, o contexto acumulado prejudicar a precisão, ou houver repetição/perda
+de informação importante. Antes de sugerir, registre em `docs/PLANO_ATUAL.md` o
+necessário para a continuação, e ofereça um prompt curto de retomada.
+
+### Memória e aprendizado
+- `CLAUDE.md` — regras permanentes, arquitetura, convenções, forma de trabalho.
+- `DESAFIOS.md` — problemas recorrentes, limitações conhecidas, soluções validadas
+  (formato na subseção seguinte).
+- `docs/DECISOES.md` — decisões técnicas estruturais relevantes (formato ADR).
+- Skills (`.claude/skills/`) — quando o aprendizado for um procedimento reutilizável e
+  bem definido (ex.: `etl-atlas`, já existente). Verifique o conteúdo atual antes de
+  alterar uma skill, e preserve o que continuar válido.
+
+Registre só o que for recorrente, específico deste projeto, útil em sessões futuras, não
+óbvio ao examinar o código, e confirmado durante o trabalho. Não registre hipóteses
+ainda não verificadas, detalhes temporários, ou histórico completo da conversa.
+
+### Registro de desafios (`DESAFIOS.md`)
+Formato por entrada: Nome do desafio / Contexto / Sintoma / Causa confirmada / Solução
+validada / Prevenção / Arquivos ou componentes relacionados. Só marque a causa como
+"confirmada" quando ela realmente foi verificada — caso contrário, registre como
+hipótese ainda não confirmada.
+
+### Decisões técnicas (`docs/DECISOES.md`)
+Para escolhas relevantes de arquitetura, biblioteca, framework, banco, API, padrão de
+código, segurança, estrutura de pastas, autenticação, testes ou deploy: apresente de 2 a
+4 alternativas realmente viáveis, com vantagens, desvantagens, complexidade, impacto em
+manutenção/segurança, aderência ao que já existe (Seção 1️⃣) e custo de migração futura.
+Termine com uma recomendação clara, priorizando simplicidade, segurança, manutenção,
+baixo acoplamento, reutilização e compatibilidade com o stack já em uso — não introduza
+biblioteca nova quando o stack atual já resolve. Registre decisões estruturais em
+`docs/DECISOES.md`, formato ADR quando fizer sentido (contexto, decisão, alternativas
+consideradas, consequências, data).
+
+### Escolha do modelo
+Ao considerar qual modelo é mais adequado para o próximo passo: capacidade maior para
+arquitetura, decisões de alto impacto, depuração complexa, análise de segurança e
+refatorações amplas; equilibrado para implementação normal, testes, revisão de código e
+documentação; rápido/econômico para buscas simples, alterações mecânicas, formatação e
+tarefas repetitivas de baixo risco. Quando fizer diferença, mencione a troca em uma
+frase — não interrompa uma tarefa simples só para sugerir isso.
+
+### Execução e validação
+Depois de alterar código, rode os testes/lint/typecheck relevantes quando o ambiente
+permitir (ver exceção do bash sandbox acima) e diga claramente o que foi de fato
+executado com sucesso versus o que ainda precisa ser rodado pelo usuário. Nunca afirme
+que algo foi testado quando o comando correspondente não foi executado com sucesso.
+
+### Formato das respostas
+Durante o trabalho, responda de forma objetiva. Ao concluir uma etapa, informe: o que
+foi feito, quais arquivos foram alterados, como foi validado, o que falta, e se há
+alguma decisão pendente. Evite repetir longamente o pedido, narrar cada ação trivial,
+apresentar planos genéricos sem examinar o projeto, ou afirmar sucesso sem validação.
+
+Quando houver algo que dependa exclusivamente de uma decisão do usuário, feche a
+resposta com um bloco separado:
+
+```
+## ⚠️ PENDENTE
+**Decisão necessária:** ...
+**Opções:** ...
+**Recomendação:** ...
+**Impacto da espera:** ...
+```
+
+Não use esse bloco para algo que você mesmo pode resolver examinando o projeto.
+
+Quando não houver nenhuma ação técnica nem decisão pendente, finalize a resposta com
+`✅ SESSÃO FINALIZADA` — usar somente quando a tarefa estiver concluída, as validações
+possíveis já tiverem sido executadas, não houver bloqueios, não houver decisão aguardando
+resposta do usuário, e o contexto necessário para o futuro já estiver documentado.
+
+---
+
 ## 🧠 Regra Estratégica da Empresa
 
 > Estrutura primeiro. Funcionalidades depois.
