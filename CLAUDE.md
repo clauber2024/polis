@@ -276,6 +276,22 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   navegador (busca, voo, painel, deep-link, repetir a mesma busca, notas de
   ausência em 5101837 e na linha TSEE) antes de considerar pronto.
 
+- **Frontend — painel de ranking estadual (09/07/2026, RF-030 a RF-036):**
+  `frontend/src/components/mapa/PainelRanking.tsx` (só renderização, dado via
+  props) + integração na `PaginaMapa` (botão nos controles, painel à esquerda
+  do mapa). Ranking calculado NO CLIENTE a partir do GeoJSON já carregado —
+  é ordenação simples, não metodologia; o badge "Vazio de Acesso" (RF-032)
+  usa SEMPRE a classificação do backend (mesmo fetch lazy do destaque,
+  refatorado em `garantirVaziosCarregados`). RF-033 (filtro por nome dentro
+  do painel) preserva a posição real — filtrar não renumera. RF-035 reusa a
+  mecânica foco+painel da busca do header. Barra do RF-032: normalização
+  min–max dentro da UF (leitura "distância do pior da UF"), não posição.
+  **Exclusões documentadas**: RF-034 só parcial — "ranking por variação no
+  período" NÃO implementado (a API só serve o snapshot mais recente de cada
+  indicador; exigiria endpoint histórico); RF-037 (bloco IPER do estado) NÃO
+  implementado — depende do RF-080, bloqueado pelo TSEE (ver ARQUITETURA.md).
+  **AINDA NAO VALIDADO** no ambiente do usuario.
+
 **NAO implementado ainda** (apesar de descrito em secoes deste documento como padrao):
 - Backend Node/Express: endpoints de LEITURA (`GET /api/vazios-de-acesso`,
   `/api/municipios` + variantes, `/api/bases-de-dados`, export CSV/GeoJSON/XLSX,
@@ -287,9 +303,10 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
 - Frontend React - INICIADO em 09/07/2026 (fundação + mapa, ver bloco acima), mas ainda
   falta a maior parte: landing page, painel analítico/comparação (RF-049/050), telas de
   login e painéis Colaborador/Admin (consumindo a auth já existente), export/relatório
-  pela interface, drill-down de setores censitários (RF-043/045), painel de ranking
-  (RF-031/032, incluindo o filtro RF-033) e o painel tipo heatmap (RF-057). Busca por
-  município no header (RF-026) implementada em 09/07/2026 — ver bloco acima.
+  pela interface, drill-down de setores censitários (RF-043/045) e o painel tipo
+  heatmap (RF-057). Busca por município no header (RF-026) e painel de ranking
+  estadual (RF-030 a RF-036, com exclusões documentadas) implementados em
+  09/07/2026 — ver blocos acima.
 - Makefile de deploy/producao - `make up-prod`, `make deploy`, `make deploy-rebuild`,
   `make deploy-first`, `make shell`, `make lint` continuam **especificacao**, nao
   implementados (ver Secao 7). Os comandos de desenvolvimento (`make up`, `make

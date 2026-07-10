@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { MapaMunicipios, type FocoMunicipio } from '../components/mapa/MapaMunicipios';
 import { Legenda } from '../components/mapa/Legenda';
 import { PainelMunicipio } from '../components/mapa/PainelMunicipio';
+import { PainelRanking } from '../components/mapa/PainelRanking';
 import { buscarGeoJsonNacional } from '../services/municipios.service';
 import {
   buscarTodosVaziosDeAcesso,
@@ -32,6 +33,7 @@ export function PaginaMapa() {
   const [municipioSelecionado, setMunicipioSelecionado] =
     useState<MunicipioComIndicadores | null>(null);
   const [foco, setFoco] = useState<FocoMunicipio | null>(null);
+  const [rankingAberto, setRankingAberto] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
@@ -53,15 +55,15 @@ export function PaginaMapa() {
     };
   }, []);
 
-  // Busca a classificação de Vazios de Acesso na primeira vez que o destaque
-  // é ligado. De propósito NO HANDLER, não em useEffect: a primeira versão
-  // usava um efeito com `carregandoVazios` nas dependências, e o próprio
-  // setCarregandoVazios(true) re-disparava o efeito — o cleanup marcava a
-  // busca em andamento como cancelada e o resultado era descartado (spinner
-  // eterno). Bug real encontrado na validação de 09/07/2026.
-  function aoAlternarDestaque(ligado: boolean) {
-    setDestaqueLigado(ligado);
-    if (!ligado || vazios || carregandoVazios) return;
+  // Busca a classificação de Vazios de Acesso na primeira vez que alguém
+  // precisa dela (destaque no mapa OU badges do ranking). De propósito NO
+  // HANDLER, não em useEffect: a primeira versão usava um efeito com
+  // `carregandoVazios` nas dependências, e o próprio setCarregandoVazios(true)
+  // re-disparava o efeito — o cleanup marcava a busca em andamento como
+  // cancelada e o resultado era descartado (spinner eterno). Bug real
+  // encontrado na validação de 09/07/2026.
+  function garantirVaziosCarregados() {
+    if (vazios || carregandoVazios) return;
     setCarregandoVazios(true);
     setErroVazios(null);
     buscarTodosVaziosDeAcesso()
@@ -75,6 +77,11 @@ export function PaginaMapa() {
       .finally(() => setCarregandoVazios(false));
   }
 
+  function aoAlternarDestaque(ligado: boolean) {
+    setDestaqueLigado(ligado);
+    if (ligado) garantirVaziosCarregados();
+  }
+
   const quebras = useMemo(() => {
     if (!dados) return [];
     const valores = dados.features
@@ -86,6 +93,17 @@ export function PaginaMapa() {
   const codigosDestaque = useMemo(
     () => (destaqueLigado && vazios ? vazios.municipios.map((m) => m.codigoIbge) : null),
     [destaqueLigado, vazios],
+  );
+
+  // Badges do ranking (RF-032) — mesma classificação do backend, como Set.
+  const codigosVazios = useMemo(
+    () => (vazios ? new Set(vazios.municipios.map((m) => m.codigoIbge)) : null),
+    [vazios],
+  );
+
+  const listaMunicipios = useMemo(
+    () => dados?.features.map((f) => f.properties) ?? [],
+    [dados],
   );
 
   // Índice codigoIbge → município do GeoJSON original: o clique no mapa só
@@ -118,8 +136,26 @@ export function PaginaMapa() {
     );
   }, [codigoBuscado, dados, municipioPorCodigo, setSearchParams]);
 
+  // RF-035: clicar num item do ranking = mesma mecânica da busca do header
+  // (abre o painel de detalhe e enquadra o município no mapa).
+  function aoSelecionarDoRanking(codigoIbge: string) {
+    setMunicipioSelecionado(municipioPorCodigo.get(codigoIbge) ?? null);
+    setFoco({ codigoIbge });
+  }
+
   return (
     <div className="relative flex h-full">
+      {rankingAberto && dados && (
+        <PainelRanking
+          municipios={listaMunicipios}
+          indicador={indicador}
+          codigosVazios={codigosVazios}
+          carregandoVazios={carregandoVazios}
+          aoSelecionarMunicipio={aoSelecionarDoRanking}
+          aoFechar={() => setRankingAberto(false)}
+        />
+      )}
+
       <div className="relative min-w-0 flex-1">
         <MapaMunicipios
           dados={dados}
@@ -151,6 +187,17 @@ export function PaginaMapa() {
               </option>
             ))}
           </select>
+
+          <button
+            type="button"
+            onClick={() => {
+              setRankingAberto((aberto) => !aberto);
+              if (!rankingAberto) garantirVaziosCarregados();
+            }}
+            className="mt-3 w-full rounded border border-slate-300 px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+          >
+            {rankingAberto ? 'Fechar ranking estadual' : 'Ranking estadual'}
+          </button>
 
           <label className="mt-3 flex items-center gap-2 text-sm text-slate-700">
             <input
