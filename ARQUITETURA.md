@@ -2,7 +2,7 @@
 > Complemento ao [`CLAUDE.md`](./CLAUDE.md) (padroes tecnicos) e ao [`README.md`](./README.md).
 > Este documento cobre o que muda com frequencia: estado dos dados, decisoes de fontes
 > e fila de trabalho. Padroes de codigo, banco e Git estao no CLAUDE.md - nao duplicar aqui.
-> Ultima atualizacao: 09/07/2026.
+> Ultima atualizacao: 10/07/2026.
 
 ## Estado dos dados (pos-sessao DEC/FEC real, jul/2026)
 
@@ -633,6 +633,135 @@ analise de correlacao abaixo), `0017_indicadores_sociais_rdpc.sql` (`renda_per_c
   Se isso continuar bloqueado nas proximas sessoes, considerar abrir um chamado
   formal com a ANEEL (contato do dataset: dadosabertos@aneel.gov.br) em vez de
   so tentar de novo silenciosamente.
+
+## RF-005 (Landing Page) - 3 indicadores nacionais ainda nao calculados
+
+Contexto: `GET /api/estatisticas-nacionais` (`backend/src/services/estatisticasNacionais.service.ts`,
+sessao 10/07/2026) calcula 3 dos 6 numeros pedidos pelo RF-005 com dado real
+(sistemas MMGD, potencia total, municipios com MMGD) e expoe os outros 3 como
+`indicadoresIndisponiveis`, sem numero fabricado. Usuario pediu (10/07/2026)
+para registrar que acha os 3 viaveis "em breve" - status real de cada um,
+verificado nesta sessao:
+
+- **Pessoas beneficiadas por creditos de energia** - QUASE RESOLVIDO, achado
+  confirmado em 10/07/2026 (inspecao real do Parquet, nao mais hipotese).
+  O campo e `QtdUCRecebeCredito` (numero de UCs que recebem credito por
+  empreendimento) - e **o mesmo campo que `extrair_mmgd_aneel.py` ja soma**
+  para preencher `numero_ucs_com_mmgd` (ver correcao grande abaixo, "Erro de
+  rotulo"). Distribuicao confirmada por modalidade (`DscModalidadeHabilitado`,
+  4.523.689 linhas totais):
+  - Geracao na propria UC (3.586.001 linhas): media 1,001 - basicamente
+    sempre 1 (a propria UC geradora).
+  - Auto consumo remoto (914.657 linhas): media 3,13, max 41.809.
+  - Compartilhada (21.384 linhas): media 74,67, max 24.951.
+  - Condominio (1.042 linhas): media 2,76, max 44.
+  - Soma nacional de `QtdUCRecebeCredito`: 8.063.052.
+  Ou seja: o Atlas JA TEM o numero real de UCs beneficiadas
+  (`totalUcsBeneficiadas`, endpoint `/api/estatisticas-nacionais`, sessao
+  10/07/2026). **RESOLVIDO em 10/07/2026 (decisao do usuario): expor como
+  ESTIMATIVA**, nao contagem exata - `numero_ucs_residencial` (subconjunto
+  RESIDENCIAL de `QtdUCRecebeCredito`, ja existente desde migration 0020,
+  NAO o total `numero_ucs_com_mmgd` que mistura classes nao-residenciais)
+  multiplicado pela media nacional de moradores por domicilio do IBGE
+  (Censo 2022 = **2,79**, caiu de 3,31 em 2010 - fonte: Agencia de Noticias
+  IBGE, "Pais tem 90 milhoes de domicilios, 34% a mais que em 2010",
+  `agenciadenoticias.ibge.gov.br/agencia-noticias/2012-agencia-de-noticias/
+  noticias/37238`). Exposto em `pessoasBeneficiadas.pessoasBeneficiadasEstimativa`,
+  com o rotulo "(estimativa)" sempre visivel na landing (nunca escondido em
+  tooltip) e a fonte citada. Removido de `indicadoresIndisponiveis`.
+
+**Erro de rotulo encontrado e corrigido em 10/07/2026 (migration 0025)**:
+ao investigar o item acima, ficou confirmado que `numero_ucs_com_mmgd`
+(coluna existente desde a migration 0000) NUNCA representou "numero de
+sistemas/instalacoes MMGD conectados" - `extrair_mmgd_aneel.py` sempre somou
+`QtdUCRecebeCredito` (UCs beneficiadas), nao contou linhas (isso ja estava
+documentado no proprio docstring do extractor, so ninguem tinha percebido a
+implicacao para o RF-005 ate esta sessao). O card "Sistemas MMGD conectados"
+da landing (implementado na mesma sessao, antes desta correcao) estava
+exibindo o numero certo com o rotulo errado. Corrigido: `numero_empreendimentos`
+(COUNT real de instalacoes, ja calculado em memoria pelo extractor via
+`groupby(...).count()` mas descartado antes do INSERT) agora e persistido
+(migration `0025_mmgd_indicadores_numero_empreendimentos.sql`) e exposto
+separadamente como `totalInstalacoesMmgd`. VALIDADO em 10/07/2026 - migration
+aplicada e `extrair_mmgd_aneel.py` reexecutado: **4.523.648 instalacoes**
+nacionais (`numero_empreendimentos`) contra **8.063.052 UCs beneficiadas**
+por credito (`numero_ucs_com_mmgd`) - proporcao ~1,78, exatamente a media ja
+observada na inspecao direta do Parquet (`QtdUCRecebeCredito.describe()`,
+acima).
+
+- **Participacao da solar distribuida na matriz eletrica nacional** -
+  FONTE CONFIRMADA em 10/07/2026 (pesquisa web), **numero atualizado na
+  mesma sessao**: o registro anterior (abaixo, riscado por precisao)
+  citava 5,6% via BEN 2025/ano-base 2024 - substituido pelo numero mais
+  recente, ja que o BEN 2026 (ano-base 2025) foi publicado em 03/06/2026,
+  antes desta sessao. Fonte primaria conferida diretamente
+  (`epe.gov.br/pt/imprensa/noticias/epe-publica-o-relatorio-sintese-do-balanco-energetico-nacional-2026`):
+  "A micro e minigeracao distribuida (MMGD) atingiu **7,0%** na geracao
+  total de eletricidade no Brasil, em 2025." Nota de precisao: o BEN 2026
+  reporta MMGD (guarda-chuva regulatorio), nao "solar distribuida" isolada
+  - MMGD e majoritariamente solar fotovoltaica, mas essa proporcao especifica
+  (~97,5%, numero visto em busca) vem de outro documento EPE (Caderno MMGD e
+  Baterias 2035), nao do BEN 2026 - **nao misturar as duas fontes numa unica
+  citacao** (mesmo cuidado ja aplicado ao TSEE/RF-034, nunca combinar dados de
+  fontes/anos-base diferentes como se fossem uma coisa so).
+  **DECISAO DO USUARIO (10/07/2026)**: opcao (a) da lista de alternativas
+  abaixo - citar o numero exatamente como o BEN 2026 o publica (rotulado
+  "MMGD", nao "solar distribuida"), com fonte e ano, mesmo tratamento ja dado
+  ao OBEPE (referencia de contexto, nao KPI calculado pelo Atlas). Implementado:
+  `PaginaLanding.tsx`, secao "Referencias metodologicas" (paragrafo logo apos o
+  OBEPE) + `motivo` do item `participacaoMatrizNacional` em
+  `indicadoresIndisponiveis` (`estatisticasNacionais.service.ts`) atualizado
+  para apontar para essa citacao. O item **continua** em
+  `indicadoresIndisponiveis` - o Atlas nao passou a calcular esse numero, so
+  passou a citar a fonte externa ao lado do card "Em breve". Sem mudanca de
+  contrato da API (nenhum campo novo em `EstatisticasNacionais`). **Pendente**:
+  validar `make front-typecheck` no ambiente do usuario (nao rodado nesta
+  sessao via bash sandbox, ver excecao confirmada).
+  Registro historico da decisao original, mantido para rastreabilidade:
+  ~~RESSALVA: e um numero em PDF (relatorio anual), nao um dataset
+  baixavel/atualizavel via ETL automatico - diferente dos outros indicadores
+  do Atlas, que vem de fontes primarias versionadas por extractor proprio.
+  Decisao pendente do usuario: (a) guardar este numero como constante citada
+  manualmente (mesmo tratamento ja dado a conteudo institucional estatico,
+  como a nota do OBEPE), com nota "ano base 2024, fonte EPE/BEN 2025" e
+  lembrete de atualizar quando a EPE publicar o proximo Anuario; ou (b) nao
+  expor nenhum numero e manter como "indicadorIndisponivel" ate existir um
+  pipeline de verdade para isso.~~
+
+- **Projecao futura de potencia instalada** - INVESTIGACAO CONCLUIDA
+  (10/07/2026, verificacao rodada no ambiente do usuario). A documentacao
+  anterior (CLAUDE.md, RF-034) tratava a falta de "serie temporal" como
+  limitacao de SCHEMA. Nao e - `mmgd_indicadores` tem chave unica em
+  `(unidade_espacial_id, periodo_referencia)` (migration
+  `0000_criacao_tabelas.sql`), NAO em `unidade_espacial_id` sozinho, e o
+  upsert do extractor usa o mesmo par como `ON CONFLICT`
+  (`extrair_mmgd_aneel.py`) - o schema comporta historico. O que faltava
+  era dado real acumulado, nao capacidade de schema. **Resultado da query de
+  verificacao** (rodada em 10/07/2026 contra o banco local):
+  ```
+   total_unidades | total_periodos_distintos | periodo_mais_antigo | periodo_mais_recente
+  ----------------+---------------------------+----------------------+-----------------------
+             5648 |                         1 | 2026-06-01           | 2026-06-01
+  ```
+  **CONCLUSAO CONFIRMADA**: existe apenas 1 periodo (`2026-06-01`) em toda a
+  tabela, para as 5.648 unidades espaciais - o extractor de MMGD nunca rodou
+  mais de uma vez com Parquets de periodos diferentes ate hoje. Nao ha
+  historico real, so a CAPACIDADE de schema para acumula-lo dai em diante.
+  Isso fecha as tres pendencias relacionadas com a mesma resposta:
+  - **Projecao de potencia (RF-005)**: nao viavel agora - permanece em
+    `indicadoresIndisponiveis`. Nao simular tendencia com um unico ponto no
+    tempo.
+  - **Filtro de periodo (RF-046)**: permanece documentado como exclusao
+    (ja assim no bloco "Landing Page + Dashboard Publico" do CLAUDE.md).
+  - **Ranking por variacao no periodo (RF-034)**: permanece documentado como
+    exclusao (ja assim no bloco "Frontend - painel de ranking estadual" do
+    CLAUDE.md).
+  **Caminho daqui pra frente**: nenhuma mudanca de codigo agora. O extractor
+  `extrair_mmgd_aneel.py` precisa rodar de novo em meses futuros, com
+  Parquets de periodos novos da ANEEL, para `periodo_referencia` acumular
+  mais de um valor por unidade - so entao (dado real de >= 2-3 periodos)
+  reavaliar as tres features acima. Nao ha bloqueio tecnico, so tempo/
+  cadencia de execucao do ETL.
 
 ## Ideias para investigar (nao priorizadas)
 
@@ -2378,6 +2507,83 @@ e media simples, mesma limitacao ja assumida em outros cruzamentos deste
 projeto); (4) decidir se cabe nota metodologica explicita sobre a
 concentracao da Equatorial fora-GO no fundo do ranking refletir tambem
 regiao/vulnerabilidade social, nao so desempenho.
+
+**As 3 decisoes acima (2, 3, 4) foram tomadas em 10/07/2026** - ver
+docs/DECISOES.md, ADR "Ranking publico de distribuidoras - exibicao,
+ponderacao e nota metodologica": (2) segregacao visual (ranking principal
+so com os dois eixos + prazo confiavel; secao separada "dados incompletos"
+para o resto); (3) IVS passa a ser ponderado por populacao estimada do
+municipio; (4) nota metodologica fixa sobre Equatorial fora-GO, visivel, nao
+em tooltip. **Primeiro passo de persistencia real criado na mesma sessao**:
+migration 0026 (`desempenho_conexao_distribuidoras`) + extractor
+`backend/src/etl/loaders/extrair_desempenho_conexao_mmgd.py` (baixa as 5
+regioes, agrega por distribuidora, resolve o crosswalk com o INDQUAL e faz
+upsert - reaproveita a mesma metodologia dos scripts de `analises/`, ver
+docstring do extractor). **AINDA NAO EXECUTADO/VALIDADO no ambiente do
+usuario** - proximo passo: rodar `make migrate` + o novo extractor no WSL
+(pode demorar - Sudeste tem ~19,5M linhas), depois construir o service/route
+Node (`GET /api/ranking-distribuidoras`, eixo de justica calculado em SQL a
+partir de `qualidade_conjunto_municipio` + `indicadores_sociais` + populacao
+estimada) e a pagina frontend.
+
+**VALIDADO PONTA A PONTA no ambiente do usuario em 10/07/2026**: migration
+0026 aplicada, extractor rodou as 5 regioes (54,3M linhas, 52
+distribuidoras), `GET /api/ranking-distribuidoras` retornando dado real
+(`make typecheck` limpo), pagina frontend `/ranking-distribuidoras`
+renderizada e validada visualmente (`make front-typecheck` limpo). Produto
+funcional de ponta a ponta - sem RF numerado no DRF (fora do escopo
+original de justica energetica por municipio, ver secao acima).
+
+**PENDENCIA registrada em 10/07/2026, INVESTIGADA E FECHADA na mesma sessao**
+(script `backend/src/etl/analises/investigar_cobertura_indqual_ranking_distribuidoras.py`,
+SOMENTE LEITURA): por que 14 distribuidoras caiam em
+`distribuidorasComDadosIncompletos` por falta do eixo de justica, SEM relacao
+com `prazo_confiavel`. A hipotese original registrada logo apos a validacao
+("(b) e cobertura - sig_agente existe mas tem 0 linhas em
+qualidade_conjunto_municipio") foi **REFUTADA por consulta direta** - todos
+os 11 sig_agente tinham municipios associados. A causa real, confirmada:
+
+  - **11 distribuidoras (causa confirmada - MULTIPLA, nao e bug)**: Demei,
+    Dmed, Mux Energia, Hidropan, Eflul, Cooperalianca, Cocel, RGE, Chesp,
+    CPFL Santa Cruz, Energisa Borborema. TODOS os municipios que essas
+    distribuidoras atendem sao TAMBEM cobertos por outra distribuidora
+    (area de concessao compartilhada/dividida - tipico de cooperativas e
+    empresas municipais pequenas que atendem so um bolsao dentro de um
+    municipio majoritariamente servido por uma concessionaria maior).
+    A regra ja documentada de excluir municipio com >1 `sig_agente`
+    distinto (atribuicao ambigua - mesmo criterio do prototipo
+    `investigar_distribuidora_regioes_problema.py`) por isso zera 100% da
+    cobertura dessas 11. **E o comportamento correto e intencional da regra
+    de desambiguacao, nao uma falha de dado ou bug do ranking.**
+  - **4 distribuidoras (causa confirmada - lacuna real de nomenclatura no
+    crosswalk, CORRIGIDA)**: Forcel, Joao Cesa, Nova Palma, Santa Maria nao
+    tinham par no INDQUAL por nomenclatura muito diferente do nome usado no
+    dataset de fila de conexao. Confirmado via pesquisa externa (mesmo
+    padrao de confianca do caso Enel GO=EQUATORIAL GO) + consulta direta ao
+    banco: Forcel (Forca e Luz Coronel Vivida, fundada 1959, adquirida pelo
+    Grupo Pacto Energia em 2021, mesmo CNPJ 79850574000109) = sig_agente
+    "PACTO ENERGIA PR"; Joao Cesa ("Empresa Forca e Luz Joao Cesa Ltda.",
+    Siderópolis/SC, 1o/2o lugar no ranking oficial de qualidade da ANEEL
+    entre pequenas distribuidoras em 2018/2021/2024) = "EFLJC"; Nova Palma
+    (UHENPAL, Usina Hidreletrica Nova Palma, hoje "Nova Palma Energia",
+    atende 9 municipios da Quarta Colonia/RS) = "UHENPAL"; Santa Maria
+    ("Empresa Luz e Forca Santa Maria S/A", 110 mil consumidores, 11
+    municipios) = "ELFSM". Adicionadas ao `MAPEAMENTO_MANUAL_CONFIRMADO` de
+    `extrair_desempenho_conexao_mmgd.py` - extractor re-executado
+    (52/52 distribuidoras casadas com o INDQUAL, antes 48/52).
+    **Resultado pos-correcao**: Nova Palma ganhou eixo de justica de
+    verdade e saiu de `distribuidorasComDadosIncompletos` (os municipios da
+    UHENPAL nao sao compartilhados) - correcao real, nao so cosmetica.
+    Forcel, Joao Cesa e Santa Maria continuam sem eixo de justica, mas agora
+    pela MESMA causa confirmada do grupo anterior (municipios 100%
+    compartilhados com outra distribuidora) - o crosswalk estava certo em
+    nao achar par antes, so mascarava a causa real.
+
+**Status final**: 13 distribuidoras em `distribuidorasComDadosIncompletos`
+por falta de eixo de justica (11 originais + Forcel + Joao Cesa + Santa
+Maria), todas pela mesma causa confirmada (area de concessao compartilhada) -
+comportamento correto da regra de desambiguacao, nao lacuna de dado nem bug.
+Nenhuma acao adicional necessaria - pendencia fechada.
 
 
 ## Manutencao deste documento
