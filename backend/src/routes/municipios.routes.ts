@@ -29,8 +29,9 @@ export const municipiosRouter = Router();
  * por uf/regiao/nome, ordenação por qualquer indicador e paginação. Ver
  * src/services/municipios.service.ts para os detalhes.
  *
- * Query params (todos opcionais): uf, regiao, nome, ordenarPor, ordem,
- * pagina, porPagina — ver schemas/municipios.schema.ts.
+ * Query params (todos opcionais): uf, regiao, nome, potenciaMin, potenciaMax
+ * (RF-046, faixa de potência instalada em kW), ordenarPor, ordem, pagina,
+ * porPagina — ver schemas/municipios.schema.ts.
  */
 municipiosRouter.get(
   '/municipios',
@@ -61,8 +62,9 @@ municipiosRouter.get(
  * GET /api/municipios/exportar (RF-047)
  *
  * Download de dados públicos em CSV ou GeoJSON (?formato=csv|geojson),
- * mesmos filtros de /api/municipios (uf/regiao/nome/ordenarPor/ordem), sem
- * paginação — exporta todos os municípios que casarem o filtro. Registrada
+ * mesmos filtros de /api/municipios (uf/regiao/nome/potenciaMin/potenciaMax/
+ * ordenarPor/ordem), sem paginação — exporta todos os municípios que
+ * casarem o filtro. Registrada
  * ANTES de '/municipios/:codigoIbge' pelo mesmo motivo de '/comparar'
  * (mesmo formato de path que um código IBGE).
  */

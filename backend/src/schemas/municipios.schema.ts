@@ -51,6 +51,16 @@ export const listarMunicipiosQuerySchema = z.object({
   // case-insensitive, sem exigir acento exato do cliente.
   nome: z.string().trim().min(1).max(120).optional(),
 
+  // RF-046 (Dashboard Público): filtro por faixa de potência instalada
+  // (potencia_instalada_kw, MMGD total — mesmo campo já usado em
+  // CRITERIOS_ORDENACAO_MUNICIPIO). "período" também é pedido no RF-046, mas
+  // NÃO foi implementado: o modelo de dados só guarda o snapshot mais recente
+  // de cada indicador (sem série temporal) — mesma limitação já documentada
+  // para RF-034 (ranking por variação no período). Decisão do usuário
+  // (10/07/2026): documentar como exclusão, não simular.
+  potenciaMin: z.coerce.number().min(0).optional(),
+  potenciaMax: z.coerce.number().min(0).optional(),
+
   ordenarPor: z.enum(CRITERIOS_ORDENACAO_MUNICIPIO).default('nome'),
 
   // Default 'asc' porque o default de ordenarPor é 'nome' (ordem alfabética

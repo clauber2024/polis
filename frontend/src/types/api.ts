@@ -58,6 +58,9 @@ export interface ListarMunicipiosResultado {
     uf: string | null;
     regiao: string | null;
     nome: string | null;
+    /** RF-046 (Dashboard Público) — faixa de potência instalada, kW. */
+    potenciaMin: number | null;
+    potenciaMax: number | null;
   };
   ordenacao: {
     ordenarPor: string;
@@ -146,6 +149,185 @@ export interface ClassificarMunicipiosResultado {
   resultados: MunicipioClassificado[];
 }
 
+// ---------------------------------------------------------------------------
+// Autenticação (RF-009/013/014) — fundação de RBAC, ver CLAUDE.md "Fundação de
+// autenticação/RBAC". Papel Público não autentica.
+// ---------------------------------------------------------------------------
+
+export type Papel = 'colaborador' | 'administrador';
+
+/** Espelho do `usuario` retornado por POST /api/auth/login. */
+export interface UsuarioAutenticado {
+  id: number;
+  nome: string;
+  email: string;
+  papel: Papel;
+}
+
+/** Espelho do corpo de resposta de POST /api/auth/login. */
+export interface LoginResultado {
+  token: string;
+  usuario: UsuarioAutenticado;
+}
+
+// ---------------------------------------------------------------------------
+// Escrita do Colaborador (RF-059 a RF-067) — ver
+// backend/src/services/colaborador.service.ts.
+// ---------------------------------------------------------------------------
+
+/** As 6 fontes primárias do Atlas (ver basesDeDadosCanonicas.ts no backend). */
+export const BASES_DE_DADOS_CANONICAS = ['aneel', 'ibge', 'cadunico', 'tsee', 'ivs_ipea', 'inpe'] as const;
+export type BaseDadosCanonica = (typeof BASES_DE_DADOS_CANONICAS)[number];
+
+export type StatusRevisaoBaseDados = 'em_revisao' | 'validado' | 'inconsistencia_encontrada';
+
+/** Espelho de listarRevisoesBasesDados (RF-059). */
+export interface RevisaoBaseDados {
+  baseDados: BaseDadosCanonica;
+  status: StatusRevisaoBaseDados;
+  atualizadoEm: string;
+  atualizadoPorNome: string | null;
+}
+
+/** Espelho de listarObservacoesBasesDados (RF-060). */
+export interface ObservacaoBaseDados {
+  id: number;
+  baseDados: BaseDadosCanonica;
+  mensagem: string;
+  criadoEm: string;
+  autorNome: string | null;
+}
+
+/** Espelho de listarSugestoesIndicadores (RF-061). */
+export interface SugestaoIndicador {
+  id: number;
+  indicador: string;
+  mensagem: string;
+  criadoEm: string;
+  autorNome: string | null;
+}
+
+/** Espelho de listarNotasMetodologicas (RF-064/065/066). */
+export interface NotaMetodologica {
+  id: number;
+  topico: string;
+  conteudo: string;
+  forcaAchado: number | null;
+  criadoEm: string;
+  autorNome: string | null;
+}
+
+export type StatusMaterialComunicacao = 'em_producao' | 'em_revisao' | 'publicado';
+
+/** Espelho de listarMateriaisComunicacao (RF-067). */
+export interface MaterialComunicacao {
+  id: number;
+  titulo: string;
+  status: StatusMaterialComunicacao;
+  criadoEm: string;
+  atualizadoEm: string;
+  autorNome: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Painel Admin (RF-070 a RF-077) — ver backend/src/services/admin.service.ts.
+// RF-070 (upload de arquivo real) não implementado — decisão do usuário foi
+// manter a carga de dado só via ETL Python, ver CLAUDE.md.
+// ---------------------------------------------------------------------------
+
+/** As 6 bases canônicas + a linha especial de granularidade fina do MMGD (RF-072). */
+export const IDS_METADADOS_BASES_DADOS = [
+  ...BASES_DE_DADOS_CANONICAS,
+  'aneel_mmgd_granularidade_fina',
+] as const;
+export type IdMetadadoBaseDados = (typeof IDS_METADADOS_BASES_DADOS)[number];
+
+export type GranularidadeEspacial = 'municipio' | 'setor_censitario' | 'cep' | 'bairro' | 'outro';
+export type StatusMetadadoBaseDados = 'pendente' | 'validado' | 'erro' | 'aguardando_liberacao';
+
+/** Espelho de listarMetadadosBasesDados (RF-071/072/073). */
+export interface MetadadoBaseDados {
+  baseDados: IdMetadadoBaseDados;
+  granularidadeEspacial: GranularidadeEspacial | null;
+  status: StatusMetadadoBaseDados;
+  observacao: string | null;
+  atualizadoEm: string;
+  atualizadoPorNome: string | null;
+}
+
+export type StatusAprovacaoIndicador = 'pendente' | 'aprovado' | 'rejeitado';
+
+/** Espelho de listarAprovacoesIndicadores (RF-074). */
+export interface AprovacaoIndicador {
+  id: number;
+  indicador: string;
+  status: StatusAprovacaoIndicador;
+  motivo: string | null;
+  criadoEm: string;
+  decididoEm: string | null;
+}
+
+/** Espelho de listarVersoesPublicadas (RF-075). */
+export interface VersaoPublicada {
+  id: number;
+  versao: string;
+  descricao: string;
+  publicadoEm: string;
+  publicadoPorNome: string | null;
+}
+
+/** Espelho de listarUsuarios (RF-076) — nunca inclui senhaHash. */
+export interface UsuarioAdmin {
+  id: number;
+  nome: string;
+  email: string;
+  papel: Papel;
+  ativo: boolean;
+  criadoEm: string;
+}
+
+// ---------------------------------------------------------------------------
+// Landing Page (RF-001 a RF-008) — ver backend/src/services/estatisticasNacionais.service.ts
+// ---------------------------------------------------------------------------
+
+/** Espelho de IndicadorIndisponivel (estatisticasNacionais.service.ts). */
+export interface IndicadorIndisponivel {
+  id: 'participacaoMatrizNacional' | 'projecaoFuturaPotencia';
+  rotulo: string;
+  motivo: string;
+}
+
+/**
+ * Espelho de PessoasBeneficiadasEstimativa — SEMPRE rotular como estimativa
+ * na UI, nunca como contagem exata (usa numero_ucs_residencial × média
+ * nacional de moradores por domicílio, IBGE Censo 2022).
+ */
+export interface PessoasBeneficiadasEstimativa {
+  totalUcsResidenciaisBeneficiadas: number;
+  mediaPessoasPorDomicilio: number;
+  fonteMediaPessoasPorDomicilio: string;
+  pessoasBeneficiadasEstimativa: number;
+}
+
+/**
+ * Espelho de EstatisticasNacionais (GET /api/estatisticas-nacionais, RF-005).
+ * Só os 3 primeiros campos são calculados de fato — os outros 3 números
+ * pedidos pelo RF-005 (pessoas beneficiadas, participação na matriz nacional,
+ * projeção futura) não são calculáveis com o schema atual e aparecem em
+ * `indicadoresIndisponiveis`, cada um com o motivo — nunca fabricados.
+ */
+export interface EstatisticasNacionais {
+  /** UCs beneficiadas por crédito de energia — não é contagem de instalações. Ver backend. */
+  totalUcsBeneficiadas: number;
+  /** Contagem real de instalações MMGD (migration 0025) — null até o extractor rodar de novo. */
+  totalInstalacoesMmgd: number | null;
+  potenciaTotalInstaladaKw: number;
+  totalMunicipiosComMmgd: number;
+  periodoReferencia: string | null;
+  pessoasBeneficiadas: PessoasBeneficiadasEstimativa;
+  indicadoresIndisponiveis: IndicadorIndisponivel[];
+}
+
 /** Espelho de ListarVaziosDeAcessoResultado (GET /api/vazios-de-acesso). */
 export interface ListarVaziosDeAcessoResultado {
   metodologia: {
@@ -173,4 +355,47 @@ export interface ListarVaziosDeAcessoResultado {
   };
   paginacao: Paginacao;
   resultados: MunicipioClassificado[];
+}
+
+/**
+ * Espelho de DistribuidoraRanking (GET /api/ranking-distribuidoras). Ver
+ * docs/DECISOES.md, ADR "Ranking público de distribuidoras", para as 3
+ * decisões de exibição que moldam este contrato: segregação visual
+ * (rankingPrincipal x distribuidorasComDadosIncompletos, nunca a mesma
+ * posição ordinal), IVS ponderado por população, nota metodológica fixa.
+ */
+export interface DistribuidoraRanking {
+  distribuidora: string;
+  sigAgenteIndqual: string | null;
+  regiaoPrincipal: string;
+  nPedidos: number;
+  nRegioes: number;
+  amostraPequena: boolean;
+  pctConectado: number;
+  prazoConfiavel: boolean;
+  /** NULL quando prazoConfiavel = false — NUNCA ler como "0% no prazo". */
+  pctDentroDoPrazo: number | null;
+  nMunicipiosAtendidos: number | null;
+  nMunicipiosComIvs: number | null;
+  ivsMedioPonderadoPorPopulacao: number | null;
+  eixoTecnico: number | null;
+  eixoJustica: number | null;
+  scoreComposto: number | null;
+  scoreApenasTecnico: boolean;
+  motivosDadosIncompletos: string[];
+}
+
+/** Espelho de RankingDistribuidorasResultado (GET /api/ranking-distribuidoras). */
+export interface RankingDistribuidorasResultado {
+  metodologia: {
+    eixoTecnico: string;
+    eixoJustica: string;
+    composicaoScore: string;
+    limiarAmostraPequena: number;
+  };
+  notaMetodologicaJustica: string;
+  notaMetodologicaDadosIncompletos: string;
+  totalDistribuidoras: number;
+  rankingPrincipal: DistribuidoraRanking[];
+  distribuidorasComDadosIncompletos: DistribuidoraRanking[];
 }

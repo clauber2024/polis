@@ -6,6 +6,7 @@ import {
   type PontosHeatmap,
 } from '../components/mapa/MapaMunicipios';
 import { Legenda } from '../components/mapa/Legenda';
+import { PainelFiltrosDashboard } from '../components/mapa/PainelFiltrosDashboard';
 import { PainelHeatmapVazios } from '../components/mapa/PainelHeatmapVazios';
 import { PainelMunicipio } from '../components/mapa/PainelMunicipio';
 import { PainelRanking } from '../components/mapa/PainelRanking';
@@ -52,6 +53,16 @@ export function PaginaMapa() {
   const [foco, setFoco] = useState<FocoMunicipio | null>(null);
   const [rankingAberto, setRankingAberto] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Filtros do Dashboard Público (RF-046) + download (RF-047). Painel
+  // controlado (ver PainelFiltrosDashboard.tsx) — os valores moram aqui
+  // porque o cálculo de codigosVisiveis (abaixo) precisa deles junto com
+  // `dados`, que também mora nesta página.
+  const [filtrosAberto, setFiltrosAberto] = useState(false);
+  const [filtroUf, setFiltroUf] = useState('');
+  const [filtroRegiao, setFiltroRegiao] = useState('');
+  const [filtroPotenciaMin, setFiltroPotenciaMin] = useState('');
+  const [filtroPotenciaMax, setFiltroPotenciaMax] = useState('');
 
   useEffect(() => {
     let ativo = true;
@@ -172,6 +183,64 @@ export function PaginaMapa() {
     [dados],
   );
 
+  // Opções do painel de filtros (RF-046) — mesma técnica de derivar de
+  // `listaMunicipios` já usada em PainelRanking.tsx para a lista de UFs.
+  const ufsDisponiveis = useMemo(() => {
+    const porUf = new Map<string, string>();
+    for (const m of listaMunicipios) porUf.set(m.uf, m.nomeEstado);
+    return [...porUf.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [listaMunicipios]);
+
+  const regioesDisponiveis = useMemo(
+    () => [...new Set(listaMunicipios.map((m) => m.regiao))].sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [listaMunicipios],
+  );
+
+  const filtrosDashboardAtivos = !!(
+    filtroUf ||
+    filtroRegiao ||
+    filtroPotenciaMin ||
+    filtroPotenciaMax
+  );
+
+  // RF-046: municípios visíveis no mapa depois do filtro — null quando nenhum
+  // filtro está ativo (mostra todos). "Sem dado" de potência nunca casa com
+  // filtro de faixa, mesma regra já usada no backend (buscarEFiltrarMunicipios).
+  const codigosVisiveis = useMemo(() => {
+    if (!dados || !filtrosDashboardAtivos) return null;
+    const minimo = filtroPotenciaMin ? Number(filtroPotenciaMin) : undefined;
+    const maximo = filtroPotenciaMax ? Number(filtroPotenciaMax) : undefined;
+    return dados.features
+      .filter((f) => {
+        const m = f.properties;
+        if (filtroUf && m.uf !== filtroUf) return false;
+        if (filtroRegiao && m.regiao !== filtroRegiao) return false;
+        if (minimo !== undefined && (m.potenciaInstaladaKw === null || m.potenciaInstaladaKw < minimo)) {
+          return false;
+        }
+        if (maximo !== undefined && (m.potenciaInstaladaKw === null || m.potenciaInstaladaKw > maximo)) {
+          return false;
+        }
+        return true;
+      })
+      .map((f) => f.properties.codigoIbge);
+  }, [dados, filtrosDashboardAtivos, filtroUf, filtroRegiao, filtroPotenciaMin, filtroPotenciaMax]);
+
+  function limparFiltrosDashboard() {
+    setFiltroUf('');
+    setFiltroRegiao('');
+    setFiltroPotenciaMin('');
+    setFiltroPotenciaMax('');
+  }
+
+  // Ranking (RF-030) e Filtros (RF-046) são dois painéis laterais do mesmo
+  // tamanho — mantidos mutuamente exclusivos para não disputar espaço à
+  // esquerda do mapa.
+  function alternarFiltros() {
+    setFiltrosAberto((aberto) => !aberto);
+    setRankingAberto(false);
+  }
+
   // Índice codigoIbge → município do GeoJSON original: o clique no mapa só
   // devolve o código (as properties do feature perdem os nulos na conversão
   // interna do MapLibre para tile vetorial — ver MapaMunicipios).
@@ -184,7 +253,7 @@ export function PaginaMapa() {
   // one-shot — seleciona o município, voa até ele e REMOVE o parâmetro da URL
   // (replace, sem poluir o histórico). Consumir e remover permite repetir a
   // mesma busca (a URL volta a mudar) e, de quebra, dá deep-link: abrir
-  // /?municipio=3550308 direto já enquadra São Paulo quando o GeoJSON chega.
+  // /mapa?municipio=3550308 direto já enquadra São Paulo quando o GeoJSON chega.
   const codigoBuscado = searchParams.get('municipio');
   useEffect(() => {
     if (!codigoBuscado || !dados) return;
@@ -222,6 +291,25 @@ export function PaginaMapa() {
         />
       )}
 
+      {filtrosAberto && dados && (
+        <PainelFiltrosDashboard
+          ufs={ufsDisponiveis}
+          regioes={regioesDisponiveis}
+          uf={filtroUf}
+          regiao={filtroRegiao}
+          potenciaMin={filtroPotenciaMin}
+          potenciaMax={filtroPotenciaMax}
+          totalVisiveis={codigosVisiveis?.length ?? listaMunicipios.length}
+          totalMunicipios={listaMunicipios.length}
+          aoMudarUf={setFiltroUf}
+          aoMudarRegiao={setFiltroRegiao}
+          aoMudarPotenciaMin={setFiltroPotenciaMin}
+          aoMudarPotenciaMax={setFiltroPotenciaMax}
+          aoLimparFiltros={limparFiltrosDashboard}
+          aoFechar={() => setFiltrosAberto(false)}
+        />
+      )}
+
       <div className="relative min-w-0 flex-1">
         <MapaMunicipios
           dados={dados}
@@ -230,6 +318,7 @@ export function PaginaMapa() {
           codigosDestaque={codigosDestaque}
           pontosHeatmap={pontosHeatmap}
           foco={foco}
+          codigosVisiveis={codigosVisiveis}
           aoClicarMunicipio={(codigoIbge) =>
             setMunicipioSelecionado(municipioPorCodigo.get(codigoIbge) ?? null)
           }
@@ -259,12 +348,27 @@ export function PaginaMapa() {
             type="button"
             onClick={() => {
               setRankingAberto((aberto) => !aberto);
+              setFiltrosAberto(false);
               if (!rankingAberto) garantirVaziosCarregados();
             }}
             className="mt-3 w-full rounded border border-slate-300 px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
           >
             {rankingAberto ? 'Fechar ranking estadual' : 'Ranking estadual'}
           </button>
+
+          <button
+            type="button"
+            onClick={alternarFiltros}
+            className="mt-2 w-full rounded border border-slate-300 px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+          >
+            {filtrosAberto ? 'Fechar filtros' : 'Filtros (Dashboard Público)'}
+          </button>
+          {filtrosDashboardAtivos && !filtrosAberto && (
+            <p className="mt-1 text-xs text-amber-600">
+              Filtro ativo: {codigosVisiveis?.length ?? 0} de {listaMunicipios.length} municípios
+              visíveis.
+            </p>
+          )}
 
           <label className="mt-3 flex items-center gap-2 text-sm text-slate-700">
             <input

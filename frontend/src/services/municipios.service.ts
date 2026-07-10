@@ -3,7 +3,7 @@ import type {
   ListarMunicipiosResultado,
   MunicipioComIndicadores,
 } from '../types/api';
-import { obterJson } from './http';
+import { baixarArquivo, obterJson } from './http';
 
 /**
  * Campos numéricos do contrato — usados para normalização abaixo.
@@ -99,5 +99,34 @@ export async function buscarMunicipiosPorNome(nome: string): Promise<ListarMunic
 export async function buscarMunicipio(codigoIbge: string): Promise<MunicipioComIndicadores> {
   return normalizarMunicipio(
     await obterJson<MunicipioComIndicadores>(`/api/municipios/${codigoIbge}`),
+  );
+}
+
+/**
+ * GET /api/municipios/exportar (RF-047) — download de dados públicos do
+ * Dashboard Público em CSV/GeoJSON, honrando os mesmos filtros do painel
+ * RF-046 (estado, região, faixa de potência instalada). "período" não é
+ * aceito aqui de propósito — RF-046 pede o filtro, mas o backend não tem
+ * série temporal para filtrar por (ver PainelFiltrosDashboard.tsx e
+ * municipios.schema.ts no backend).
+ */
+export async function exportarMunicipios(
+  formato: 'csv' | 'geojson',
+  filtros: { uf?: string; regiao?: string; potenciaMin?: number; potenciaMax?: number },
+): Promise<void> {
+  const dataHoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(
+    new Date(),
+  );
+  const params: Record<string, string> = { formato };
+  if (filtros.uf) params.uf = filtros.uf;
+  if (filtros.regiao) params.regiao = filtros.regiao;
+  if (filtros.potenciaMin !== undefined) params.potenciaMin = String(filtros.potenciaMin);
+  if (filtros.potenciaMax !== undefined) params.potenciaMax = String(filtros.potenciaMax);
+
+  const extensao = formato === 'geojson' ? 'geojson' : 'csv';
+  await baixarArquivo(
+    '/api/municipios/exportar',
+    params,
+    `municipios-dashboard-publico-${dataHoje}.${extensao}`,
   );
 }

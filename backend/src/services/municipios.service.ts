@@ -233,6 +233,8 @@ export interface ListarMunicipiosResultado {
     uf: string | null;
     regiao: string | null;
     nome: string | null;
+    potenciaMin: number | null;
+    potenciaMax: number | null;
   };
   ordenacao: {
     ordenarPor: ListarMunicipiosQuery['ordenarPor'];
@@ -254,7 +256,10 @@ export interface ListarMunicipiosResultado {
  * de filtro/ordenação entre os dois casos de uso.
  */
 async function buscarEFiltrarMunicipios(
-  query: Pick<ListarMunicipiosQuery, 'uf' | 'regiao' | 'nome' | 'ordenarPor' | 'ordem'>,
+  query: Pick<
+    ListarMunicipiosQuery,
+    'uf' | 'regiao' | 'nome' | 'potenciaMin' | 'potenciaMax' | 'ordenarPor' | 'ordem'
+  >,
 ): Promise<MunicipioComIndicadores[]> {
   const linhasBrutas = await buscarPainelBruto();
   let municipios = linhasBrutas.map(calcularDerivados);
@@ -270,6 +275,20 @@ async function buscarEFiltrarMunicipios(
     // mesma decisão de "sem SQL dinâmico" já tomada em vaziosDeAcesso).
     const termo = query.nome.toLocaleLowerCase('pt-BR');
     municipios = municipios.filter((m) => m.nome.toLocaleLowerCase('pt-BR').includes(termo));
+  }
+  // RF-046 (Dashboard Público): faixa de potência instalada. Município sem
+  // dado de MMGD (potenciaInstaladaKw null) é excluído por qualquer faixa —
+  // "sem dado" nunca deve casar com um filtro numérico, mesma regra já usada
+  // em ordenarMunicipios (nulo nunca vira extremo).
+  if (query.potenciaMin !== undefined) {
+    municipios = municipios.filter(
+      (m) => m.potenciaInstaladaKw !== null && m.potenciaInstaladaKw >= query.potenciaMin!,
+    );
+  }
+  if (query.potenciaMax !== undefined) {
+    municipios = municipios.filter(
+      (m) => m.potenciaInstaladaKw !== null && m.potenciaInstaladaKw <= query.potenciaMax!,
+    );
   }
 
   return ordenarMunicipios(municipios, query.ordenarPor, query.ordem);
@@ -290,6 +309,8 @@ export async function listarMunicipios(
       uf: query.uf ?? null,
       regiao: query.regiao ?? null,
       nome: query.nome ?? null,
+      potenciaMin: query.potenciaMin ?? null,
+      potenciaMax: query.potenciaMax ?? null,
     },
     ordenacao: {
       ordenarPor: query.ordenarPor,

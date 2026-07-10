@@ -82,6 +82,13 @@ interface MapaMunicipiosProps {
   /** Município a enquadrar (fitBounds) ou null. Ver FocoMunicipio. */
   foco: FocoMunicipio | null;
   /**
+   * Códigos IBGE visíveis no filtro do Dashboard Público (RF-046) ou null
+   * quando nenhum filtro está ativo (mostra todos). Municípios fora da lista
+   * somem do preenchimento E do contorno — "filtro" aqui é literal, não
+   * esmaecimento (diferente do modo heatmap, que só troca a cor de fundo).
+   */
+  codigosVisiveis: string[] | null;
+  /**
    * Recebe só o codigoIbge — as properties do feature clicado NÃO são
    * confiáveis para leitura de indicadores (o MapLibre descarta valores
    * nulos na conversão interna para tile vetorial); a página resolve o
@@ -115,6 +122,7 @@ export function MapaMunicipios({
   codigosDestaque,
   pontosHeatmap,
   foco,
+  codigosVisiveis,
   aoClicarMunicipio,
 }: MapaMunicipiosProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -290,6 +298,24 @@ export function MapaMunicipios({
       mapa.setFilter(CAMADA_DESTAQUE, ['boolean', false]);
     }
   }, [codigosDestaque, mapaCarregado, dados]);
+
+  // Filtro do Dashboard Público (RF-046) — esconde (não esmaece) municípios
+  // fora da faixa/estado/região selecionados, no preenchimento E no contorno.
+  // Independente do destaque de Vazios de Acesso (camada separada,
+  // CAMADA_DESTAQUE) e do heatmap — filtrar o choropleth não afeta essas
+  // outras camadas de propósito (fora do escopo do RF-046).
+  useEffect(() => {
+    const mapa = mapaRef.current;
+    if (!mapa || !mapaCarregado) return;
+    if (!mapa.getLayer(CAMADA_PREENCHIMENTO) || !mapa.getLayer(CAMADA_CONTORNO)) return;
+
+    const filtro =
+      codigosVisiveis !== null
+        ? (['in', ['get', 'codigoIbge'], ['literal', codigosVisiveis]] as unknown as FilterSpecification)
+        : null;
+    mapa.setFilter(CAMADA_PREENCHIMENTO, filtro);
+    mapa.setFilter(CAMADA_CONTORNO, filtro);
+  }, [codigosVisiveis, mapaCarregado, dados]);
 
   // Voa até o município buscado (RF-026). fitBounds em vez de flyTo com zoom
   // fixo: municípios variam de ~3 km² a ~150.000 km² (Altamira/PA), zoom fixo
