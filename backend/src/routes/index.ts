@@ -10,6 +10,8 @@ import { basesDeDadosRouter } from './basesDeDados.routes.js';
 import { authRouter } from './auth.routes.js';
 import { colaboradorRouter } from './colaborador.routes.js';
 import { adminRouter } from './admin.routes.js';
+import { estatisticasNacionaisRouter } from './estatisticasNacionais.routes.js';
+import { rankingDistribuidorasRouter } from './rankingDistribuidoras.routes.js';
 
 export const router = Router();
 
@@ -19,3 +21,5 @@ router.use(basesDeDadosRouter);
 router.use(authRouter);
 router.use(colaboradorRouter);
 router.use(adminRouter);
+router.use(estatisticasNacionaisRouter);
+router.use(rankingDistribuidorasRouter);
