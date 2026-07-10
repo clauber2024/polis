@@ -58,6 +58,19 @@ Rural/Outras/Não-classificado (inclui o valor espúrio 'REBR'/'RE' já
 documentado em `carregar_classe_consumo_mmgd`) NÃO são trazidos para o banco
 nesta migration — só Residencial, que é o que a metodologia de Vazio de
 Acesso precisa. Requer a migration 0020 aplicada antes de rodar este script.
+
+NUMERO_EMPREENDIMENTOS (novo, migration 0025, sessão 10/07/2026):
+--------------------------------------------------------------------------
+Ao construir GET /api/estatisticas-nacionais (RF-005, Landing Page), ficou
+claro que numero_ucs_com_mmgd (acima) NUNCA representou "número de
+sistemas/instalações conectados" — sempre foi UCs BENEFICIADAS por crédito
+(ver "POR QUE QtdUCRecebeCredito SOMADO" acima). Este extractor já calculava
+a contagem real de instalações (COUNT de linhas por município) no `agregado`
+em memória, mas descartava o valor antes do INSERT. A partir desta sessão,
+numero_empreendimentos também é persistido, para que "instalações
+conectadas" e "UCs beneficiadas por crédito" sejam dois números distintos e
+corretamente rotulados (ver ARQUITETURA.md, seção "RF-005"). Requer a
+migration 0025 aplicada antes de rodar este script.
 ================================================================================
 """
 
@@ -265,15 +278,16 @@ def executar_upsert_mmgd(engine, agregado: pd.DataFrame, periodo_referencia: str
     sql_upsert = text("""
         INSERT INTO mmgd_indicadores
             (unidade_espacial_id, periodo_referencia, potencia_instalada_kw,
-             numero_ucs_com_mmgd, potencia_residencial_kw, numero_ucs_residencial,
-             total_ucs_municipio, e_dado_ilustrativo)
+             numero_ucs_com_mmgd, numero_empreendimentos, potencia_residencial_kw,
+             numero_ucs_residencial, total_ucs_municipio, e_dado_ilustrativo)
         VALUES
             (:unidade_espacial_id, :periodo_referencia, :potencia_instalada_kw,
-             :numero_ucs_com_mmgd, :potencia_residencial_kw, :numero_ucs_residencial,
-             NULL, 'false')
+             :numero_ucs_com_mmgd, :numero_empreendimentos, :potencia_residencial_kw,
+             :numero_ucs_residencial, NULL, 'false')
         ON CONFLICT (unidade_espacial_id, periodo_referencia) DO UPDATE SET
             potencia_instalada_kw = EXCLUDED.potencia_instalada_kw,
             numero_ucs_com_mmgd = EXCLUDED.numero_ucs_com_mmgd,
+            numero_empreendimentos = EXCLUDED.numero_empreendimentos,
             potencia_residencial_kw = EXCLUDED.potencia_residencial_kw,
             numero_ucs_residencial = EXCLUDED.numero_ucs_residencial;
     """)
@@ -291,6 +305,7 @@ def executar_upsert_mmgd(engine, agregado: pd.DataFrame, periodo_referencia: str
                     "periodo_referencia": periodo_referencia,
                     "potencia_instalada_kw": float(linha["potencia_instalada_kw"]),
                     "numero_ucs_com_mmgd": int(linha["numero_ucs_com_mmgd"]),
+                    "numero_empreendimentos": int(linha["numero_empreendimentos"]),
                     "potencia_residencial_kw": float(linha["potencia_residencial_kw"]),
                     "numero_ucs_residencial": int(linha["numero_ucs_residencial"]),
                 })

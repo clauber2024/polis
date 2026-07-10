@@ -46,7 +46,26 @@ export const mmgdIndicadores = pgTable(
 
     potenciaInstaladaKw: doublePrecision('potencia_instalada_kw').notNull(),
 
+    /**
+     * Nº de UCs BENEFICIADAS por crédito de energia (QtdUCRecebeCredito
+     * somado, não COUNT de linhas — ver extrair_mmgd_aneel.py) — pode
+     * exceder o número de instalações em modalidade Compartilhada/Auto
+     * consumo remoto, onde um empreendimento beneficia várias UCs. NÃO é
+     * "número de sistemas/instalações conectados" (isso é
+     * numeroEmpreendimentos, abaixo) — nome mantido por compatibilidade
+     * (coluna já existia antes desta distinção ficar clara, ver migration
+     * 0025 e ARQUITETURA.md "RF-005").
+     */
     numeroUcsComMmgd: integer('numero_ucs_com_mmgd').notNull(),
+
+    /**
+     * Nº de empreendimentos (instalações/sistemas) de MMGD conectados —
+     * COUNT de linhas do Parquet ANEEL por município, diferente de
+     * numeroUcsComMmgd acima (que soma UCs beneficiadas, não instalações).
+     * Adicionada na migration 0025. NULL para snapshots carregados antes
+     * dela (precisa rodar extrair_mmgd_aneel.py novamente).
+     */
+    numeroEmpreendimentos: integer('numero_empreendimentos'),
 
     /**
      * Potência instalada (kW) apenas dos empreendimentos com
