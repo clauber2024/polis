@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { MapaMunicipios, type FocoMunicipio } from '../components/mapa/MapaMunicipios';
+import {
+  MapaMunicipios,
+  type FocoMunicipio,
+  type PontosHeatmap,
+} from '../components/mapa/MapaMunicipios';
 import { Legenda } from '../components/mapa/Legenda';
+import { PainelHeatmapVazios } from '../components/mapa/PainelHeatmapVazios';
 import { PainelMunicipio } from '../components/mapa/PainelMunicipio';
 import { PainelRanking } from '../components/mapa/PainelRanking';
 import { buscarGeoJsonNacional } from '../services/municipios.service';
@@ -10,7 +15,18 @@ import {
   type VaziosDeAcessoCompleto,
 } from '../services/vaziosDeAcesso.service';
 import type { FeatureCollectionMunicipios, MunicipioComIndicadores } from '../types/api';
+import { centroDaGeometria } from '../utils/geometria';
 import { INDICADORES_MAPA, calcularQuebrasQuantis } from '../utils/indicadores';
+
+/**
+ * Peso mínimo de um ponto no heatmap (RF-057): municípios sem IVS não podem
+ * pesar 0 (sumiriam do heatmap — ausência de IVS não significa ausência de
+ * vazio), nem o município de MENOR IVS pode zerar (ele continua sendo um
+ * Vazio de Acesso classificado). Normalização min–max é apresentação, mesma
+ * régua da barra do ranking (RF-032) — a CLASSIFICAÇÃO continua 100% do
+ * backend.
+ */
+const PESO_MINIMO_HEATMAP = 0.2;
 
 /**
  * Mapa interativo do Atlas (RF-016/017 choropleth; RF-055/056 destaque dos
@@ -26,6 +42,7 @@ export function PaginaMapa() {
   const indicador = INDICADORES_MAPA.find((i) => i.id === indicadorId) ?? INDICADORES_MAPA[0];
 
   const [destaqueLigado, setDestaqueLigado] = useState(false);
+  const [heatmapLigado, setHeatmapLigado] = useState(false);
   const [vazios, setVazios] = useState<VaziosDeAcessoCompleto | null>(null);
   const [carregandoVazios, setCarregandoVazios] = useState(false);
   const [erroVazios, setErroVazios] = useState<string | null>(null);
@@ -73,12 +90,18 @@ export function PaginaMapa() {
           causa instanceof Error ? causa.message : 'Falha ao carregar os Vazios de Acesso.',
         );
         setDestaqueLigado(false);
+        setHeatmapLigado(false);
       })
       .finally(() => setCarregandoVazios(false));
   }
 
   function aoAlternarDestaque(ligado: boolean) {
     setDestaqueLigado(ligado);
+    if (ligado) garantirVaziosCarregados();
+  }
+
+  function aoAlternarHeatmap(ligado: boolean) {
+    setHeatmapLigado(ligado);
     if (ligado) garantirVaziosCarregados();
   }
 
@@ -100,6 +123,49 @@ export function PaginaMapa() {
     () => (vazios ? new Set(vazios.municipios.map((m) => m.codigoIbge)) : null),
     [vazios],
   );
+
+  // Pontos do heatmap (RF-057): centro do bbox de cada Vazio de Acesso
+  // (geometria do GeoJSON já carregado) + peso = IVS normalizado min–max
+  // DENTRO do conjunto de vazios (ver PESO_MINIMO_HEATMAP). A lista de quem
+  // é vazio vem SEMPRE do backend; aqui só se monta a apresentação.
+  const pontosHeatmap = useMemo<PontosHeatmap | null>(() => {
+    if (!heatmapLigado || !vazios || !dados) return null;
+
+    const geometriaPorCodigo = new Map(
+      dados.features.map((f) => [f.properties.codigoIbge, f.geometry]),
+    );
+
+    const valoresIvs = vazios.municipios
+      .map((m) => m.ivs)
+      .filter((v): v is number => v !== null);
+    const minimo = valoresIvs.length > 0 ? Math.min(...valoresIvs) : 0;
+    const amplitude = valoresIvs.length > 0 ? Math.max(...valoresIvs) - minimo : 0;
+
+    const features = vazios.municipios.flatMap(
+      (m): PontosHeatmap['features'] => {
+        const geometria = geometriaPorCodigo.get(m.codigoIbge);
+        if (!geometria) return [];
+        const centro = centroDaGeometria(geometria);
+        if (!centro) return [];
+        const peso =
+          m.ivs === null
+            ? PESO_MINIMO_HEATMAP
+            : amplitude > 0
+              ? PESO_MINIMO_HEATMAP +
+                (1 - PESO_MINIMO_HEATMAP) * ((m.ivs - minimo) / amplitude)
+              : 1;
+        return [
+          {
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: centro },
+            properties: { peso },
+          },
+        ];
+      },
+    );
+
+    return { type: 'FeatureCollection', features };
+  }, [heatmapLigado, vazios, dados]);
 
   const listaMunicipios = useMemo(
     () => dados?.features.map((f) => f.properties) ?? [],
@@ -162,6 +228,7 @@ export function PaginaMapa() {
           indicador={indicador}
           quebras={quebras}
           codigosDestaque={codigosDestaque}
+          pontosHeatmap={pontosHeatmap}
           foco={foco}
           aoClicarMunicipio={(codigoIbge) =>
             setMunicipioSelecionado(municipioPorCodigo.get(codigoIbge) ?? null)
@@ -209,8 +276,24 @@ export function PaginaMapa() {
             Destacar Vazios de Acesso
             {carregandoVazios && <span className="text-xs text-slate-400">carregando…</span>}
           </label>
+
+          <label className="mt-2 flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={heatmapLigado}
+              onChange={(evento) => aoAlternarHeatmap(evento.target.checked)}
+              className="h-4 w-4"
+            />
+            Heatmap de Vazios de Acesso
+          </label>
+          {heatmapLigado && (
+            <p className="mt-1 text-xs text-slate-400">
+              O indicador do mapa fica esmaecido enquanto o heatmap está ativo.
+            </p>
+          )}
+
           {erroVazios && <p className="mt-1 text-xs text-red-600">{erroVazios}</p>}
-          {destaqueLigado && vazios && vazios.avisos.totalPrecisaReextrairMmgd > 0 && (
+          {(destaqueLigado || heatmapLigado) && vazios && vazios.avisos.totalPrecisaReextrairMmgd > 0 && (
             <p className="mt-1 text-xs text-amber-600">
               {vazios.avisos.totalPrecisaReextrairMmgd.toLocaleString('pt-BR')} municípios fora da
               classificação (MMGD residencial pendente de re-extração — ver CLAUDE.md).
@@ -218,14 +301,23 @@ export function PaginaMapa() {
           )}
         </div>
 
-        {/* Legenda */}
+        {/* Legenda — no modo heatmap (RF-057) o painel do heatmap substitui a
+            legenda do choropleth (modo exclusivo: o choropleth está esmaecido). */}
         <div className="absolute bottom-6 left-4">
-          <Legenda
-            indicador={indicador}
-            quebras={quebras}
-            destaqueLigado={destaqueLigado && !!vazios}
-            totalDestacados={vazios?.municipios.length ?? 0}
-          />
+          {heatmapLigado && vazios ? (
+            <PainelHeatmapVazios
+              totalVazios={vazios.municipios.length}
+              medianaNacional={vazios.medianaNacional}
+              notaMetodologica={vazios.notaMetodologica}
+            />
+          ) : (
+            <Legenda
+              indicador={indicador}
+              quebras={quebras}
+              destaqueLigado={destaqueLigado && !!vazios}
+              totalDestacados={vazios?.municipios.length ?? 0}
+            />
+          )}
         </div>
 
         {/* Estados de carga/erro do GeoJSON nacional */}

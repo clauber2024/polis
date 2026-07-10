@@ -10,6 +10,8 @@ export function buscarVaziosDeAcesso(
 
 export interface VaziosDeAcessoCompleto {
   medianaNacional: ListarVaziosDeAcessoResultado['metodologia']['medianaNacional'];
+  /** Ressalva do corte bivariado (renda não controlada) — o backend EXIGE que ela acompanhe qualquer exibição da classificação; o painel do heatmap (RF-057) a mostra. */
+  notaMetodologica: string;
   avisos: ListarVaziosDeAcessoResultado['avisos'];
   resumoPorQuadrante: ListarVaziosDeAcessoResultado['resumoPorQuadrante'];
   municipios: MunicipioClassificado[];
@@ -47,6 +49,7 @@ export async function buscarTodosVaziosDeAcesso(): Promise<VaziosDeAcessoComplet
 
   return {
     medianaNacional: primeira.metodologia.medianaNacional,
+    notaMetodologica: primeira.notaMetodologica,
     avisos: primeira.avisos,
     resumoPorQuadrante: primeira.resumoPorQuadrante,
     municipios,

@@ -3,10 +3,12 @@ import maplibregl, {
   type ExpressionSpecification,
   type FilterSpecification,
   type GeoJSONSource,
+  type HeatmapLayerSpecification,
   type Map as MapaMapLibre,
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { FeatureCollectionMunicipios } from '../../types/api';
+import { bboxDaGeometria } from '../../utils/geometria';
 import type { IndicadorMapa } from '../../utils/indicadores';
 
 /**
@@ -23,10 +25,37 @@ import type { IndicadorMapa } from '../../utils/indicadores';
 
 export const COR_SEM_DADO = '#e2e8f0';
 
+/**
+ * Fundo do choropleth quando o modo heatmap (RF-057) está ativo: as cores do
+ * indicador dariam mistura ilegível com a rampa do heatmap, então o
+ * preenchimento inteiro esmaece para um neutro mais claro que COR_SEM_DADO
+ * (decisão de design da sessão de 09/07/2026 — modo EXCLUSIVO, não
+ * sobreposição).
+ */
+const COR_FUNDO_MODO_HEATMAP = '#eef2f7';
+
+/**
+ * Rampa do heatmap (transparente → violeta escuro) — mesma família do
+ * violeta que já identifica "Vazio de Acesso" no destaque e nos badges
+ * (#7c3aed), para manter a identidade visual do conceito.
+ */
+export const RAMPA_HEATMAP: [number, string][] = [
+  [0, 'rgba(124, 58, 237, 0)'],
+  [0.15, '#ede9fe'],
+  [0.4, '#c4b5fd'],
+  [0.65, '#8b5cf6'],
+  [1, '#5b21b6'],
+];
+
 const FONTE = 'municipios';
+const FONTE_HEATMAP = 'vazios-heatmap';
 const CAMADA_PREENCHIMENTO = 'municipios-preenchimento';
 const CAMADA_CONTORNO = 'municipios-contorno';
 const CAMADA_DESTAQUE = 'vazios-destaque';
+const CAMADA_HEATMAP = 'vazios-heatmap';
+
+/** Pontos do heatmap (RF-057): centro do município + peso 0–1 (IVS normalizado). */
+export type PontosHeatmap = GeoJSON.FeatureCollection<GeoJSON.Point, { peso: number }>;
 
 /**
  * Comando de enquadramento (busca de município, RF-026). Objeto em vez de
@@ -44,6 +73,12 @@ interface MapaMunicipiosProps {
   quebras: number[];
   /** Códigos IBGE a destacar (quadrante Vazio de Acesso) ou null para desligar. */
   codigosDestaque: string[] | null;
+  /**
+   * Pontos do heatmap de Vazios de Acesso (RF-057) ou null para desligar.
+   * Não-nulo também ESMAECE o choropleth (modo exclusivo). Quem monta os
+   * pontos e calcula os pesos é a página — aqui só renderização.
+   */
+  pontosHeatmap: PontosHeatmap | null;
   /** Município a enquadrar (fitBounds) ou null. Ver FocoMunicipio. */
   foco: FocoMunicipio | null;
   /**
@@ -53,39 +88,6 @@ interface MapaMunicipiosProps {
    * município completo a partir do GeoJSON original.
    */
   aoClicarMunicipio: (codigoIbge: string) => void;
-}
-
-/**
- * Bounding box [[oeste, sul], [leste, norte]] de uma geometria GeoJSON,
- * varrendo as coordenadas recursivamente (municípios são MultiPolygon).
- * Sem dependência de turf/etc. — é a única operação geométrica do frontend.
- */
-function bboxDaGeometria(
-  geometria: GeoJSON.Geometry,
-): [[number, number], [number, number]] | null {
-  if (!('coordinates' in geometria)) return null;
-  let oeste = Infinity;
-  let sul = Infinity;
-  let leste = -Infinity;
-  let norte = -Infinity;
-  const visitar = (no: unknown): void => {
-    if (!Array.isArray(no)) return;
-    if (typeof no[0] === 'number' && typeof no[1] === 'number') {
-      const [lng, lat] = no as [number, number];
-      if (lng < oeste) oeste = lng;
-      if (lng > leste) leste = lng;
-      if (lat < sul) sul = lat;
-      if (lat > norte) norte = lat;
-      return;
-    }
-    no.forEach(visitar);
-  };
-  visitar(geometria.coordinates);
-  if (!Number.isFinite(oeste) || !Number.isFinite(sul)) return null;
-  return [
-    [oeste, sul],
-    [leste, norte],
-  ];
 }
 
 function expressaoChoropleth(
@@ -111,6 +113,7 @@ export function MapaMunicipios({
   indicador,
   quebras,
   codigosDestaque,
+  pontosHeatmap,
   foco,
   aoClicarMunicipio,
 }: MapaMunicipiosProps) {
@@ -211,12 +214,67 @@ export function MapaMunicipios({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- corChoropleth é aplicado pelo efeito abaixo nas atualizações
   }, [dados, mapaCarregado]);
 
-  // Troca de indicador → só repinta a camada (sem recriar fonte).
+  // Troca de indicador → só repinta a camada (sem recriar fonte). No modo
+  // heatmap (RF-057) o choropleth esmaece para o fundo neutro — modo
+  // exclusivo, ver COR_FUNDO_MODO_HEATMAP.
+  const modoHeatmap = pontosHeatmap !== null;
   useEffect(() => {
     const mapa = mapaRef.current;
     if (!mapa || !mapaCarregado || !mapa.getLayer(CAMADA_PREENCHIMENTO)) return;
-    mapa.setPaintProperty(CAMADA_PREENCHIMENTO, 'fill-color', corChoropleth);
-  }, [corChoropleth, mapaCarregado, dados]);
+    mapa.setPaintProperty(
+      CAMADA_PREENCHIMENTO,
+      'fill-color',
+      modoHeatmap ? COR_FUNDO_MODO_HEATMAP : corChoropleth,
+    );
+  }, [corChoropleth, modoHeatmap, mapaCarregado, dados]);
+
+  // Liga/desliga/atualiza a camada heatmap (RF-057). Fonte e camada são
+  // criadas de forma lazy no primeiro uso; desligar só esconde (visibility),
+  // não destrói — religar é instantâneo.
+  useEffect(() => {
+    const mapa = mapaRef.current;
+    if (!mapa || !mapaCarregado) return;
+
+    const fonte = mapa.getSource(FONTE_HEATMAP) as GeoJSONSource | undefined;
+    if (!pontosHeatmap) {
+      if (fonte && mapa.getLayer(CAMADA_HEATMAP)) {
+        mapa.setLayoutProperty(CAMADA_HEATMAP, 'visibility', 'none');
+      }
+      return;
+    }
+
+    if (fonte) {
+      fonte.setData(pontosHeatmap as GeoJSON.GeoJSON);
+      mapa.setLayoutProperty(CAMADA_HEATMAP, 'visibility', 'visible');
+      return;
+    }
+
+    mapa.addSource(FONTE_HEATMAP, {
+      type: 'geojson',
+      data: pontosHeatmap as GeoJSON.GeoJSON,
+    });
+    mapa.addLayer({
+      id: CAMADA_HEATMAP,
+      type: 'heatmap',
+      source: FONTE_HEATMAP,
+      paint: {
+        // Peso 0–1 já vem calculado da página (IVS normalizado, RF-056 como
+        // critério de intensidade — decisão da sessão de 09/07/2026).
+        'heatmap-weight': ['get', 'peso'],
+        // Intensidade/raio crescem com o zoom para o kernel não "sumir" ao
+        // aproximar (padrão recomendado na doc do MapLibre para heatmaps).
+        'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 3, 0.8, 7, 2],
+        'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 3, 14, 6, 36, 9, 90],
+        'heatmap-color': [
+          'interpolate',
+          ['linear'],
+          ['heatmap-density'],
+          ...RAMPA_HEATMAP.flat(),
+        ],
+        'heatmap-opacity': 0.8,
+      } as unknown as HeatmapLayerSpecification['paint'],
+    });
+  }, [pontosHeatmap, mapaCarregado]);
 
   // Liga/desliga o contorno de destaque dos Vazios de Acesso.
   useEffect(() => {

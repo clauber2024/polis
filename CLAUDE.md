@@ -290,6 +290,30 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   implementado — depende do RF-080, bloqueado pelo TSEE (ver ARQUITETURA.md).
   VALIDADO no ambiente do usuario e commitado em 09/07/2026.
 
+- **Frontend — heatmap de Vazios de Acesso (09/07/2026, RF-057):** camada
+  `heatmap` do MapLibre no mapa existente (não um segundo mapa) + painel-legenda
+  `frontend/src/components/mapa/PainelHeatmapVazios.tsx`. Decisões (usuário):
+  (1) **modo EXCLUSIVO**, não sobreposição — ligar o heatmap esmaece o
+  choropleth para fundo neutro (`COR_FUNDO_MODO_HEATMAP`) e troca a Legenda
+  pelo painel do heatmap; cores das duas camadas misturadas eram ilegíveis;
+  (2) **peso = IVS** (critério de priorização padrão do RF-056), normalizado
+  min–max NO CLIENTE dentro do conjunto de vazios, com piso
+  `PESO_MINIMO_HEATMAP = 0.2` (IVS nulo/mínimo não pode pesar 0 — o município
+  continua sendo um vazio classificado). Normalização é apresentação (mesma
+  régua da barra do ranking); a CLASSIFICAÇÃO segue 100% do backend, mesmo
+  fetch lazy (`garantirVaziosCarregados`). Pontos = centro do bbox de cada
+  município (`frontend/src/utils/geometria.ts` — `bboxDaGeometria` movida de
+  `MapaMunicipios.tsx` para lá + `centroDaGeometria`; centro de bbox pode cair
+  fora de polígono côncavo, irrelevante para densidade kernel — se um dia
+  precisar de ponto garantido dentro, é ST_PointOnSurface no backend). O
+  painel-legenda exibe a `notaMetodologica` do endpoint (o backend exige que
+  ela acompanhe qualquer exibição da classificação — campo novo em
+  `VaziosDeAcessoCompleto`, frontend/services). Rampa violeta (mesma
+  identidade do destaque/badges). Camada criada lazy; desligar só esconde
+  (`visibility: none`). VALIDADO no ambiente do usuario em 09/07/2026
+  (typecheck limpo + teste visual: esmaecer/restaurar, concentração no
+  Nordeste, convivência com o destaque).
+
 **NAO implementado ainda** (apesar de descrito em secoes deste documento como padrao):
 - Backend Node/Express: endpoints de LEITURA (`GET /api/vazios-de-acesso`,
   `/api/municipios` + variantes, `/api/bases-de-dados`, export CSV/GeoJSON/XLSX,
@@ -301,10 +325,10 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
 - Frontend React - INICIADO em 09/07/2026 (fundação + mapa, ver bloco acima), mas ainda
   falta a maior parte: landing page, painel analítico/comparação (RF-049/050), telas de
   login e painéis Colaborador/Admin (consumindo a auth já existente), export/relatório
-  pela interface, drill-down de setores censitários (RF-043/045) e o painel tipo
-  heatmap (RF-057). Busca por município no header (RF-026) e painel de ranking
-  estadual (RF-030 a RF-036, com exclusões documentadas) implementados em
-  09/07/2026 — ver blocos acima.
+  pela interface e drill-down de setores censitários (RF-043/045). Busca por
+  município no header (RF-026), painel de ranking estadual (RF-030 a RF-036,
+  com exclusões documentadas) e heatmap de Vazios de Acesso (RF-057)
+  implementados e validados em 09/07/2026 — ver blocos acima.
 - Makefile de deploy/producao - `make up-prod`, `make deploy`, `make deploy-rebuild`,
   `make deploy-first`, `make shell`, `make lint` continuam **especificacao**, nao
   implementados (ver Secao 7). Os comandos de desenvolvimento (`make up`, `make
@@ -316,7 +340,8 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   ETL Python
 - Cruzamento MMGD x indicadores sociais (identificacao de "vazios de acesso") -
   classificacao/ranking (item 3) ja tem endpoint real (acima); RF-057 (painel tipo
-  heatmap) continua pendente - e exibicao/frontend, nao calculo
+  heatmap) implementado no frontend e validado em 09/07/2026 (ver bloco acima) -
+  dimensao completa: classificacao, ranking e heatmap
 
 **Como rodar o que existe hoje:** ver `README.md`, secao "Como rodar localmente" - ETL via
 execucao direta de scripts Python (`python3 backend/src/etl/loaders/extrair_X.py`) ou
@@ -553,10 +578,13 @@ porta 5173, com o backend rodando na 3000). Makefile de desenvolvimento existe d
 │       ├── pages/
 │       │   └── PaginaMapa.tsx      (busca dados via services, estado da página)
 │       ├── components/
+│       │   ├── BuscaMunicipio.tsx  (busca do header, RF-026 - fora de mapa/ de propósito)
 │       │   └── mapa/               (isolados de lógica de negócio - CLAUDE.md Seção 4)
-│       │       ├── MapaMunicipios.tsx  (MapLibre: choropleth + destaque de vazios)
+│       │       ├── MapaMunicipios.tsx  (MapLibre: choropleth + destaque + heatmap RF-057)
 │       │       ├── Legenda.tsx
-│       │       └── PainelMunicipio.tsx (detalhe do município clicado, RF-025)
+│       │       ├── PainelMunicipio.tsx (detalhe do município clicado, RF-025)
+│       │       ├── PainelRanking.tsx   (ranking estadual, RF-030 a RF-036)
+│       │       └── PainelHeatmapVazios.tsx (painel-legenda do heatmap, RF-057)
 │       ├── services/               (todo fetch passa por aqui, nunca em componente)
 │       │   ├── http.ts             (cliente central, trata { erro: { mensagem } })
 │       │   ├── municipios.service.ts
@@ -565,7 +593,9 @@ porta 5173, com o backend rodando na 3000). Makefile de desenvolvimento existe d
 │       │   └── api.ts              (espelho manual dos contratos do backend)
 │       └── utils/
 │           ├── formatadores.ts     (Intl pt-BR)
-│           └── indicadores.ts      (catálogo de camadas choropleth + quintis)
+│           ├── geometria.ts        (bbox + centro de bbox, RF-026/057 - sem turf)
+│           ├── indicadores.ts      (catálogo de camadas choropleth + quintis)
+│           └── notasAusencia.ts    (ausência justificada de dado, painel RF-025)
 ├── docker/                         (PLANEJADO - Dockerfiles de producao nao existem)
 ├── docs/
 │   ├── DRF.md
