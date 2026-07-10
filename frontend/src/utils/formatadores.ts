@@ -10,6 +10,21 @@ const formatoMoeda = new Intl.NumberFormat('pt-BR', {
 
 export type FormatoIndicador = 'numero' | 'inteiro' | 'moeda' | 'percentual';
 
+/**
+ * Formata timestamps (`criadoEm`/`atualizadoEm` etc.) em America/Sao_Paulo —
+ * CLAUDE.md, "Padrão de Timezone": o backend guarda em UTC (`timestamptz`),
+ * mas a exibição para o usuário é sempre UTC-3, nunca UTC bruto.
+ */
+const formatoDataHora = new Intl.DateTimeFormat('pt-BR', {
+  timeZone: 'America/Sao_Paulo',
+  dateStyle: 'short',
+  timeStyle: 'short',
+});
+
+export function formatarDataHora(isoString: string): string {
+  return formatoDataHora.format(new Date(isoString));
+}
+
 export function formatarValor(
   valor: number | null | undefined,
   formato: FormatoIndicador,

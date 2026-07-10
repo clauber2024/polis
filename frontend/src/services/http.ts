@@ -20,11 +20,15 @@ export class ErroDeApi extends Error {
   }
 }
 
-export async function obterJson<T>(caminho: string, params?: Record<string, string>): Promise<T> {
+export async function obterJson<T>(
+  caminho: string,
+  params?: Record<string, string>,
+  token?: string | null,
+): Promise<T> {
   const query = params ? `?${new URLSearchParams(params).toString()}` : '';
-  const resposta = await fetch(`${BASE_URL}${caminho}${query}`, {
-    headers: { Accept: 'application/json' },
-  });
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const resposta = await fetch(`${BASE_URL}${caminho}${query}`, { headers });
 
   if (!resposta.ok) {
     let mensagem = `Erro ${resposta.status} ao chamar ${caminho}`;
@@ -40,6 +44,45 @@ export async function obterJson<T>(caminho: string, params?: Record<string, stri
   }
 
   return (await resposta.json()) as T;
+}
+
+/**
+ * Requisição de escrita (POST/PUT/PATCH/DELETE), usada pelos services de
+ * escrita do Colaborador/Admin (RF-059 a RF-077) — anexa `Authorization`
+ * quando `token` é passado. `DELETE /api/admin/usuarios/:id` responde 204 sem
+ * corpo (ver admin.controller.ts), por isso o corpo é lido como texto e só
+ * parseado como JSON se não vazio.
+ */
+export async function enviarJson<T>(
+  metodo: 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+  caminho: string,
+  opcoes?: { corpo?: unknown; token?: string | null },
+): Promise<T> {
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (opcoes?.corpo !== undefined) headers['Content-Type'] = 'application/json';
+  if (opcoes?.token) headers.Authorization = `Bearer ${opcoes.token}`;
+
+  const resposta = await fetch(`${BASE_URL}${caminho}`, {
+    method: metodo,
+    headers,
+    body: opcoes?.corpo !== undefined ? JSON.stringify(opcoes.corpo) : undefined,
+  });
+
+  if (!resposta.ok) {
+    let mensagem = `Erro ${resposta.status} ao chamar ${caminho}`;
+    let detalhes: unknown;
+    try {
+      const corpo = (await resposta.json()) as ErroApi;
+      mensagem = corpo.erro?.mensagem ?? mensagem;
+      detalhes = corpo.erro?.detalhes;
+    } catch {
+      // corpo não-JSON — mantém a mensagem genérica
+    }
+    throw new ErroDeApi(resposta.status, mensagem, detalhes);
+  }
+
+  const texto = await resposta.text();
+  return (texto ? (JSON.parse(texto) as T) : (undefined as T));
 }
 
 /**
