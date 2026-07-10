@@ -415,6 +415,58 @@ function ordenarMunicipios(
   });
 }
 
+export interface ClassificarMunicipiosResultado {
+  notaMetodologica: string;
+  medianaNacional: {
+    potencialSolarKwhM2Dia: number;
+    mmgdResidencialPer1000Hab: number;
+  };
+  codigosNaoEncontrados: string[];
+  resultados: MunicipioClassificado[];
+}
+
+/**
+ * Painel Analítico (RF-049/050, feedback do usuário): classificação de
+ * quadrante de um conjunto específico de municípios (não paginação
+ * nacional). Resolve uma ambiguidade real do badge binário que existia antes
+ * no frontend ("Sim"/"Não" a partir de `codigosVazios`, que só continha o
+ * quadrante "vazio_de_acesso" — um município fora desse Set podia estar
+ * classificado em OUTRO quadrante OU simplesmente excluído por falta de
+ * dado, e o frontend não tinha como distinguir os dois casos). Aqui
+ * `quadrante`/`quadranteRotulo` vêm null explicitamente quando o município
+ * está excluído (`classificarQuadrante` já retorna null nesse caso — ver
+ * `totalExcluidosSemDado`/`totalPrecisaReextrairMmgd` em `listarVaziosDeAcesso`
+ * para o mesmo motivo em escala nacional).
+ *
+ * Reaproveita buscarPainelBruto/classificarPainel (mesmas funções do
+ * endpoint de listagem e de classificarMunicipioIndividual) — a classificação
+ * depende de MEDIANAS NACIONAIS, então sempre calcula o painel completo antes
+ * de filtrar pelos códigos pedidos (não dá pra saber "vazio ou não" sem isso).
+ */
+export async function classificarMunicipios(
+  codigos: string[],
+): Promise<ClassificarMunicipiosResultado> {
+  const linhasBrutas = await buscarPainelBruto();
+  const painel = classificarPainel(linhasBrutas);
+  const porCodigo = new Map(painel.municipios.map((m) => [m.codigoIbge, m]));
+
+  const resultados = codigos
+    .map((codigo) => porCodigo.get(codigo))
+    .filter((municipio): municipio is MunicipioClassificado => municipio !== undefined);
+
+  const codigosNaoEncontrados = codigos.filter((codigo) => !porCodigo.has(codigo));
+
+  return {
+    notaMetodologica: NOTA_METODOLOGICA,
+    medianaNacional: {
+      potencialSolarKwhM2Dia: painel.medianaIrradiacao,
+      mmgdResidencialPer1000Hab: painel.medianaMmgdResidencialPerCapita,
+    },
+    codigosNaoEncontrados,
+    resultados,
+  };
+}
+
 export interface ClassificacaoMunicipioIndividual {
   quadrante: Quadrante | null;
   quadranteRotulo: string | null;

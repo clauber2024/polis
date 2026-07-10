@@ -1,4 +1,8 @@
-import type { ListarVaziosDeAcessoResultado, MunicipioClassificado } from '../types/api';
+import type {
+  ClassificarMunicipiosResultado,
+  ListarVaziosDeAcessoResultado,
+  MunicipioClassificado,
+} from '../types/api';
 import { obterJson } from './http';
 
 /** GET /api/vazios-de-acesso (RF-055/056) — uma página da classificação. */
@@ -6,6 +10,23 @@ export function buscarVaziosDeAcesso(
   params: Record<string, string>,
 ): Promise<ListarVaziosDeAcessoResultado> {
   return obterJson<ListarVaziosDeAcessoResultado>('/api/vazios-de-acesso', params);
+}
+
+/**
+ * GET /api/vazios-de-acesso/classificar (Painel Analítico, RF-049/050) —
+ * classificação de quadrante de um conjunto ESPECÍFICO de municípios (1 a
+ * 10), não a paginação nacional usada por buscarTodosVaziosDeAcesso (essa
+ * continua reservada para o destaque/heatmap do mapa, que precisam do
+ * conjunto nacional completo). `quadrante`/`quadranteRotulo` vêm `null`
+ * quando o município está excluído da classificação por falta de dado —
+ * distinção que o Set binário de `buscarTodosVaziosDeAcesso` não permitia
+ * fazer (só dizia "é Vazio de Acesso" ou não, sem diferenciar "é outro
+ * quadrante" de "sem dado").
+ */
+export function classificarMunicipios(codigos: string[]): Promise<ClassificarMunicipiosResultado> {
+  return obterJson<ClassificarMunicipiosResultado>('/api/vazios-de-acesso/classificar', {
+    codigos: codigos.join(','),
+  });
 }
 
 export interface VaziosDeAcessoCompleto {

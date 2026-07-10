@@ -67,14 +67,32 @@ export async function buscarGeoJsonNacional(): Promise<FeatureCollectionMunicipi
   return colecao;
 }
 
-/** GET /api/municipios (RF-026 etc.) — busca por nome, paginada. */
-export async function buscarMunicipiosPorNome(nome: string): Promise<ListarMunicipiosResultado> {
-  const resultado = await obterJson<ListarMunicipiosResultado>('/api/municipios', {
-    nome,
-    porPagina: '10',
-  });
+/**
+ * GET /api/municipios — busca/filtro geral, paginada. Generalizada a partir
+ * de buscarMunicipiosPorNome (mantida abaixo, inalterada, para não quebrar
+ * BuscaMunicipio.tsx/header) para servir também o filtro por Região/UF do
+ * seletor multi-município do Painel Analítico (RF-049/050, feedback do
+ * usuário: "opção de filtros para escolher os municípios").
+ */
+export async function buscarMunicipios(params: {
+  nome?: string;
+  uf?: string;
+  regiao?: string;
+  porPagina?: number;
+}): Promise<ListarMunicipiosResultado> {
+  const query: Record<string, string> = { porPagina: String(params.porPagina ?? 10) };
+  if (params.nome) query.nome = params.nome;
+  if (params.uf) query.uf = params.uf;
+  if (params.regiao) query.regiao = params.regiao;
+
+  const resultado = await obterJson<ListarMunicipiosResultado>('/api/municipios', query);
   resultado.resultados.forEach(normalizarMunicipio);
   return resultado;
+}
+
+/** GET /api/municipios (RF-026 etc.) — busca por nome, paginada. */
+export async function buscarMunicipiosPorNome(nome: string): Promise<ListarMunicipiosResultado> {
+  return buscarMunicipios({ nome, porPagina: 10 });
 }
 
 /** GET /api/municipios/:codigoIbge (RF-025) — painel de detalhe. */

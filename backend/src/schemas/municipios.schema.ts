@@ -130,3 +130,23 @@ export const exportarComparacaoQuerySchema = compararMunicipiosQuerySchema.exten
 });
 
 export type ExportarComparacaoQuery = z.infer<typeof exportarComparacaoQuerySchema>;
+
+/**
+ * Painel Analítico (RF-049/050): médias de referência (nacional, regional ou
+ * estadual) para contextualizar a comparação de municípios. `uf` e `regiao`
+ * são mutuamente exclusivos por convenção do service (uf tem prioridade se os
+ * dois vierem, mas o cliente normal só manda um por vez); nenhum dos dois =
+ * média nacional (todos os ~5.570 municípios).
+ */
+export const mediasMunicipiosQuerySchema = z.object({
+  uf: z
+    .string()
+    .trim()
+    .length(2, 'uf deve ter 2 letras (ex: "PE").')
+    .transform((valor) => valor.toUpperCase())
+    .optional(),
+
+  regiao: z.enum(REGIOES_VALIDAS).optional(),
+});
+
+export type MediasMunicipiosQuery = z.infer<typeof mediasMunicipiosQuerySchema>;

@@ -56,3 +56,30 @@ export const listarVaziosDeAcessoQuerySchema = z.object({
 });
 
 export type ListarVaziosDeAcessoQuery = z.infer<typeof listarVaziosDeAcessoQuerySchema>;
+
+/**
+ * Painel Analítico (RF-049/050, feedback do usuário): classificação de
+ * quadrante de um conjunto ESPECÍFICO de municípios (2 a 10, mesmo limite do
+ * Painel Analítico) — diferente de `listarVaziosDeAcessoQuerySchema`
+ * (que pagina o país inteiro), este busca só os códigos pedidos. Mesmo
+ * padrão de dedupe de `compararMunicipiosQuerySchema`
+ * (municipios.schema.ts), reaproveitado aqui em vez de importado para manter
+ * os dois domínios (indicadores x classificação) independentes.
+ */
+export const classificarMunicipiosQuerySchema = z.object({
+  codigos: z
+    .string()
+    .trim()
+    .min(1, 'informe pelo menos 1 código IBGE (ex: "3550308,3106200").')
+    .transform((valor) =>
+      Array.from(new Set(valor.split(',').map((codigo) => codigo.trim()).filter((codigo) => codigo.length > 0))),
+    )
+    .pipe(
+      z
+        .array(z.string().regex(/^\d{7}$/, 'cada código IBGE deve ter exatamente 7 dígitos numéricos.'))
+        .min(1, 'informe pelo menos 1 código IBGE.')
+        .max(10, 'no máximo 10 municípios por consulta.'),
+    ),
+});
+
+export type ClassificarMunicipiosQuery = z.infer<typeof classificarMunicipiosQuerySchema>;

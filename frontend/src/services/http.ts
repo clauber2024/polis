@@ -41,3 +41,39 @@ export async function obterJson<T>(caminho: string, params?: Record<string, stri
 
   return (await resposta.json()) as T;
 }
+
+/**
+ * Baixa um arquivo binário (CSV/XLSX/PDF) e dispara o download no navegador.
+ * Usado pelas exportações (RF-047/RF-052/RF-058) — mesmo tratamento de erro
+ * de obterJson (formato { erro: { mensagem } } do backend), mas a resposta de
+ * sucesso é um Blob, não JSON.
+ */
+export async function baixarArquivo(
+  caminho: string,
+  params: Record<string, string>,
+  nomeArquivo: string,
+): Promise<void> {
+  const query = `?${new URLSearchParams(params).toString()}`;
+  const resposta = await fetch(`${BASE_URL}${caminho}${query}`);
+
+  if (!resposta.ok) {
+    let mensagem = `Erro ${resposta.status} ao chamar ${caminho}`;
+    try {
+      const corpo = (await resposta.json()) as ErroApi;
+      mensagem = corpo.erro?.mensagem ?? mensagem;
+    } catch {
+      // corpo não-JSON — mantém a mensagem genérica
+    }
+    throw new ErroDeApi(resposta.status, mensagem);
+  }
+
+  const blob = await resposta.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = nomeArquivo;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}

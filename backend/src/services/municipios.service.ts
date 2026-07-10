@@ -21,7 +21,12 @@ import ExcelJS from 'exceljs';
 import { db } from '../db/client.js';
 import { AppError } from '../utils/AppError.js';
 import { paraCsv } from '../utils/csv.js';
-import type { ListarMunicipiosQuery, ExportarMunicipiosQuery } from '../schemas/municipios.schema.js';
+import {
+  CRITERIOS_ORDENACAO_MUNICIPIO,
+  type ListarMunicipiosQuery,
+  type ExportarMunicipiosQuery,
+  type MediasMunicipiosQuery,
+} from '../schemas/municipios.schema.js';
 
 export interface MunicipioComIndicadores {
   codigoIbge: string;
@@ -347,6 +352,66 @@ export async function compararMunicipios(codigos: string[]): Promise<CompararMun
     codigosSolicitados: codigos,
     codigosNaoEncontrados,
     resultados,
+  };
+}
+
+/** Campos numéricos elegíveis para média — reaproveita a whitelist de ordenação (CRITERIOS_ORDENACAO_MUNICIPIO), excluindo 'nome' (não numérico). */
+const CAMPOS_MEDIA = CRITERIOS_ORDENACAO_MUNICIPIO.filter(
+  (campo): campo is Exclude<(typeof CRITERIOS_ORDENACAO_MUNICIPIO)[number], 'nome'> =>
+    campo !== 'nome',
+);
+
+export interface MediasMunicipios {
+  escopo: 'nacional' | 'regiao' | 'uf';
+  /** Sigla da UF ou nome da região filtrada — null quando escopo é 'nacional'. */
+  filtro: string | null;
+  totalMunicipios: number;
+  medias: Record<(typeof CAMPOS_MEDIA)[number], number | null>;
+}
+
+/**
+ * Painel Analítico (RF-049/050): média de referência para contextualizar a
+ * comparação — nacional (sem filtro), regional ou estadual. Reaproveita
+ * buscarPainelBruto (mesma consulta usada por listarMunicipios/exportação) e
+ * filtra/agrega EM MEMÓRIA — mesma decisão já tomada em buscarEFiltrarMunicipios
+ * ("dataset nacional é ~5.570 linhas — trivial em RAM"), evita duplicar SQL de
+ * agregação em paralelo ao SELECT já validado. `uf` tem prioridade sobre
+ * `regiao` se os dois vierem (uf implica região, mas não o contrário).
+ */
+export async function calcularMediasMunicipios(
+  query: MediasMunicipiosQuery,
+): Promise<MediasMunicipios> {
+  const linhasBrutas = await buscarPainelBruto();
+  let municipios = linhasBrutas.map(calcularDerivados);
+
+  let escopo: MediasMunicipios['escopo'] = 'nacional';
+  let filtro: string | null = null;
+
+  if (query.uf) {
+    municipios = municipios.filter((m) => m.uf === query.uf);
+    escopo = 'uf';
+    filtro = query.uf;
+  } else if (query.regiao) {
+    municipios = municipios.filter((m) => m.regiao === query.regiao);
+    escopo = 'regiao';
+    filtro = query.regiao;
+  }
+
+  const medias = Object.fromEntries(
+    CAMPOS_MEDIA.map((campo) => {
+      const valores = municipios
+        .map((m) => m[campo])
+        .filter((valor): valor is number => typeof valor === 'number');
+      const media = valores.length > 0 ? valores.reduce((soma, v) => soma + v, 0) / valores.length : null;
+      return [campo, media];
+    }),
+  ) as MediasMunicipios['medias'];
+
+  return {
+    escopo,
+    filtro,
+    totalMunicipios: municipios.length,
+    medias,
   };
 }
 

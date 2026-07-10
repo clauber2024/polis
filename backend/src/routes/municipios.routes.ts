@@ -5,6 +5,7 @@ import {
   compararMunicipiosController,
   exportarMunicipiosController,
   exportarComparacaoController,
+  mediasMunicipiosController,
 } from '../controllers/municipios.controller.js';
 import { relatorioTerritorioController } from '../controllers/relatorioTerritorio.controller.js';
 import { setoresCensitariosController } from '../controllers/setoresCensitarios.controller.js';
@@ -15,6 +16,7 @@ import {
   compararMunicipiosQuerySchema,
   exportarMunicipiosQuerySchema,
   exportarComparacaoQuerySchema,
+  mediasMunicipiosQuerySchema,
 } from '../schemas/municipios.schema.js';
 
 export const municipiosRouter = Router();
@@ -82,6 +84,21 @@ municipiosRouter.get(
   '/municipios/comparar/exportar',
   validateRequest({ query: exportarComparacaoQuerySchema }),
   exportarComparacaoController,
+);
+
+/**
+ * GET /api/municipios/medias (Painel Analítico, RF-049/050)
+ *
+ * Média de referência nacional/regional/estadual (?uf= ou ?regiao=, ambos
+ * opcionais e mutuamente priorizados por uf — ver
+ * services/municipios.service.ts). Registrada ANTES de
+ * '/municipios/:codigoIbge' pelo mesmo motivo de '/comparar' e '/exportar'
+ * (mesmo formato de path que um código IBGE).
+ */
+municipiosRouter.get(
+  '/municipios/medias',
+  validateRequest({ query: mediasMunicipiosQuerySchema }),
+  mediasMunicipiosController,
 );
 
 /**

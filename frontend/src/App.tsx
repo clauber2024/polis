@@ -1,11 +1,13 @@
 import { Link, Route, Routes, useNavigate } from 'react-router-dom';
 import { BuscaMunicipio } from './components/BuscaMunicipio';
 import { PaginaMapa } from './pages/PaginaMapa';
+import { PainelAnalitico } from './pages/PainelAnalitico';
 
 /**
- * Rotas do Atlas. Por enquanto só o mapa (RF-016/017/055/056) — landing page,
- * painel analítico e telas de login/painéis (Colaborador/Admin) virão em
- * sessões futuras, ver CLAUDE.md "Estado Real do Projeto".
+ * Rotas do Atlas. Mapa (RF-016/017/055/056) e Painel Analítico
+ * (RF-049/050/052) implementados — landing page e telas de login/painéis
+ * (Colaborador/Admin) virão em sessões futuras, ver CLAUDE.md "Estado Real
+ * do Projeto".
  *
  * A busca de município fica no header (RF-026). A seleção vira navegação com
  * `?municipio=<codigoIbge>` — a PaginaMapa consome o parâmetro (voa até o
@@ -21,9 +23,12 @@ export function App() {
         <Link to="/" className="text-lg font-semibold text-slate-900">
           Atlas Solar <span className="text-amber-500">Justo</span>
         </Link>
-        <nav className="text-sm text-slate-600">
+        <nav className="flex gap-4 text-sm text-slate-600">
           <Link to="/" className="hover:text-slate-900">
             Mapa
+          </Link>
+          <Link to="/painel-analitico" className="hover:text-slate-900">
+            Painel Analítico
           </Link>
         </nav>
         <div className="ml-auto">
@@ -32,9 +37,10 @@ export function App() {
           />
         </div>
       </header>
-      <main className="min-h-0 flex-1">
+      <main className="min-h-0 flex-1 overflow-y-auto">
         <Routes>
           <Route path="/" element={<PaginaMapa />} />
+          <Route path="/painel-analitico" element={<PainelAnalitico />} />
         </Routes>
       </main>
     </div>

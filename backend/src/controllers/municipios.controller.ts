@@ -17,6 +17,7 @@ import {
   exportarMunicipiosGeoJson,
   exportarComparacaoCsv,
   exportarComparacaoXlsx,
+  calcularMediasMunicipios,
 } from '../services/municipios.service.js';
 import type {
   ListarMunicipiosQuery,
@@ -24,6 +25,7 @@ import type {
   CompararMunicipiosQuery,
   ExportarMunicipiosQuery,
   ExportarComparacaoQuery,
+  MediasMunicipiosQuery,
 } from '../schemas/municipios.schema.js';
 
 export async function listarMunicipiosController(
@@ -62,6 +64,26 @@ export async function compararMunicipiosController(
   try {
     const { codigos } = req.query as unknown as CompararMunicipiosQuery;
     const resultado = await compararMunicipios(codigos);
+    res.json(resultado);
+  } catch (erro) {
+    next(erro);
+  }
+}
+
+/**
+ * GET /api/municipios/medias (Painel Analítico, RF-049/050)
+ *
+ * Média de referência (nacional/regional/estadual) para contextualizar a
+ * comparação de municípios — ver docstring de calcularMediasMunicipios.
+ */
+export async function mediasMunicipiosController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const query = req.query as unknown as MediasMunicipiosQuery;
+    const resultado = await calcularMediasMunicipios(query);
     res.json(resultado);
   } catch (erro) {
     next(erro);

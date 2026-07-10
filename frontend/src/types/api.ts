@@ -84,6 +84,28 @@ export interface FeatureCollectionMunicipios {
   features: FeatureMunicipio[];
 }
 
+/**
+ * Espelho de CompararMunicipiosResultado (municipios.service.ts) —
+ * GET /api/municipios/comparar (RF-049/050, Painel Analítico).
+ */
+export interface CompararMunicipiosResultado {
+  codigosSolicitados: string[];
+  codigosNaoEncontrados: string[];
+  resultados: MunicipioComIndicadores[];
+}
+
+/**
+ * Espelho de MediasMunicipios (municipios.service.ts) —
+ * GET /api/municipios/medias (Painel Analítico, RF-049/050): média de
+ * referência nacional/regional/estadual para contextualizar a comparação.
+ */
+export interface MediasMunicipios {
+  escopo: 'nacional' | 'regiao' | 'uf';
+  filtro: string | null;
+  totalMunicipios: number;
+  medias: Partial<Record<keyof MunicipioComIndicadores, number | null>>;
+}
+
 /** Quadrantes de vazios de acesso (vaziosDeAcesso.service.ts). */
 export type Quadrante =
   | 'vazio_de_acesso'
@@ -104,6 +126,24 @@ export interface MunicipioClassificado {
   ivs: number | null;
   rendaMediaDomiciliar: number | null;
   percentualPobrezaCadunico: number | null;
+}
+
+/**
+ * Espelho de ClassificarMunicipiosResultado (vaziosDeAcesso.service.ts) —
+ * GET /api/vazios-de-acesso/classificar (Painel Analítico, RF-049/050):
+ * classificação de quadrante de um conjunto específico de municípios (não a
+ * paginação nacional). `quadrante`/`quadranteRotulo` vêm `null` quando o
+ * município está excluído da classificação por falta de dado — diferente de
+ * "não é Vazio de Acesso" (classificado em outro quadrante).
+ */
+export interface ClassificarMunicipiosResultado {
+  notaMetodologica: string;
+  medianaNacional: {
+    potencialSolarKwhM2Dia: number;
+    mmgdResidencialPer1000Hab: number;
+  };
+  codigosNaoEncontrados: string[];
+  resultados: MunicipioClassificado[];
 }
 
 /** Espelho de ListarVaziosDeAcessoResultado (GET /api/vazios-de-acesso). */
