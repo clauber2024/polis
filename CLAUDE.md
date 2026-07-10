@@ -223,10 +223,58 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   conversão interna GeoJSON→tile vetorial → o clique no mapa devolve só o
   `codigoIbge` e a página resolve o município no GeoJSON original (nunca ler
   indicadores das properties de um feature clicado). Makefile ganhou
-  `front`/`front-typecheck`/`front-build`. **AINDA NAO VALIDADO** no ambiente do usuario (bash sandbox
-  nao acessa o caminho WSL): pedir para rodar `cd frontend && npm install`,
-  `make front-typecheck` e `make front` (com `make dev` em outro terminal)
-  antes de considerar pronto.
+  `front`/`front-typecheck`/`front-build`. VALIDADO ponta a ponta no ambiente
+  do usuario em 09/07/2026.
+- **Frontend — busca por município no header (09/07/2026, RF-026):** campo de
+  busca com autocomplete no header (`frontend/src/components/BuscaMunicipio.tsx`
+  — fora de `components/mapa/` de propósito, não é componente de mapa),
+  reutilizando o service já existente `buscarMunicipiosPorNome`
+  (`GET /api/municipios?nome=`, debounce 300 ms, teclado com setas/Enter/Esc,
+  `onMouseDown` nas opções para a seleção não ser engolida pelo clique-fora).
+  Decisões: (1) seleção vira navegação para `/?municipio=<codigoIbge>` — a
+  `PaginaMapa` consome o parâmetro como comando **one-shot** (seleciona o
+  município no GeoJSON já carregado, abre o painel RF-025, seta o foco do mapa
+  e REMOVE o parâmetro da URL com `replace`); isso desacopla header/página,
+  permite repetir a mesma busca e dá deep-link de graça
+  (ex.: `/?municipio=3550308` já abre enquadrado em São Paulo); (2)
+  `MapaMunicipios` ganhou prop `foco: FocoMunicipio | null` — objeto
+  `{ codigoIbge }`, não string, para busca repetida re-disparar o efeito de
+  voo; (3) `fitBounds` no bbox da geometria (helper `bboxDaGeometria`,
+  recursivo, sem turf) em vez de `flyTo` com zoom fixo — municípios variam de
+  ~3 km² a ~150.000 km². **RF-033 NÃO entrou** (filtro dentro do painel de
+  ranking — o painel de ranking RF-031/032 ainda não existe). Na validação da
+  mesma sessão entraram dois ajustes: (a) contorno de município trocado de
+  branco puro para cinza translúcido (`#64748b`, opacity 0.4) — branco sumia
+  nas classes claras do choropleth; (b) **notas de ausência justificada de
+  dado** no painel RF-025 (`frontend/src/utils/notasAusencia.ts` +
+  `PainelMunicipio`): "—" ganha justificativa quando a ausência é documentada
+  — TSEE aguardando ANEEL jan/2026+ (todos os municípios), os 4 casos sem
+  irradiação no Atlas INPE 2017 (Fernando de Noronha, 2 corpos d'água/RS e
+  Boa Esperança do Norte/MT 5101837, instalado 01/01/2025, desmembrado de
+  Sorriso e Nova Ubiratã), quebra MMGD residencial nula com total presente
+  (snapshot pré-migration 0020), e nota geral no topo do painel para os 4
+  municípios especiais. Regra do catálogo: só ausência documentada
+  (docstrings dos extractors/ARQUITETURA.md) — "—" sem nota é lacuna a
+  investigar. É metadado de apresentação, por isso vive no frontend (como
+  utils/indicadores.ts); se o backend um dia servir isso, migrar. (c) campo
+  `descricao` em IndicadorMapa/LinhaIndicador (legenda + painel) para
+  esclarecimento metodológico: rótulo do CadÚnico corrigido de "Pobreza
+  (CadÚnico)" para "Pobreza entre famílias do CadÚnico" — o denominador é
+  famílias CADASTRADAS, não população (métrica 2 do extrair_cadunico.py; o
+  rótulo antigo induzia a leitura "% do município em pobreza") — e irradiação
+  ganhou a contextualização que o extractor EXIGE em qualquer exibição
+  (média climatológica 1999–2015 + citação LABREN/CCST/INPE, condição de
+  licenciamento). (d) **mudança de contrato da API** (backend + espelho
+  frontend juntos, regra da Seção 4): `municipios.service.ts` (backend) agora
+  expõe `populacaoEstimada` (densidade × área, arredondada — o Atlas não
+  guarda população absoluta; era calculada só internamente para o per capita
+  de MMGD) e `percentualCadunico` (cobertura, métrica 1 do extractor, já
+  existia na view consolidada mas não no SELECT) — novas linhas no painel
+  RF-025 ("População (estimada)" no grupo Território e "População no
+  CadÚnico" nos sociais, ambas com descricao). **AINDA NAO
+  VALIDADO** no ambiente do usuario: rodar `make front-typecheck` e testar no
+  navegador (busca, voo, painel, deep-link, repetir a mesma busca, notas de
+  ausência em 5101837 e na linha TSEE) antes de considerar pronto.
 
 **NAO implementado ainda** (apesar de descrito em secoes deste documento como padrao):
 - Backend Node/Express: endpoints de LEITURA (`GET /api/vazios-de-acesso`,
@@ -237,10 +285,11 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   RF-070 ("upload de bases") implementado so como workflow/status, NAO recebimento de
   arquivo via API - decisao explicita do usuario, ver bloco acima.
 - Frontend React - INICIADO em 09/07/2026 (fundação + mapa, ver bloco acima), mas ainda
-  falta a maior parte: landing page, painel analítico/comparação (RF-049/050), busca por
-  município na interface, telas de login e painéis Colaborador/Admin (consumindo a auth
-  já existente), export/relatório pela interface, drill-down de setores censitários
-  (RF-043/045) e o painel tipo heatmap (RF-057)
+  falta a maior parte: landing page, painel analítico/comparação (RF-049/050), telas de
+  login e painéis Colaborador/Admin (consumindo a auth já existente), export/relatório
+  pela interface, drill-down de setores censitários (RF-043/045), painel de ranking
+  (RF-031/032, incluindo o filtro RF-033) e o painel tipo heatmap (RF-057). Busca por
+  município no header (RF-026) implementada em 09/07/2026 — ver bloco acima.
 - Makefile de deploy/producao - `make up-prod`, `make deploy`, `make deploy-rebuild`,
   `make deploy-first`, `make shell`, `make lint` continuam **especificacao**, nao
   implementados (ver Secao 7). Os comandos de desenvolvimento (`make up`, `make

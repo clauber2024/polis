@@ -23,8 +23,12 @@ export interface MunicipioComIndicadores {
   regiao: string;
   areaKm2: number | null;
   densidadePopulacional: number | null;
+  /** ESTIMADA (densidade × área) — o Atlas não guarda população absoluta. */
+  populacaoEstimada: number | null;
   ivs: number | null;
   rendaMediaDomiciliar: number | null;
+  /** Cobertura: pessoas cadastradas no CadÚnico ÷ população (Censo 2022) × 100. */
+  percentualCadunico: number | null;
   percentualPobrezaCadunico: number | null;
   percentualTarifaSocial: number | null;
   taxaAlfabetizacao: number | null;

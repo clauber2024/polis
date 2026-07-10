@@ -27,6 +27,9 @@ export function Legenda({ indicador, quebras, destaqueLigado, totalDestacados }:
         {indicador.rotulo}
         {indicador.unidade ? ` (${indicador.unidade})` : ''}
       </p>
+      {indicador.descricao && (
+        <p className="mb-1 leading-snug text-slate-500">{indicador.descricao}</p>
+      )}
       <p className="mb-2 text-slate-500">
         Classes por quintis{indicador.sentido === 'negativo' ? ' — valor maior é pior' : ''}
       </p>

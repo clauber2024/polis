@@ -31,8 +31,16 @@ export interface MunicipioComIndicadores {
   regiao: string;
   areaKm2: number | null;
   densidadePopulacional: number | null;
+  /**
+   * População ESTIMADA (densidade × área) — o Atlas não guarda população
+   * absoluta; mesma estimativa já usada nos per capita de MMGD (ver
+   * calcularDerivados). Exibir sempre como estimativa, não como Censo.
+   */
+  populacaoEstimada: number | null;
   ivs: number | null;
   rendaMediaDomiciliar: number | null;
+  /** Cobertura: pessoas cadastradas no CadÚnico ÷ população (Censo 2022) × 100. */
+  percentualCadunico: number | null;
   percentualPobrezaCadunico: number | null;
   percentualTarifaSocial: number | null;
   taxaAlfabetizacao: number | null;
@@ -59,6 +67,7 @@ interface LinhaBruta {
   densidadePopulacional: number | null;
   ivs: number | null;
   rendaMediaDomiciliar: number | null;
+  percentualCadunico: number | null;
   percentualPobrezaCadunico: number | null;
   percentualTarifaSocial: number | null;
   taxaAlfabetizacao: number | null;
@@ -108,6 +117,7 @@ const SELECT_BASE = sql`
       vsc.densidade_populacional          AS "densidadePopulacional",
       vsc.ivs                             AS "ivs",
       vsc.renda_media_domiciliar          AS "rendaMediaDomiciliar",
+      vsc.percentual_cadunico             AS "percentualCadunico",
       vsc.percentual_pobreza_cadunico     AS "percentualPobrezaCadunico",
       vsc.percentual_tarifa_social        AS "percentualTarifaSocial",
       vsc.taxa_alfabetizacao              AS "taxaAlfabetizacao",
@@ -180,6 +190,9 @@ function calcularDerivados(linha: LinhaBruta): MunicipioComIndicadores {
 
   return {
     ...linha,
+    // Arredondada: é estimativa (densidade × área), casas decimais passariam
+    // falsa precisão de contagem censitária.
+    populacaoEstimada: populacaoEstimada !== null ? Math.round(populacaoEstimada) : null,
     mmgdPer1000Hab,
     mmgdResidencialPer1000Hab,
   };

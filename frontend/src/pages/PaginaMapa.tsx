@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { MapaMunicipios } from '../components/mapa/MapaMunicipios';
+import { useSearchParams } from 'react-router-dom';
+import { MapaMunicipios, type FocoMunicipio } from '../components/mapa/MapaMunicipios';
 import { Legenda } from '../components/mapa/Legenda';
 import { PainelMunicipio } from '../components/mapa/PainelMunicipio';
 import { buscarGeoJsonNacional } from '../services/municipios.service';
@@ -30,6 +31,8 @@ export function PaginaMapa() {
 
   const [municipioSelecionado, setMunicipioSelecionado] =
     useState<MunicipioComIndicadores | null>(null);
+  const [foco, setFoco] = useState<FocoMunicipio | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     let ativo = true;
@@ -93,6 +96,28 @@ export function PaginaMapa() {
     [dados],
   );
 
+  // Busca do header (RF-026): consome ?municipio=<codigoIbge> como comando
+  // one-shot — seleciona o município, voa até ele e REMOVE o parâmetro da URL
+  // (replace, sem poluir o histórico). Consumir e remover permite repetir a
+  // mesma busca (a URL volta a mudar) e, de quebra, dá deep-link: abrir
+  // /?municipio=3550308 direto já enquadra São Paulo quando o GeoJSON chega.
+  const codigoBuscado = searchParams.get('municipio');
+  useEffect(() => {
+    if (!codigoBuscado || !dados) return;
+    const municipio = municipioPorCodigo.get(codigoBuscado);
+    if (municipio) {
+      setMunicipioSelecionado(municipio);
+      setFoco({ codigoIbge: codigoBuscado });
+    }
+    setSearchParams(
+      (atuais) => {
+        atuais.delete('municipio');
+        return atuais;
+      },
+      { replace: true },
+    );
+  }, [codigoBuscado, dados, municipioPorCodigo, setSearchParams]);
+
   return (
     <div className="relative flex h-full">
       <div className="relative min-w-0 flex-1">
@@ -101,6 +126,7 @@ export function PaginaMapa() {
           indicador={indicador}
           quebras={quebras}
           codigosDestaque={codigosDestaque}
+          foco={foco}
           aoClicarMunicipio={(codigoIbge) =>
             setMunicipioSelecionado(municipioPorCodigo.get(codigoIbge) ?? null)
           }

@@ -16,8 +16,10 @@ import { obterJson } from './http';
 const CAMPOS_NUMERICOS = [
   'areaKm2',
   'densidadePopulacional',
+  'populacaoEstimada',
   'ivs',
   'rendaMediaDomiciliar',
+  'percentualCadunico',
   'percentualPobrezaCadunico',
   'percentualTarifaSocial',
   'taxaAlfabetizacao',

@@ -17,6 +17,13 @@ export interface IndicadorMapa {
   unidade: string | null;
   formato: FormatoIndicador;
   sentido: 'positivo' | 'negativo';
+  /**
+   * Esclarecimento metodológico exibido junto do rótulo (legenda e painel).
+   * Obrigatório quando o rótulo sozinho induz a leitura errada (ex.: pobreza
+   * CadÚnico — denominador é famílias cadastradas, não população) ou quando
+   * a fonte exige contextualização (ex.: irradiação é média climatológica).
+   */
+  descricao?: string;
   /** Rampa sequencial claro→escuro, 5 classes (quebras por quantis em runtime). */
   cores: [string, string, string, string, string];
 }
@@ -33,6 +40,12 @@ export const INDICADORES_MAPA: IndicadorMapa[] = [
     unidade: 'kWh/m²·dia',
     formato: 'numero',
     sentido: 'positivo',
+    // O extractor EXIGE esta contextualização em qualquer exibição do dado
+    // (média climatológica, não ano específico) + citação da fonte (condição
+    // de licenciamento do Atlas INPE) — ver extrair_irradiacao_solar_inpe.py.
+    descricao:
+      'Média climatológica de longo prazo (satélite, 1999–2015), não um ano ' +
+      'específico. Fonte: Atlas Brasileiro de Energia Solar 2017, LABREN/CCST/INPE.',
     cores: RAMPA_AMBAR,
   },
   {
@@ -69,10 +82,17 @@ export const INDICADORES_MAPA: IndicadorMapa[] = [
   },
   {
     id: 'percentualPobrezaCadunico',
-    rotulo: 'Pobreza (CadÚnico)',
+    rotulo: 'Pobreza entre famílias do CadÚnico',
     unidade: null,
     formato: 'percentual',
     sentido: 'negativo',
+    // Denominador é FAMÍLIAS CADASTRADAS, não população — ver docstring de
+    // extrair_cadunico.py (métrica 2). Sem isso o usuário lê "% do município
+    // em pobreza", que superestima muito (SP: ~39% das cadastradas).
+    descricao:
+      'Percentual das famílias cadastradas no CadÚnico classificadas em pobreza ou ' +
+      'extrema pobreza (critérios do próprio Cadastro) — não é percentual da ' +
+      'população do município. Fonte: MDS/MI Social, dez/2025.',
     cores: RAMPA_VERMELHA,
   },
   {

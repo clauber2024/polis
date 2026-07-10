@@ -28,6 +28,15 @@ const CAMADA_PREENCHIMENTO = 'municipios-preenchimento';
 const CAMADA_CONTORNO = 'municipios-contorno';
 const CAMADA_DESTAQUE = 'vazios-destaque';
 
+/**
+ * Comando de enquadramento (busca de município, RF-026). Objeto em vez de
+ * string de propósito: repetir a mesma busca cria um objeto novo e re-dispara
+ * o efeito de voo mesmo com codigoIbge igual.
+ */
+export interface FocoMunicipio {
+  codigoIbge: string;
+}
+
 interface MapaMunicipiosProps {
   dados: FeatureCollectionMunicipios | null;
   indicador: IndicadorMapa;
@@ -35,6 +44,8 @@ interface MapaMunicipiosProps {
   quebras: number[];
   /** Códigos IBGE a destacar (quadrante Vazio de Acesso) ou null para desligar. */
   codigosDestaque: string[] | null;
+  /** Município a enquadrar (fitBounds) ou null. Ver FocoMunicipio. */
+  foco: FocoMunicipio | null;
   /**
    * Recebe só o codigoIbge — as properties do feature clicado NÃO são
    * confiáveis para leitura de indicadores (o MapLibre descarta valores
@@ -42,6 +53,39 @@ interface MapaMunicipiosProps {
    * município completo a partir do GeoJSON original.
    */
   aoClicarMunicipio: (codigoIbge: string) => void;
+}
+
+/**
+ * Bounding box [[oeste, sul], [leste, norte]] de uma geometria GeoJSON,
+ * varrendo as coordenadas recursivamente (municípios são MultiPolygon).
+ * Sem dependência de turf/etc. — é a única operação geométrica do frontend.
+ */
+function bboxDaGeometria(
+  geometria: GeoJSON.Geometry,
+): [[number, number], [number, number]] | null {
+  if (!('coordinates' in geometria)) return null;
+  let oeste = Infinity;
+  let sul = Infinity;
+  let leste = -Infinity;
+  let norte = -Infinity;
+  const visitar = (no: unknown): void => {
+    if (!Array.isArray(no)) return;
+    if (typeof no[0] === 'number' && typeof no[1] === 'number') {
+      const [lng, lat] = no as [number, number];
+      if (lng < oeste) oeste = lng;
+      if (lng > leste) leste = lng;
+      if (lat < sul) sul = lat;
+      if (lat > norte) norte = lat;
+      return;
+    }
+    no.forEach(visitar);
+  };
+  visitar(geometria.coordinates);
+  if (!Number.isFinite(oeste) || !Number.isFinite(sul)) return null;
+  return [
+    [oeste, sul],
+    [leste, norte],
+  ];
 }
 
 function expressaoChoropleth(
@@ -67,6 +111,7 @@ export function MapaMunicipios({
   indicador,
   quebras,
   codigosDestaque,
+  foco,
   aoClicarMunicipio,
 }: MapaMunicipiosProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -150,7 +195,11 @@ export function MapaMunicipios({
       id: CAMADA_CONTORNO,
       type: 'line',
       source: FONTE,
-      paint: { 'line-color': '#ffffff', 'line-width': 0.3 },
+      // Cinza neutro translúcido em vez de branco puro: branco somia nas
+      // classes mais claras do choropleth (primeiro quintil é quase branco)
+      // e o cinza mantém a divisa legível em qualquer classe sem pesar nas
+      // escuras. Ajuste feito após validação visual de 09/07/2026.
+      paint: { 'line-color': '#64748b', 'line-width': 0.3, 'line-opacity': 0.4 },
     });
     mapa.addLayer({
       id: CAMADA_DESTAQUE,
@@ -183,6 +232,19 @@ export function MapaMunicipios({
       mapa.setFilter(CAMADA_DESTAQUE, ['boolean', false]);
     }
   }, [codigosDestaque, mapaCarregado, dados]);
+
+  // Voa até o município buscado (RF-026). fitBounds em vez de flyTo com zoom
+  // fixo: municípios variam de ~3 km² a ~150.000 km² (Altamira/PA), zoom fixo
+  // cortaria os grandes ou afogaria os pequenos.
+  useEffect(() => {
+    const mapa = mapaRef.current;
+    if (!mapa || !mapaCarregado || !dados || !foco) return;
+    const feature = dados.features.find((f) => f.properties.codigoIbge === foco.codigoIbge);
+    if (!feature?.geometry) return;
+    const bbox = bboxDaGeometria(feature.geometry);
+    if (!bbox) return;
+    mapa.fitBounds(bbox, { padding: 80, maxZoom: 10, duration: 1400 });
+  }, [foco, mapaCarregado, dados]);
 
   return <div ref={containerRef} className="h-full w-full" />;
 }
