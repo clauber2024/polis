@@ -135,7 +135,7 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   `qualidade_conjunto_municipio` criadas FORA do Drizzle, via
   `backend/src/etl/schema_qualidade.sql` (ver nota de inconsistencia arquitetural na
   Secao 2)
-- Migrations incrementais 0000 a 0024 - ver `backend/src/db/migrations/`. Numeracao
+- Migrations incrementais 0000 a 0025 - ver `backend/src/db/migrations/`. Numeracao
   formal NAO cobre o schema de qualidade (criado fora do sistema de migrations ate a
   migration 0011, que so adiciona as views DEC/FEC "real" em cima do schema ja existente).
   0014-0017: indices compostos + views consolidadas (`vw_indicadores_sociais_consolidado`,
@@ -159,7 +159,10 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   `usuarios` (fundacao de auth/RBAC, ver bloco "Fundacao de autenticacao/RBAC"
   acima). 0023: tabelas de escrita do Colaborador (RF-059 a RF-067). 0024:
   tabelas do Admin + `usuarios.ativo` (RF-070 a RF-077) - ver bloco "Endpoints
-  de escrita do Colaborador e Painel Admin" acima.
+  de escrita do Colaborador e Painel Admin" acima. 0025: `numero_empreendimentos`
+  em `mmgd_indicadores` (correção de rótulo do RF-005, ver bloco "Correção de
+  rótulo em RF-005 + migration 0025" acima) - aplicada e validada no ambiente
+  do usuário em 10/07/2026.
 - 20 extractors Python funcionais em `backend/src/etl/loaders/` (territorio, MMGD/ANEEL,
   Infraestrutura Urbana/Censo, Renda e Trabalho/RAIS via BigQuery, Alfabetizacao/Censo,
   Mortalidade Infantil/SIM+SINASC via BigQuery, Moradia/Censo, Tipo de Domicilio/Censo,
@@ -290,6 +293,48 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   implementado — depende do RF-080, bloqueado pelo TSEE (ver ARQUITETURA.md).
   VALIDADO no ambiente do usuario e commitado em 09/07/2026.
 
+- **Divergência de documentação encontrada (10/07/2026):** ao iniciar a
+  sessão de login/painéis, o código já continha `PainelAnalitico.tsx` +
+  `components/painel-analitico/` + `services/comparacao.service.ts`
+  totalmente implementados e roteados em `App.tsx` (RF-049/050/052) — mas
+  esta seção do CLAUDE.md nunca foi atualizada para refletir isso (a lista
+  "NAO implementado ainda" abaixo ainda os listava como pendentes até esta
+  edição). Não foi possível reconstituir em qual sessão/commit isso entrou
+  (bash sandbox não acessa este projeto para `git log`, ver "Exceção
+  confirmada" na Seção 10) — se for relevante, confirmar com o usuário e
+  registrar a data real depois. Mantido aqui como alerta: **não confiar cegamente
+  na lista de pendências deste arquivo sem checar o código**, exatamente a
+  situação que a checagem de sincronização do topo deste arquivo tenta evitar
+  (mas para docs desatualizadas, não para git).
+- **Frontend — login + painéis Colaborador/Admin (10/07/2026, RF-009/013/014,
+  RF-059 a RF-067, RF-070 a RF-077):** consumindo a fundação de auth e os
+  endpoints de escrita já validados nesta mesma sessão (ver blocos "Backend
+  Node/Express", "Fundação de autenticação/RBAC" e "Endpoints de escrita do
+  Colaborador e Painel Admin" acima). Implementado: `AuthContext.tsx`
+  (sessão em Context + `localStorage`, chave `atlas.sessao` — JWT stateless,
+  sem endpoint de refresh nesta fundação), `RotaProtegida.tsx` (redireciona
+  para `/login` sem sessão, para `/` com sessão mas papel não autorizado),
+  `PaginaLogin.tsx`, `services/auth.service.ts` +
+  `services/colaborador.service.ts` + `services/admin.service.ts` (espelhando
+  1:1 os 14 endpoints de escrita já testados via curl), `PainelColaborador.tsx`
+  (5 cartões: revisões de bases RF-059, observações RF-060, sugestões RF-061,
+  notas metodológicas com histórico RF-064/065/066, materiais de comunicação
+  RF-067) e `PainelAdmin.tsx` (4 cartões: metadados técnicos RF-071/072/073,
+  fila de aprovação de indicadores RF-074, versões publicadas RF-075, gestão
+  de usuários RF-076). Decisões: (1) `http.ts` ganhou `enviarJson` genérico
+  (POST/PUT/PATCH/DELETE com `Authorization: Bearer` opcional) e `obterJson`
+  ganhou parâmetro `token` opcional — sem quebrar as chamadas existentes;
+  (2) o guard de "último administrador"/"não remover a própria conta"
+  (RF-076) é tratado 100% no backend — `CartaoGestaoUsuarios.tsx` só exibe a
+  mensagem de erro que a API devolver, nunca reproduz a regra no cliente
+  (mesmo princípio já usado para a classificação de Vazios de Acesso); (3)
+  `formatarDataHora` novo em `utils/formatadores.ts` (America/Sao_Paulo, ver
+  "Padrão de Timezone" — os timestamps de revisão/observação/nota/versão
+  agora exibidos usam isso, não `Date` bruto). VALIDADO no ambiente do
+  usuário em 10/07/2026 (`make front-typecheck` limpo + teste manual no
+  navegador: login com as duas contas de demonstração, escrita nos cartões
+  de Colaborador/Admin, e RBAC — Colaborador não vê "Painel Admin" nem
+  acessa `/admin`).
 - **Frontend — heatmap de Vazios de Acesso (09/07/2026, RF-057):** camada
   `heatmap` do MapLibre no mapa existente (não um segundo mapa) + painel-legenda
   `frontend/src/components/mapa/PainelHeatmapVazios.tsx`. Decisões (usuário):
@@ -313,6 +358,102 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   (`visibility: none`). VALIDADO no ambiente do usuario em 09/07/2026
   (typecheck limpo + teste visual: esmaecer/restaurar, concentração no
   Nordeste, convivência com o destaque).
+- **Landing Page + Dashboard Público (10/07/2026, RF-001 a RF-008, RF-046 a
+  RF-048):** primeira landing institucional do Atlas — até esta sessão "/"
+  ia direto para o mapa (não existia landing nenhuma). Backend: novo
+  endpoint `GET /api/estatisticas-nacionais` (RF-005,
+  `backend/src/services/estatisticasNacionais.service.ts` +
+  controller/route dedicados) — dos 6 números pedidos pelo RF-005, só 3 são
+  calculáveis com o schema atual (sistemas MMGD conectados, potência total
+  instalada, municípios com presença de MMGD, agregados via SQL sobre a
+  mesma CTE `mmgd_latest` já validada em municipios.service.ts); os outros 3
+  ("pessoas beneficiadas por créditos de energia", "participação da solar
+  distribuída na matriz elétrica nacional", "projeção futura de potência")
+  exigem dado que o Atlas não tem (recorte de beneficiários de geração
+  compartilhada da ANEEL; total de geração nacional do Brasil como
+  denominador; modelo de projeção) — expostos em
+  `indicadoresIndisponiveis`, cada um com o motivo, NUNCA fabricados (mesmo
+  princípio já usado no RF-034/TSEE). Também no backend: filtro de faixa de
+  potência instalada (`potenciaMin`/`potenciaMax`, RF-046) adicionado a
+  `listarMunicipiosQuerySchema` — propaga automaticamente para
+  `GET /api/municipios` e `GET /api/municipios/exportar` (RF-047) por
+  herdarem o mesmo schema base. **RF-046 também pede filtro por "período",
+  NÃO implementado** — decisão do usuário (10/07/2026): documentar como
+  exclusão (mesma limitação já registrada para RF-034), não simular um
+  filtro que não filtra nada de verdade. **CORREÇÃO importante (mesma
+  sessão)**: a frase "o schema só guarda o snapshot mais recente, sem série
+  temporal" é IMPRECISA — verificado que `mmgd_indicadores` tem chave única
+  em `(unidade_espacial_id, periodo_referencia)`, não em `unidade_espacial_id`
+  sozinho (migration 0000) — o schema comporta múltiplos períodos por
+  município; os services é que sempre pegam só o mais recente via
+  `DISTINCT ON`. Ver ARQUITETURA.md, seção "RF-005 (Landing Page) — 3
+  indicadores nacionais ainda não calculados", para o achado completo e o
+  próximo passo (checar quantos períodos distintos já existem de fato antes
+  de prometer o filtro/projeção).
+  Frontend: `pages/PaginaLanding.tsx` (RF-001 a RF-008 — hero com 2 CTAs,
+  seção explicativa, indicadores nacionais com badge "Em breve" honesto
+  para os 3 indisponíveis, fontes de dados, Referências Metodológicas
+  separada citando o OBEPE sem listá-lo como fonte primária — RF-007/
+  RT-005/RF-078 — e footer). **Reestruturação de rotas**: "/" virou a
+  landing pública; o mapa/dashboard migrou de "/" para "/mapa"; App.tsx
+  ganhou `LayoutApp` (header interno com nav/busca/sessão, antes inline no
+  próprio `App()`) envolvendo todas as rotas exceto a landing via
+  `<Outlet/>` do react-router-dom v7. Ajustes de consequência: `BuscaMunicipio`
+  navega para `/mapa?municipio=...` (antes `/?municipio=...`),
+  `RotaProtegida` redireciona papel não autorizado para `/mapa` (antes
+  `/`), `PaginaLogin` usa `/mapa` como destino default pós-login (antes
+  `/`). Novo `components/mapa/PainelFiltrosDashboard.tsx` (RF-046: UF,
+  região, faixa de potência, período desabilitado com tooltip explicando a
+  exclusão) + botões de download CSV/GeoJSON (RF-047, reaproveitando
+  `baixarArquivo` de `services/http.ts`, já existente desde a sessão do
+  Painel Analítico mas ainda não usado por nenhuma tela até agora). Filtro
+  aplicado CLIENT-SIDE sobre o GeoJSON nacional já carregado (mesma
+  arquitetura de "buscar uma vez, filtrar localmente" já usada em
+  PainelRanking) — nova prop `codigosVisiveis` em `MapaMunicipios.tsx`
+  esconde (não esmaece) municípios fora do filtro via `setFilter` do
+  MapLibre nas camadas de preenchimento E contorno; independente do
+  destaque/heatmap de Vazios de Acesso, de propósito (fora do escopo do
+  RF-046). Painel de Filtros e o Ranking estadual (RF-030) são mantidos
+  mutuamente exclusivos (mesma largura, mesmo lado esquerdo do mapa).
+  VALIDADO no ambiente do usuário em 10/07/2026 (`make typecheck` e
+  `make front-typecheck` limpos, sem erro em nenhum dos dois — bash sandbox
+  não roda esses comandos direto, ver Seção 10, "Exceção confirmada").
+  Teste manual no navegador (landing, filtros, download) ainda não feito
+  nesta sessão — fica para quando o usuário abrir a aplicação.
+- **Correção de rótulo em RF-005 + migration 0025 (10/07/2026):** ao investigar
+  pedido do usuário para viabilizar os 3 indicadores indisponíveis da landing
+  (ver ARQUITETURA.md, seção "RF-005"), foi confirmado por inspeção real do
+  Parquet ANEEL/MMGD que `numero_ucs_com_mmgd` (coluna existente desde a
+  migration 0000) **nunca** representou "sistemas/instalações conectados" —
+  sempre foi soma de `QtdUCRecebeCredito` (UCs beneficiadas por crédito de
+  energia, que excede o número de instalações em modalidade Compartilhada/
+  Auto consumo remoto). O card "Sistemas MMGD conectados" da landing (mesma
+  sessão, implementado antes desta correção) exibia o número certo com o
+  rótulo errado. Corrigido: `GET /api/estatisticas-nacionais` agora expõe
+  `totalUcsBeneficiadas` (renomeado) e `totalInstalacoesMmgd` (novo — COUNT
+  real de instalações, coluna `numero_empreendimentos`, migration `0025_mmgd_
+  indicadores_numero_empreendimentos.sql`, valor que `extrair_mmgd_aneel.py`
+  já calculava via `groupby(...).count()` mas descartava antes do INSERT).
+  **Efeito colateral positivo**: `totalUcsBeneficiadas` já é, na prática, o
+  dado bruto que o RF-005 item 4 ("pessoas beneficiadas por créditos de
+  energia") pede — só falta decidir um fator de conversão UC→pessoas (ex.:
+  média de moradores por domicílio, IBGE), documentado como estimativa.
+  VALIDADO no ambiente do usuário em 10/07/2026: migration 0025 aplicada
+  (`make migrate`, sem erro nela própria — os `ERROR`s no log pertencem a
+  migrations antigas re-executadas contra um banco já provisionado, ruído
+  conhecido e pré-existente, não regressão desta sessão) e
+  `extrair_mmgd_aneel.py` reexecutado com sucesso: 4.523.648 instalações
+  agregadas nacionalmente (`numero_empreendimentos`) contra 8.063.052 UCs
+  beneficiadas por crédito (`numero_ucs_com_mmgd`) — confirma a proporção
+  ~1,78 já observada na inspeção direta do Parquet. `make typecheck` e
+  `make front-typecheck` limpos.
+  **"Pessoas beneficiadas" (RF-005 item 4) resolvido na mesma sessão, como
+  ESTIMATIVA** (decisão do usuário): `numero_ucs_residencial` (subconjunto
+  RESIDENCIAL, não o total) × 2,79 pessoas/domicílio (IBGE, Censo 2022) —
+  exposto em `pessoasBeneficiadas.pessoasBeneficiadasEstimativa`, removido
+  de `indicadoresIndisponiveis`. Landing sempre rotula "(estimativa)" de
+  forma visível, nunca escondida em tooltip. Ver ARQUITETURA.md "RF-005"
+  para a fonte completa do fator de conversão.
 
 **NAO implementado ainda** (apesar de descrito em secoes deste documento como padrao):
 - Backend Node/Express: endpoints de LEITURA (`GET /api/vazios-de-acesso`,
@@ -322,13 +463,24 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   acima) implementados, mas **ainda nao validados no ambiente do usuario nesta sessao**.
   RF-070 ("upload de bases") implementado so como workflow/status, NAO recebimento de
   arquivo via API - decisao explicita do usuario, ver bloco acima.
-- Frontend React - INICIADO em 09/07/2026 (fundação + mapa, ver bloco acima), mas ainda
-  falta a maior parte: landing page, painel analítico/comparação (RF-049/050), telas de
-  login e painéis Colaborador/Admin (consumindo a auth já existente), export/relatório
-  pela interface e drill-down de setores censitários (RF-043/045). Busca por
-  município no header (RF-026), painel de ranking estadual (RF-030 a RF-036,
-  com exclusões documentadas) e heatmap de Vazios de Acesso (RF-057)
-  implementados e validados em 09/07/2026 — ver blocos acima.
+- Frontend React - INICIADO em 09/07/2026 (fundação + mapa, ver bloco acima).
+  Landing page (RF-001 a RF-008) e download CSV/GeoJSON pela interface
+  (RF-047) implementados em 10/07/2026 — ver bloco "Landing Page + Dashboard
+  Público" acima, typecheck validado (teste manual no navegador ainda
+  pendente). Segue faltando:
+  RF-011/012 (painel de "acesso de demonstração" com preenchimento
+  automático na tela de login — hoje `PaginaLogin.tsx` só tem o formulário),
+  relatório-resumo exportável (RF-058, endpoint backend
+  `/municipios/:codigoIbge/relatorio` já existe, sem botão na interface), e
+  drill-down de setores censitários (RF-043/045, piloto SP já tem endpoint).
+  Painel analítico/comparação
+  (RF-049/050/052) já estava implementado no código antes desta sessão (10/07/2026),
+  mas sem registro aqui — ver bloco "Divergência de documentação encontrada" acima.
+  Busca por município no header (RF-026), painel de ranking estadual (RF-030 a
+  RF-036, com exclusões documentadas), heatmap de Vazios de Acesso (RF-057,
+  09/07/2026) e login + painéis Colaborador/Admin (RF-009/013/014, RF-059 a RF-067,
+  RF-070 a RF-077, 10/07/2026 — validado no ambiente do usuário, ver bloco
+  acima) implementados — ver blocos acima.
 - Makefile de deploy/producao - `make up-prod`, `make deploy`, `make deploy-rebuild`,
   `make deploy-first`, `make shell`, `make lint` continuam **especificacao**, nao
   implementados (ver Secao 7). Os comandos de desenvolvimento (`make up`, `make
@@ -421,7 +573,8 @@ porta 5173, com o backend rodando na 3000). Makefile de desenvolvimento existe d
 │       │   ├── schema/            (Drizzle schema - IMPLEMENTADO)
 │       │   │   ├── municipios.ts
 │       │   │   ├── unidades_espaciais.ts
-│       │   │   ├── mmgd_indicadores.ts   (+ potenciaResidencialKw/numeroUcsResidencial, migration 0020)
+│       │   │   ├── mmgd_indicadores.ts   (+ potenciaResidencialKw/numeroUcsResidencial, migration 0020;
+│       │   │   │   + numeroEmpreendimentos, migration 0025 — ver "Correção de rótulo" acima)
 │       │   │   ├── indicadores_sociais.ts (+ percentualPobrezaCadunico, drift da migration 0013 corrigido 07/07/2026)
 │       │   │   ├── irradiacao_solar.ts
 │       │   │   ├── indicadores_climaticos.ts
@@ -437,7 +590,7 @@ porta 5173, com o backend rodando na 3000). Makefile de desenvolvimento existe d
 │       │   │   ├── aprovacoes_indicadores.ts  (NOVO 08/07/2026 - RF-074, migration 0024)
 │       │   │   ├── versoes_publicadas.ts      (NOVO 08/07/2026 - RF-075, migration 0024)
 │       │   │   └── index.ts
-│       │   └── migrations/        (SQL incremental - IMPLEMENTADO, 0000 a 0024)
+│       │   └── migrations/        (SQL incremental - IMPLEMENTADO, 0000 a 0025)
 │       │       ├── 0000_criacao_tabelas.sql
 │       │       ├── 0001_extensoes_e_indices_espaciais.sql
 │       │       ├── ... (0002 a 0010: infraestrutura, renda, capital humano,
@@ -458,8 +611,11 @@ porta 5173, com o backend rodando na 3000). Makefile de desenvolvimento existe d
 │       │       ├── 0022_criacao_usuarios_auth.sql  (NOVO 08/07/2026 - fundacao de
 │       │       │   auth/RBAC, ver "Fundacao de autenticacao/RBAC" em Estado Real do Projeto)
 │       │       ├── 0023_colaborador_escrita.sql    (NOVO 08/07/2026 - RF-059 a RF-067)
-│       │       └── 0024_admin_escrita.sql          (NOVO 08/07/2026 - RF-070 a RF-077
-│       │             + usuarios.ativo)
+│       │       ├── 0024_admin_escrita.sql          (NOVO 08/07/2026 - RF-070 a RF-077
+│       │       │     + usuarios.ativo)
+│       │       └── 0025_mmgd_indicadores_numero_empreendimentos.sql (NOVO
+│       │             10/07/2026 - contagem real de instalações MMGD, ver
+│       │             "Correção de rótulo" em Estado Real do Projeto)
 │       ├── types/
 │       │   └── express.d.ts        (NOVO 08/07/2026 - augmentation de `Request.usuario`)
 │       ├── middlewares/            (IMPLEMENTADO 07/07/2026)
@@ -473,19 +629,24 @@ porta 5173, com o backend rodando na 3000). Makefile de desenvolvimento existe d
 │       │   ├── basesDeDados.routes.ts
 │       │   ├── auth.routes.ts      (NOVO 08/07/2026 - POST /auth/login, /logout)
 │       │   ├── colaborador.routes.ts (NOVO 08/07/2026 - RF-059 a RF-067)
-│       │   └── admin.routes.ts       (NOVO 08/07/2026 - RF-070 a RF-077)
+│       │   ├── admin.routes.ts       (NOVO 08/07/2026 - RF-070 a RF-077)
+│       │   └── estatisticasNacionais.routes.ts (NOVO 10/07/2026 - RF-005, Landing Page)
 │       ├── controllers/            (IMPLEMENTADO 07/07/2026)
 │       │   ├── vaziosDeAcesso.controller.ts
 │       │   ├── auth.controller.ts    (NOVO 08/07/2026)
 │       │   ├── colaborador.controller.ts (NOVO 08/07/2026)
-│       │   └── admin.controller.ts       (NOVO 08/07/2026)
+│       │   ├── admin.controller.ts       (NOVO 08/07/2026)
+│       │   └── estatisticasNacionais.controller.ts (NOVO 10/07/2026)
 │       ├── services/                (IMPLEMENTADO 07/07/2026 - lógica de negócio isolada aqui)
 │       │   ├── vaziosDeAcesso.service.ts  (RF-055/056/057 - ver docstring do arquivo
 │       │   │   para a metodologia completa)
 │       │   ├── auth.service.ts      (NOVO 08/07/2026 - bcryptjs + jsonwebtoken)
 │       │   ├── colaborador.service.ts (NOVO 08/07/2026)
-│       │   └── admin.service.ts       (NOVO 08/07/2026 - inclui guard de
-│       │       "ultimo administrador", ver Estado Real do Projeto)
+│       │   ├── admin.service.ts       (NOVO 08/07/2026 - inclui guard de
+│       │   │   "ultimo administrador", ver Estado Real do Projeto)
+│       │   └── estatisticasNacionais.service.ts (NOVO 10/07/2026 - RF-005: 3
+│       │       agregados reais + indicadoresIndisponiveis documentados, ver
+│       │       Estado Real do Projeto)
 │       ├── schemas/                 (IMPLEMENTADO 07/07/2026 - contratos zod)
 │       │   ├── vaziosDeAcesso.schema.ts
 │       │   ├── auth.schema.ts       (NOVO 08/07/2026 - loginSchema)
@@ -573,22 +734,33 @@ porta 5173, com o backend rodando na 3000). Makefile de desenvolvimento existe d
 │   ├── index.html
 │   └── src/
 │       ├── main.tsx                (entrypoint - StrictMode + BrowserRouter)
-│       ├── App.tsx                 (rotas + cabeçalho; só "/" → PaginaMapa por ora)
+│       ├── App.tsx                 (rotas: "/" landing pública + LayoutApp
+│       │                            envolvendo /mapa, /painel-analitico, /login,
+│       │                            /colaborador, /admin — NOVO 10/07/2026, antes
+│       │                            "/" ia direto pro mapa, ver Estado Real do Projeto)
 │       ├── index.css               (@import "tailwindcss" + altura 100%)
 │       ├── pages/
-│       │   └── PaginaMapa.tsx      (busca dados via services, estado da página)
+│       │   ├── PaginaLanding.tsx   (NOVO 10/07/2026 - RF-001 a RF-008)
+│       │   └── PaginaMapa.tsx      (busca dados via services, estado da página;
+│       │                            agora também dono do estado de filtros RF-046)
 │       ├── components/
-│       │   ├── BuscaMunicipio.tsx  (busca do header, RF-026 - fora de mapa/ de propósito)
+│       │   ├── BuscaMunicipio.tsx  (busca do header, RF-026 - fora de mapa/ de propósito;
+│       │   │                        navega para /mapa?municipio=..., antes /?municipio=...)
 │       │   └── mapa/               (isolados de lógica de negócio - CLAUDE.md Seção 4)
-│       │       ├── MapaMunicipios.tsx  (MapLibre: choropleth + destaque + heatmap RF-057)
+│       │       ├── MapaMunicipios.tsx  (MapLibre: choropleth + destaque + heatmap RF-057
+│       │       │   + filtro RF-046 via prop codigosVisiveis, NOVO 10/07/2026)
 │       │       ├── Legenda.tsx
 │       │       ├── PainelMunicipio.tsx (detalhe do município clicado, RF-025)
 │       │       ├── PainelRanking.tsx   (ranking estadual, RF-030 a RF-036)
-│       │       └── PainelHeatmapVazios.tsx (painel-legenda do heatmap, RF-057)
+│       │       ├── PainelHeatmapVazios.tsx (painel-legenda do heatmap, RF-057)
+│       │       └── PainelFiltrosDashboard.tsx (NOVO 10/07/2026 - RF-046/047,
+│       │           painel controlado, ver Estado Real do Projeto)
 │       ├── services/               (todo fetch passa por aqui, nunca em componente)
-│       │   ├── http.ts             (cliente central, trata { erro: { mensagem } })
-│       │   ├── municipios.service.ts
-│       │   └── vaziosDeAcesso.service.ts
+│       │   ├── http.ts             (cliente central, trata { erro: { mensagem } };
+│       │   │                        baixarArquivo() finalmente usado por RF-047)
+│       │   ├── municipios.service.ts (+ exportarMunicipios, NOVO 10/07/2026)
+│       │   ├── vaziosDeAcesso.service.ts
+│       │   └── estatisticasNacionais.service.ts (NOVO 10/07/2026 - RF-005)
 │       ├── types/
 │       │   └── api.ts              (espelho manual dos contratos do backend)
 │       └── utils/
@@ -791,7 +963,7 @@ localmente"):
 make up                              # sobe o Postgres/PostGIS local (docker compose)
 make down                            # derruba os containers (mantém o volume)
 make db                              # abre client psql interativo no container
-make migrate                         # aplica as migrations 0000-0024 na ordem certa
+make migrate                         # aplica as migrations 0000-0025 na ordem certa
                                       # (inclui schema_qualidade.sql antes da 0011 -
                                       # ver Seção 2, "INCONSISTÊNCIA ARQUITETURAL")
 make seed                            # popula o território (seed_municipios.py)

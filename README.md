@@ -270,14 +270,21 @@ npm run typecheck       # tsc -b
 npm run build           # tsc -b && vite build
 ```
 
-Telas de login/painéis (Colaborador/Admin), landing page e painel analítico ainda não
-existem no frontend. O backend tem endpoints de leitura (`vazios-de-acesso`,
-`municipios`, `bases-de-dados`, exports), autenticação/RBAC (`POST /api/auth/login`/
-`logout`, 3 papéis) e escrita do Colaborador/Admin (RF-059 a RF-077 — revisão de bases,
-observações, sugestões, notas metodológicas, materiais de comunicação, metadados
-técnicos, aprovação de indicadores, versionamento, gestão de usuários). Upload de
-arquivo real (RF-070) não foi implementado — decisão do projeto foi manter a carga de
-dado só via ETL Python, com a API cobrindo apenas o workflow/status.
+Login (`/login`) e painéis Colaborador (`/colaborador`) e Admin (`/admin`) implementados
+em 10/07/2026, consumindo a auth e a escrita do Colaborador/Admin já existentes no
+backend — sessão em Context + `localStorage` (`AuthContext.tsx`), rotas protegidas por
+papel (`RotaProtegida.tsx`). Landing page ainda não existe. O backend tem endpoints de
+leitura (`vazios-de-acesso`, `municipios`, `bases-de-dados`, exports), autenticação/RBAC
+(`POST /api/auth/login`/`logout`, 3 papéis) e escrita do Colaborador/Admin (RF-059 a
+RF-077 — revisão de bases, observações, sugestões, notas metodológicas, materiais de
+comunicação, metadados técnicos, aprovação de indicadores, versionamento, gestão de
+usuários), todos agora também consumidos pela interface. Upload de arquivo real
+(RF-070) não foi implementado — decisão do projeto foi manter a carga de dado só via
+ETL Python, com a API cobrindo apenas o workflow/status.
+
+Validado no ambiente do usuário em 10/07/2026 (`make front-typecheck` limpo + teste
+manual: login com as 2 contas de demonstração abaixo, escrita em cada seção do painel,
+e RBAC — Colaborador não enxerga o link "Painel Admin" nem acessa `/admin`).
 
 Para a etapa de RAIS via BigQuery, é necessária autenticação prévia:
 ```bash
