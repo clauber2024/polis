@@ -7,9 +7,10 @@ import maplibregl, {
   type Map as MapaMapLibre,
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import type { FeatureCollectionMunicipios } from '../../types/api';
+import type { FeatureCollectionMunicipios, MunicipioComIndicadores } from '../../types/api';
 import { bboxDaGeometria } from '../../utils/geometria';
 import type { IndicadorMapa } from '../../utils/indicadores';
+import { formatarValor } from '../../utils/formatadores';
 
 /**
  * Componente de mapa (MapLibre GL) — SÓ renderização (CLAUDE.md Seção 4:
@@ -133,6 +134,20 @@ export function MapaMunicipios({
   const aoClicarRef = useRef(aoClicarMunicipio);
   aoClicarRef.current = aoClicarMunicipio;
 
+  // Tooltip de hover (adicionado 12/07/2026, inspirado no protótipo visual do
+  // AI Studio) — só apresentação, mesmo princípio do resto do componente: o
+  // valor do indicador NÃO vem das properties do feature do MapLibre (elas
+  // descartam nulos na conversão pro tile vetorial, mesmo motivo já
+  // documentado para o clique), vem de uma busca em `dados` (prop já recebida
+  // pelo componente) pelo codigoIbge — sem fetch novo, sem lógica de negócio.
+  const [hover, setHover] = useState<{ x: number; y: number; codigoIbge: string } | null>(null);
+  const municipioHover: MunicipioComIndicadores | null = useMemo(() => {
+    if (!hover || !dados) return null;
+    return (
+      dados.features.find((f) => f.properties.codigoIbge === hover.codigoIbge)?.properties ?? null
+    );
+  }, [hover, dados]);
+
   const corChoropleth = useMemo(
     () => (quebras.length === 4 ? expressaoChoropleth(indicador, quebras) : COR_SEM_DADO),
     [indicador, quebras],
@@ -174,6 +189,13 @@ export function MapaMunicipios({
     });
     mapa.on('mouseleave', CAMADA_PREENCHIMENTO, () => {
       mapa.getCanvas().style.cursor = '';
+      setHover(null);
+    });
+    mapa.on('mousemove', CAMADA_PREENCHIMENTO, (evento) => {
+      const codigoIbge = evento.features?.[0]?.properties?.codigoIbge;
+      if (typeof codigoIbge === 'string') {
+        setHover({ x: evento.point.x, y: evento.point.y, codigoIbge });
+      }
     });
 
     mapaRef.current = mapa;
@@ -330,5 +352,55 @@ export function MapaMunicipios({
     mapa.fitBounds(bbox, { padding: 80, maxZoom: 10, duration: 1400 });
   }, [foco, mapaCarregado, dados]);
 
-  return <div ref={containerRef} className="h-full w-full" />;
+  return (
+    <div className="relative h-full w-full">
+      <div ref={containerRef} className="h-full w-full" />
+
+      {hover && municipioHover && (
+        <div
+          className="pointer-events-none absolute z-20 max-w-[260px] rounded-xl border border-slate-700/85 bg-slate-900/95 p-3 text-xs text-white shadow-xl backdrop-blur-md"
+          style={{ left: hover.x, top: hover.y, transform: 'translate(-50%, -110%)' }}
+        >
+          <p className="text-xs font-bold tracking-tight text-slate-100">
+            {municipioHover.nome}
+          </p>
+          <p className="font-mono text-[9px] text-slate-400">
+            {municipioHover.regiao} · {municipioHover.uf}
+          </p>
+
+          <div className="mt-2 space-y-1 rounded border border-slate-800/50 bg-slate-800/40 p-2">
+            <div className="flex items-center justify-between text-[8.5px] text-slate-400">
+              <span>Indicador Ativo</span>
+            </div>
+            <div className="text-[10px] font-semibold text-slate-200">{indicador.rotulo}</div>
+            <div className="font-mono text-xs font-bold text-violet-400">
+              {municipioHover[indicador.id] !== null
+                ? `${formatarValor(municipioHover[indicador.id] as number, indicador.formato)}${indicador.unidade ? ` ${indicador.unidade}` : ''}`
+                : 'Não disponível'}
+            </div>
+          </div>
+
+          {indicador.metadados && (
+            <div className="mt-1.5 grid grid-cols-2 gap-2 border-t border-slate-800/60 pt-1.5 text-[9px]">
+              <div>
+                <span className="block font-mono text-[7.5px] tracking-wider text-slate-500 uppercase">
+                  Confiança
+                </span>
+                <span className="font-bold text-emerald-400">{indicador.metadados.confianca}</span>
+              </div>
+              <div>
+                <span className="block font-mono text-[7.5px] tracking-wider text-slate-500 uppercase">
+                  Natureza
+                </span>
+                <span className="font-bold text-cyan-400">{indicador.metadados.natureza}</span>
+              </div>
+              <div className="col-span-2 font-mono text-[8px] text-slate-500">
+                <span className="text-slate-400">Fonte:</span> {indicador.metadados.fonte}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }

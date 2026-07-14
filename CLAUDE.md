@@ -314,7 +314,13 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   (sessão em Context + `localStorage`, chave `atlas.sessao` — JWT stateless,
   sem endpoint de refresh nesta fundação), `RotaProtegida.tsx` (redireciona
   para `/login` sem sessão, para `/` com sessão mas papel não autorizado),
-  `PaginaLogin.tsx`, `services/auth.service.ts` +
+  `PaginaLogin.tsx` — **inclui RF-011/012** (painel "Perfis de demonstração"
+  com as duas contas do seed, clique preenche e-mail/senha automaticamente;
+  identificado em 13/07/2026 como divergência de documentação — já estava
+  implementado e commitado em `834202f` desde esta sessão, só não constava
+  na lista de pendências abaixo até esta correção; badge de papel é só texto,
+  sem ícone gráfico — não bloqueante do RF-011, reavaliar se algum dia
+  importar), `services/auth.service.ts` +
   `services/colaborador.service.ts` + `services/admin.service.ts` (espelhando
   1:1 os 14 endpoints de escrita já testados via curl), `PainelColaborador.tsx`
   (5 cartões: revisões de bases RF-059, observações RF-060, sugestões RF-061,
@@ -454,6 +460,29 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   de `indicadoresIndisponiveis`. Landing sempre rotula "(estimativa)" de
   forma visível, nunca escondida em tooltip. Ver ARQUITETURA.md "RF-005"
   para a fonte completa do fator de conversão.
+- **Frontend — relatório PDF (RF-058) e drill-down de setores censitários
+  (RF-043/RF-045), 13/07/2026:** os dois endpoints de backend já existiam
+  (`GET /municipios/:codigoIbge/relatorio` e `/setores-censitarios`) sem
+  interface — fechado nesta sessão. Ambos em `PainelMunicipio.tsx` (RF-025):
+  (1) botão "Baixar relatório-resumo (PDF)" logo abaixo do cabeçalho,
+  reaproveitando `baixarArquivo` de `services/http.ts` (mesmo padrão de
+  RF-047/052) — nova função `baixarRelatorioTerritorio` em
+  `municipios.service.ts`; (2) seção colapsável "Ver detalhamento interno" no
+  fim do painel, só renderizada quando o backend confirma
+  `temGranularidadeFina` (hoje só São Paulo, 3550308 — seed ilustrativo da
+  migration 0021) — busca lazy por município via nova função
+  `buscarSetoresCensitarios`, falha silenciosa (ausência de granularidade
+  fina não é erro, RF-043). Ao expandir, mostra o aviso "Cenário ilustrativo"
+  (RF-045) e a lista de setores ordenada por potência instalada com barra
+  proporcional, mesmo padrão visual do `PainelRanking.tsx` (posição implícita
+  pela ordenação, não numerada — RF-043 não define indicador padrão de
+  ordenação, potência total foi a escolha mais direta de justificar).
+  Novos tipos `SetorCensitario`/`SetoresCensitariosResultado` em
+  `types/api.ts`, incluindo a mesma correção de campos `numeric` do Postgres
+  chegando como string (`normalizarSetor`, mesmo bug de `normalizarMunicipio`
+  já documentado acima). VALIDADO no ambiente do usuário em 13/07/2026
+  (`make front-typecheck` limpo + teste manual: download do PDF num
+  município qualquer, expansão do detalhamento em São Paulo).
 
 **NAO implementado ainda** (apesar de descrito em secoes deste documento como padrao):
 - Backend Node/Express: endpoints de LEITURA (`GET /api/vazios-de-acesso`,
@@ -467,20 +496,16 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   Landing page (RF-001 a RF-008) e download CSV/GeoJSON pela interface
   (RF-047) implementados em 10/07/2026 — ver bloco "Landing Page + Dashboard
   Público" acima, typecheck validado (teste manual no navegador ainda
-  pendente). Segue faltando:
-  RF-011/012 (painel de "acesso de demonstração" com preenchimento
-  automático na tela de login — hoje `PaginaLogin.tsx` só tem o formulário),
-  relatório-resumo exportável (RF-058, endpoint backend
-  `/municipios/:codigoIbge/relatorio` já existe, sem botão na interface), e
-  drill-down de setores censitários (RF-043/045, piloto SP já tem endpoint).
-  Painel analítico/comparação
+  pendente). Painel analítico/comparação
   (RF-049/050/052) já estava implementado no código antes desta sessão (10/07/2026),
   mas sem registro aqui — ver bloco "Divergência de documentação encontrada" acima.
   Busca por município no header (RF-026), painel de ranking estadual (RF-030 a
   RF-036, com exclusões documentadas), heatmap de Vazios de Acesso (RF-057,
-  09/07/2026) e login + painéis Colaborador/Admin (RF-009/013/014, RF-059 a RF-067,
-  RF-070 a RF-077, 10/07/2026 — validado no ambiente do usuário, ver bloco
-  acima) implementados — ver blocos acima.
+  09/07/2026), login + painéis Colaborador/Admin (RF-009 a RF-014, RF-059 a
+  RF-067, RF-070 a RF-077, 10/07/2026 — validado no ambiente do usuário, ver
+  bloco acima), relatório-resumo em PDF (RF-058) e drill-down de setores
+  censitários (RF-043/RF-045, 13/07/2026 — validado no ambiente do usuário,
+  ver bloco acima) implementados — ver blocos acima.
 - Makefile de deploy/producao - `make up-prod`, `make deploy`, `make deploy-rebuild`,
   `make deploy-first`, `make shell`, `make lint` continuam **especificacao**, nao
   implementados (ver Secao 7). Os comandos de desenvolvimento (`make up`, `make

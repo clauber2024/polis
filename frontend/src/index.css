@@ -1,4 +1,15 @@
+/* Paleta/tipografia alinhadas ao protótipo visual do AI Studio
+   (clauber2024/Atlas-Solar, importado em 12/07/2026) — ver ARQUITETURA.md
+   ou o histórico de conversa para o comparativo completo. Só estilo: nenhuma
+   lógica de negócio, service ou tipo de API foi tocado por essa mudança. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap');
 @import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
 
 /* O mapa ocupa a altura toda da viewport menos o cabeçalho — ver PaginaMapa. */
 html,

@@ -46,7 +46,7 @@ export function CartaoVersoesPublicadas() {
   }
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <section className="rounded border border-slate-200 bg-white p-4 shadow-2xs">
       <h2 className="text-base font-semibold text-slate-900">Versões publicadas (RF-075)</h2>
 
       <form onSubmit={aoSubmeter} className="my-3 space-y-2">

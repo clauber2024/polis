@@ -31,8 +31,10 @@ export function PainelHeatmapVazios({
   notaMetodologica,
 }: PainelHeatmapVaziosProps) {
   return (
-    <div className="max-w-72 rounded-lg border border-slate-200 bg-white/95 p-3 text-xs shadow">
-      <p className="mb-1 font-semibold text-slate-800">Concentração de Vazios de Acesso</p>
+    <div className="max-w-72 rounded border border-violet-100 bg-white/95 p-3 text-xs shadow-md backdrop-blur-sm">
+      <p className="mb-1 font-mono text-[10px] font-bold tracking-wider text-violet-700 uppercase">
+        Camada de Vazios de Acesso
+      </p>
       <p className="mb-2 leading-snug text-slate-500">
         {totalVazios.toLocaleString('pt-BR')} municípios com alto potencial solar (irradiação ≥{' '}
         {formatarValor(medianaNacional.potencialSolarKwhM2Dia, 'numero')} kWh/m²·dia) e baixa MMGD
@@ -42,7 +44,7 @@ export function PainelHeatmapVazios({
       </p>
 
       <div className="h-2.5 rounded" style={{ background: GRADIENTE }} />
-      <div className="mt-0.5 flex justify-between text-slate-500">
+      <div className="mt-0.5 flex justify-between font-mono text-[10px] text-slate-500">
         <span>menor concentração</span>
         <span>maior</span>
       </div>
@@ -53,7 +55,7 @@ export function PainelHeatmapVazios({
       </p>
 
       <details className="mt-2">
-        <summary className="cursor-pointer font-medium text-slate-600 hover:text-slate-800">
+        <summary className="cursor-pointer font-mono text-[10px] font-semibold tracking-wide text-violet-700 uppercase hover:text-violet-900">
           Nota metodológica
         </summary>
         <p className="mt-1 leading-snug text-slate-500">{notaMetodologica}</p>

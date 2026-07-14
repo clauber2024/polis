@@ -102,10 +102,13 @@ export function PainelRanking({
   const corDestaque = indicador.cores[3];
 
   return (
-    <aside className="flex h-full w-80 flex-col border-r border-slate-200 bg-white shadow-lg">
-      <div className="border-b border-slate-200 p-3">
+    <aside className="flex h-full w-80 flex-col border-r border-slate-200 bg-white shadow-xs">
+      <div className="border-b border-slate-100 bg-slate-50 p-3">
         <div className="mb-2 flex items-start justify-between gap-2">
           <div>
+            <span className="block font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+              Ordenação Prioritária
+            </span>
             <h2 className="text-sm font-semibold text-slate-900">Ranking estadual</h2>
             <p className="text-xs text-slate-500">{indicador.rotulo}</p>
           </div>
@@ -174,40 +177,44 @@ export function PainelRanking({
           {itensVisiveis.map((item) => {
             const ehVazio = codigosVazios?.has(item.municipio.codigoIbge) ?? false;
             return (
-              <li key={item.municipio.codigoIbge}>
+              <li key={item.municipio.codigoIbge} className="px-2 py-1">
                 <button
                   type="button"
                   onClick={() => aoSelecionarMunicipio(item.municipio.codigoIbge)}
-                  className="block w-full border-b border-slate-100 px-3 py-2 text-left hover:bg-slate-50"
+                  className={`block w-full rounded-lg border px-2.5 py-2 text-left transition-all ${
+                    ehVazio
+                      ? 'border-violet-200 bg-violet-50/60 hover:bg-violet-50'
+                      : 'border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50/60'
+                  }`}
                 >
                   <div className="flex items-baseline gap-2 text-sm">
-                    <span className="w-8 shrink-0 text-right font-medium text-slate-400">
+                    <span className="w-8 shrink-0 text-right font-mono font-semibold text-slate-400">
                       {item.posicao}º
                     </span>
                     <span className="min-w-0 flex-1 truncate text-slate-800">
                       {item.municipio.nome}
-                      {ehVazio && (
-                        <span className="ml-1.5 rounded bg-violet-100 px-1 py-0.5 align-middle text-[10px] font-semibold whitespace-nowrap text-violet-700">
-                          Vazio de Acesso
-                        </span>
-                      )}
                     </span>
                     <span
-                      className="shrink-0 font-semibold whitespace-nowrap"
+                      className="shrink-0 font-mono font-bold whitespace-nowrap"
                       style={{ color: corDestaque }}
                     >
                       {formatarValor(item.valor, indicador.formato)}
                     </span>
                   </div>
-                  <div className="mt-1 ml-10 h-1 rounded bg-slate-100">
+                  <div className="mt-1.5 ml-10 h-1.5 overflow-hidden rounded-full bg-slate-100">
                     <div
-                      className="h-1 rounded"
+                      className="h-full rounded-full transition-all duration-500"
                       style={{
                         width: `${Math.max(2, item.proporcao * 100)}%`,
                         backgroundColor: corDestaque,
                       }}
                     />
                   </div>
+                  {ehVazio && (
+                    <span className="mt-1.5 ml-10 inline-block rounded-sm bg-violet-100 px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-wide text-violet-700 uppercase">
+                      Vazio de Acesso
+                    </span>
+                  )}
                 </button>
               </li>
             );

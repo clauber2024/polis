@@ -75,7 +75,7 @@ export function CartaoMetadadosBasesDados() {
   const porBase = new Map(metadados.map((m) => [m.baseDados, m]));
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <section className="rounded border border-slate-200 bg-white p-4 shadow-2xs">
       <h2 className="text-base font-semibold text-slate-900">
         Metadados técnicos das bases (RF-071/072/073)
       </h2>

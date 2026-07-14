@@ -2,6 +2,8 @@ import type {
   FeatureCollectionMunicipios,
   ListarMunicipiosResultado,
   MunicipioComIndicadores,
+  SetorCensitario,
+  SetoresCensitariosResultado,
 } from '../types/api';
 import { baixarArquivo, obterJson } from './http';
 
@@ -129,4 +131,70 @@ export async function exportarMunicipios(
     params,
     `municipios-dashboard-publico-${dataHoje}.${extensao}`,
   );
+}
+
+/**
+ * GET /api/municipios/:codigoIbge/relatorio (RF-058) — baixa o
+ * relatório-resumo exportável em PDF do território selecionado (painel de
+ * detalhe do município, RF-025). Mesmo padrão de baixarArquivo já usado em
+ * exportarMunicipios (RF-047).
+ */
+export async function baixarRelatorioTerritorio(
+  codigoIbge: string,
+  nomeMunicipio: string,
+): Promise<void> {
+  // Remove marcas diacríticas (acentos) após NFD — faixa Unicode U+0300–U+036F
+  // (Combining Diacritical Marks), via escape explícito para não depender de
+  // caracteres combinantes literais neste arquivo-fonte.
+  const REGEX_DIACRITICOS = /[̀-ͯ]/g;
+  const slug = nomeMunicipio
+    .toLocaleLowerCase('pt-BR')
+    .normalize('NFD')
+    .replace(REGEX_DIACRITICOS, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-+|-+$)/g, '');
+  await baixarArquivo(
+    `/api/municipios/${codigoIbge}/relatorio`,
+    {},
+    `relatorio-${slug || codigoIbge}.pdf`,
+  );
+}
+
+/** Campos numéricos de SetorCensitario que chegam como STRING do Postgres — mesmo bug/correção de normalizarMunicipio acima. */
+const CAMPOS_NUMERICOS_SETOR = [
+  'areaKm2',
+  'potenciaInstaladaKw',
+  'potenciaResidencialKw',
+  'numeroUcsComMmgd',
+  'numeroUcsResidencial',
+] as const;
+
+function normalizarSetor(bruto: SetorCensitario): SetorCensitario {
+  const setor = bruto as unknown as Record<string, unknown>;
+  for (const campo of CAMPOS_NUMERICOS_SETOR) {
+    const valor = setor[campo];
+    if (valor === null || valor === undefined || valor === '') {
+      setor[campo] = null;
+    } else if (typeof valor !== 'number') {
+      const convertido = Number(valor);
+      setor[campo] = Number.isNaN(convertido) ? null : convertido;
+    }
+  }
+  return bruto;
+}
+
+/**
+ * GET /api/municipios/:codigoIbge/setores-censitarios (RF-043, RF-045) —
+ * drill-down de granularidade fina. Hoje só São Paulo (3550308) retorna
+ * setores (seed ilustrativo, migration 0021); qualquer outro município
+ * responde `temGranularidadeFina: false`, o que NÃO é erro.
+ */
+export async function buscarSetoresCensitarios(
+  codigoIbge: string,
+): Promise<SetoresCensitariosResultado> {
+  const resultado = await obterJson<SetoresCensitariosResultado>(
+    `/api/municipios/${codigoIbge}/setores-censitarios`,
+  );
+  resultado.setores.forEach(normalizarSetor);
+  return resultado;
 }

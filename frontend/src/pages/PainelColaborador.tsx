@@ -15,12 +15,17 @@ export function PainelColaborador() {
   const { sessao } = useAuth();
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4 p-6">
-      <div>
-        <h1 className="text-xl font-semibold text-slate-900">Painel Colaborador</h1>
-        <p className="text-sm text-slate-500">
-          Olá, {sessao?.usuario.nome} — revisão de bases, observações, sugestões e comunicação.
-        </p>
+    <div className="mx-auto max-w-4xl space-y-4 p-6 font-sans">
+      <div className="flex flex-col gap-1 rounded-2xl bg-slate-900 p-6 text-white shadow-xs sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1">
+          <span className="block font-mono text-[10px] font-semibold tracking-wider text-amber-400 uppercase">
+            Ambiente de Trabalho Científico
+          </span>
+          <h1 className="text-xl font-bold tracking-tight">Painel Colaborador</h1>
+          <p className="text-xs text-slate-300">
+            Olá, {sessao?.usuario.nome} — revisão de bases, observações, sugestões e comunicação.
+          </p>
+        </div>
       </div>
       <CartaoRevisoesBasesDados />
       <CartaoObservacoes />

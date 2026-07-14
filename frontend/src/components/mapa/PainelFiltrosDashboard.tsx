@@ -74,11 +74,14 @@ export function PainelFiltrosDashboard({
   }
 
   return (
-    <aside className="flex h-full w-80 flex-col border-r border-slate-200 bg-white shadow-lg">
-      <div className="flex items-start justify-between gap-2 border-b border-slate-200 p-3">
+    <aside className="flex h-full w-80 flex-col border-r border-slate-200 bg-white shadow-xs">
+      <div className="flex items-start justify-between gap-2 border-b border-slate-100 bg-slate-50 p-3">
         <div>
+          <span className="block font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+            Refinar Cobertura
+          </span>
           <h2 className="text-sm font-semibold text-slate-900">Filtros (Dashboard Público)</h2>
-          <p className="text-xs text-slate-500">
+          <p className="font-mono text-xs text-slate-500">
             {totalVisiveis.toLocaleString('pt-BR')} de {totalMunicipios.toLocaleString('pt-BR')}{' '}
             municípios
           </p>
@@ -101,7 +104,7 @@ export function PainelFiltrosDashboard({
           id="filtro-uf"
           value={uf}
           onChange={(evento) => aoMudarUf(evento.target.value)}
-          className="mb-3 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-800"
+          className="mb-3 w-full rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-800 focus:bg-white focus:ring-1 focus:ring-violet-500 focus:outline-none"
         >
           <option value="">Todos os estados</option>
           {ufs.map(([sigla, nomeEstado]) => (
@@ -118,7 +121,7 @@ export function PainelFiltrosDashboard({
           id="filtro-regiao"
           value={regiao}
           onChange={(evento) => aoMudarRegiao(evento.target.value)}
-          className="mb-3 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-800"
+          className="mb-3 w-full rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-800 focus:bg-white focus:ring-1 focus:ring-violet-500 focus:outline-none"
         >
           <option value="">Todas as regiões</option>
           {regioes.map((nomeRegiao) => (
@@ -140,7 +143,7 @@ export function PainelFiltrosDashboard({
             placeholder="Mín."
             value={potenciaMin}
             onChange={(evento) => aoMudarPotenciaMin(evento.target.value)}
-            className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-800"
+            className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-800 focus:bg-white focus:ring-1 focus:ring-violet-500 focus:outline-none"
           />
           <span className="text-slate-400">–</span>
           <input
@@ -151,7 +154,7 @@ export function PainelFiltrosDashboard({
             placeholder="Máx."
             value={potenciaMax}
             onChange={(evento) => aoMudarPotenciaMax(evento.target.value)}
-            className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-800"
+            className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-800 focus:bg-white focus:ring-1 focus:ring-violet-500 focus:outline-none"
           />
         </div>
 
@@ -183,26 +186,26 @@ export function PainelFiltrosDashboard({
           </button>
         )}
 
-        <div className="border-t border-slate-200 pt-3">
-          <p className="mb-2 text-xs font-semibold text-slate-600">
+        <div className="border-t border-slate-100 pt-3">
+          <p className="mb-2 font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
             Baixar dados públicos (RF-047)
           </p>
-          <div className="flex gap-2">
+          <div className="flex gap-1.5">
             <button
               type="button"
               onClick={() => aoExportar('csv')}
               disabled={exportando !== null}
-              className="flex-1 rounded border border-slate-300 px-2.5 py-1.5 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="flex-1 rounded border border-slate-200 px-2.5 py-2 text-[10px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
-              {exportando === 'csv' ? 'Exportando…' : 'Baixar CSV'}
+              {exportando === 'csv' ? 'Exportando…' : 'CSV'}
             </button>
             <button
               type="button"
               onClick={() => aoExportar('geojson')}
               disabled={exportando !== null}
-              className="flex-1 rounded border border-slate-300 px-2.5 py-1.5 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="flex-1 rounded border border-slate-200 px-2.5 py-2 text-[10px] font-semibold text-violet-700 hover:bg-violet-50 disabled:opacity-50"
             >
-              {exportando === 'geojson' ? 'Exportando…' : 'Baixar GeoJSON'}
+              {exportando === 'geojson' ? 'Exportando…' : 'GeoJSON'}
             </button>
           </div>
           {erroExportacao && <p className="mt-1 text-xs text-red-600">{erroExportacao}</p>}

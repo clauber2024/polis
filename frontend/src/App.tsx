@@ -21,28 +21,46 @@ function LayoutApp() {
   const { sessao, sair } = useAuth();
 
   return (
-    <div className="flex h-full flex-col">
-      <header className="flex items-center gap-6 border-b border-slate-200 bg-white px-6 py-3">
-        <Link to="/" className="text-lg font-semibold text-slate-900">
-          Atlas Solar <span className="text-amber-500">Justo</span>
+    <div className="flex h-full flex-col font-sans">
+      <header className="flex items-center gap-6 border-b border-slate-200 bg-white px-6 py-3 shadow-2xs">
+        <Link
+          to="/"
+          className="font-display text-base font-bold tracking-tight text-slate-800"
+        >
+          ATLAS SOLAR <span className="text-violet-600">JUSTO</span>
         </Link>
-        <nav className="flex gap-4 text-sm text-slate-600">
-          <Link to="/mapa" className="hover:text-slate-900">
+        <nav className="flex h-full items-center gap-1 text-xs font-semibold">
+          <Link
+            to="/mapa"
+            className="border-b-2 border-transparent px-1 py-2 text-slate-500 transition-colors hover:border-violet-500/30 hover:text-violet-600"
+          >
             Mapa
           </Link>
-          <Link to="/painel-analitico" className="hover:text-slate-900">
+          <Link
+            to="/painel-analitico"
+            className="border-b-2 border-transparent px-1 py-2 text-slate-500 transition-colors hover:border-violet-500/30 hover:text-violet-600"
+          >
             Painel Analítico
           </Link>
-          <Link to="/ranking-distribuidoras" className="hover:text-slate-900">
+          <Link
+            to="/ranking-distribuidoras"
+            className="border-b-2 border-transparent px-1 py-2 text-slate-500 transition-colors hover:border-violet-500/30 hover:text-violet-600"
+          >
             Ranking de Distribuidoras
           </Link>
           {sessao && (
-            <Link to="/colaborador" className="hover:text-slate-900">
+            <Link
+              to="/colaborador"
+              className="border-b-2 border-transparent px-1 py-2 text-slate-500 transition-colors hover:border-violet-500/30 hover:text-violet-600"
+            >
               Painel Colaborador
             </Link>
           )}
           {sessao?.usuario.papel === 'administrador' && (
-            <Link to="/admin" className="hover:text-slate-900">
+            <Link
+              to="/admin"
+              className="border-b-2 border-transparent px-1 py-2 text-slate-500 transition-colors hover:border-violet-500/30 hover:text-violet-600"
+            >
               Painel Admin
             </Link>
           )}
@@ -52,10 +70,12 @@ function LayoutApp() {
             aoSelecionar={(municipio) => navigate(`/mapa?municipio=${municipio.codigoIbge}`)}
           />
           {sessao ? (
-            <div className="flex items-center gap-2 text-sm text-slate-600">
-              <span>
-                {sessao.usuario.nome}{' '}
-                <span className="text-xs text-slate-400">({sessao.usuario.papel})</span>
+            <div className="flex items-center gap-2">
+              <span className="hidden flex-col items-end text-[11px] leading-tight text-slate-500 sm:flex">
+                <span className="font-semibold text-slate-800">{sessao.usuario.nome}</span>
+                <span className="font-mono text-[9px] uppercase tracking-wider text-slate-400">
+                  {sessao.usuario.papel}
+                </span>
               </span>
               <button
                 type="button"
@@ -63,7 +83,8 @@ function LayoutApp() {
                   sair();
                   navigate('/mapa');
                 }}
-                className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50"
+                className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                title="Sair da conta"
               >
                 Sair
               </button>
@@ -71,9 +92,9 @@ function LayoutApp() {
           ) : (
             <Link
               to="/login"
-              className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
+              className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition-all hover:bg-slate-800"
             >
-              Entrar
+              Acesso Técnico
             </Link>
           )}
         </div>

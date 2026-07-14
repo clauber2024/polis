@@ -45,6 +45,36 @@ export interface MunicipioComIndicadores {
   periodoReferenciaIrradiacao: string | null;
 }
 
+// ---------------------------------------------------------------------------
+// Drill-down de granularidade fina (RF-043/RF-045) — ver
+// backend/src/services/setoresCensitarios.service.ts. Hoje só São Paulo
+// (3550308) tem setores — seed sintético/ilustrativo da migration 0021, NÃO
+// dado real da ANEEL/IBGE; qualquer outro município responde
+// temGranularidadeFina: false (não é erro).
+// ---------------------------------------------------------------------------
+
+/** Espelho de SetorCensitario (setoresCensitarios.service.ts). */
+export interface SetorCensitario {
+  id: string;
+  nomeExibicao: string;
+  areaKm2: number | null;
+  potenciaInstaladaKw: number | null;
+  potenciaResidencialKw: number | null;
+  numeroUcsComMmgd: number | null;
+  numeroUcsResidencial: number | null;
+  eDadoIlustrativo: boolean;
+  periodoReferencia: string | null;
+}
+
+/** Espelho de SetoresCensitariosResultado (GET /api/municipios/:codigoIbge/setores-censitarios). */
+export interface SetoresCensitariosResultado {
+  codigoIbge: string;
+  nomeMunicipio: string;
+  temGranularidadeFina: boolean;
+  avisoIlustrativo: string | null;
+  setores: SetorCensitario[];
+}
+
 export interface Paginacao {
   pagina: number;
   porPagina: number;

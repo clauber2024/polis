@@ -26,6 +26,19 @@ export interface IndicadorMapa {
   descricao?: string;
   /** Rampa sequencial claro→escuro, 5 classes (quebras por quantis em runtime). */
   cores: [string, string, string, string, string];
+  /**
+   * Metadado de proveniência exibido no tooltip de hover do mapa (adicionado
+   * 12/07/2026, inspirado no protótipo visual do AI Studio). Puramente
+   * apresentacional — mesmo espírito de `descricao` acima: não deriva de
+   * nenhum cálculo, é só rótulo estático por indicador para dar transparência
+   * de fonte/confiança ao usuário. 'Observado' = medição direta da fonte
+   * primária; 'Estimado' = índice/modelo calculado a partir de outras bases.
+   */
+  metadados?: {
+    natureza: 'Observado' | 'Estimado';
+    confianca: 'Alta' | 'Média' | 'Baixa';
+    fonte: string;
+  };
 }
 
 const RAMPA_AMBAR: IndicadorMapa['cores'] = ['#fef3c7', '#fcd34d', '#f59e0b', '#d97706', '#92400e'];
@@ -47,6 +60,7 @@ export const INDICADORES_MAPA: IndicadorMapa[] = [
       'Média climatológica de longo prazo (satélite, 1999–2015), não um ano ' +
       'específico. Fonte: Atlas Brasileiro de Energia Solar 2017, LABREN/CCST/INPE.',
     cores: RAMPA_AMBAR,
+    metadados: { natureza: 'Estimado', confianca: 'Alta', fonte: 'INPE — Atlas Brasileiro de Energia Solar (2017)' },
   },
   {
     id: 'mmgdResidencialPer1000Hab',
@@ -55,6 +69,7 @@ export const INDICADORES_MAPA: IndicadorMapa[] = [
     formato: 'numero',
     sentido: 'positivo',
     cores: RAMPA_AZUL,
+    metadados: { natureza: 'Observado', confianca: 'Alta', fonte: 'ANEEL/MMGD, cálculo próprio (per capita)' },
   },
   {
     id: 'mmgdPer1000Hab',
@@ -63,6 +78,7 @@ export const INDICADORES_MAPA: IndicadorMapa[] = [
     formato: 'numero',
     sentido: 'positivo',
     cores: RAMPA_AZUL,
+    metadados: { natureza: 'Observado', confianca: 'Alta', fonte: 'ANEEL/MMGD, cálculo próprio (per capita)' },
   },
   {
     id: 'ivs',
@@ -71,6 +87,7 @@ export const INDICADORES_MAPA: IndicadorMapa[] = [
     formato: 'numero',
     sentido: 'negativo',
     cores: RAMPA_VERMELHA,
+    metadados: { natureza: 'Estimado', confianca: 'Média', fonte: 'IPEA — Índice de Vulnerabilidade Social' },
   },
   {
     id: 'rendaMediaDomiciliar',
@@ -79,6 +96,7 @@ export const INDICADORES_MAPA: IndicadorMapa[] = [
     formato: 'moeda',
     sentido: 'positivo',
     cores: RAMPA_VERDE,
+    metadados: { natureza: 'Observado', confianca: 'Alta', fonte: 'IBGE — Censo Demográfico' },
   },
   {
     id: 'percentualPobrezaCadunico',
@@ -94,6 +112,7 @@ export const INDICADORES_MAPA: IndicadorMapa[] = [
       'extrema pobreza (critérios do próprio Cadastro) — não é percentual da ' +
       'população do município. Fonte: MDS/MI Social, dez/2025.',
     cores: RAMPA_VERMELHA,
+    metadados: { natureza: 'Observado', confianca: 'Alta', fonte: 'MDS/MI Social — Cadastro Único' },
   },
   {
     id: 'tarifaEnergiaResidencial',
@@ -102,6 +121,7 @@ export const INDICADORES_MAPA: IndicadorMapa[] = [
     formato: 'numero',
     sentido: 'negativo',
     cores: RAMPA_VERMELHA,
+    metadados: { natureza: 'Observado', confianca: 'Média', fonte: 'ANEEL — Tarifas Residenciais Homologadas' },
   },
   {
     id: 'taxaAlfabetizacao',
@@ -110,6 +130,7 @@ export const INDICADORES_MAPA: IndicadorMapa[] = [
     formato: 'percentual',
     sentido: 'positivo',
     cores: RAMPA_VERDE,
+    metadados: { natureza: 'Observado', confianca: 'Alta', fonte: 'IBGE — Censo Demográfico' },
   },
 ];
 

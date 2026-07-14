@@ -77,7 +77,7 @@ export function CartaoGestaoUsuarios() {
   }
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <section className="rounded border border-slate-200 bg-white p-4 shadow-2xs">
       <h2 className="text-base font-semibold text-slate-900">Gestão de usuários (RF-076)</h2>
       <p className="mb-3 text-xs text-slate-500">
         Cadastro de novos usuários continua fora de escopo (RF-070 mantém upload real fora da

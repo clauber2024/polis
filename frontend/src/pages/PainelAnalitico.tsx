@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   MINIMO_MUNICIPIOS,
   SeletorMunicipios,
 } from '../components/painel-analitico/SeletorMunicipios';
 import { TabelaComparacao, type ColunaMedia } from '../components/painel-analitico/TabelaComparacao';
 import { GraficoComparacao } from '../components/painel-analitico/GraficoComparacao';
+import { GraficoRadar } from '../components/painel-analitico/GraficoRadar';
+import { DiagnosticoComparacao } from '../components/painel-analitico/DiagnosticoComparacao';
 import {
   compararMunicipios,
   exportarComparacao,
@@ -17,16 +19,19 @@ import type {
   MunicipioComIndicadores,
 } from '../types/api';
 import { INDICADORES_COMPARAVEIS } from '../utils/indicadoresComparacao';
+import { gerarDiagnosticos } from '../utils/diagnosticosComparacao';
 
 /**
- * Painel Analítico / Cruzamento de Variáveis (RF-049, RF-050, RF-052).
+ * Painel Analítico / Cruzamento de Variáveis (RF-049 a RF-053).
  *
- * Escopo desta versão: seleção de indicadores (RF-049), comparação lado a
- * lado com tabela + gráfico (RF-050) e exportação CSV/XLSX (RF-052).
- * DELIBERADAMENTE FORA deste escopo (ver conversa que originou esta
- * implementação): RF-051 ("Gerar leitura analítica", texto-resumo
- * automático) e RF-053 (dispersão/série temporal) — ficam para uma sessão
- * futura, quando o formato dessas duas features for decidido.
+ * Escopo: seleção de indicadores (RF-049), comparação lado a lado com
+ * tabela + gráfico (RF-050), exportação CSV/XLSX (RF-052), leitura analítica
+ * automática por regras determinísticas (RF-051, 12/07/2026 — ver
+ * utils/diagnosticosComparacao.ts) e visão multidimensional em radar
+ * (RF-053, mesmo dia — ver components/painel-analitico/GraficoRadar.tsx).
+ * RF-053 "série temporal" segue fora de escopo — o backend só serve o
+ * snapshot mais recente de cada indicador (mesma limitação já documentada
+ * para RF-034/ranking por variação).
  */
 export function PainelAnalitico() {
   const [municipios, setMunicipios] = useState<MunicipioComIndicadores[]>([]);
@@ -217,6 +222,14 @@ export function PainelAnalitico() {
     setMunicipios((atuais) => atuais.filter((m) => !codigosSemClassificacao.includes(m.codigoIbge)));
   }
 
+  // RF-051: recalcula só quando resultado/indicadores/classificacoes mudam —
+  // a função em si é pura (utils/diagnosticosComparacao.ts), sem fetch.
+  const diagnostico = useMemo(
+    () => gerarDiagnosticos(resultado, indicadoresSelecionados, classificacoes),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [resultado, indicadoresIds, classificacoes],
+  );
+
   const colunasMedia: ColunaMedia[] = [
     { chave: 'nacional', rotulo: 'Média Nacional', medias: mediasNacionais?.medias ?? null },
     ...(regiaoComum
@@ -260,21 +273,30 @@ export function PainelAnalitico() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-6">
-      <h1 className="text-xl font-semibold text-slate-900">Painel Analítico</h1>
-      <p className="mt-1 text-sm text-slate-500">
-        Cruzamento de Variáveis: compare 2 a 10 municípios pelos indicadores do Atlas.
-      </p>
+    <div className="mx-auto max-w-5xl px-6 py-6 font-sans">
+      <div className="rounded border border-slate-200 bg-white p-6 shadow-2xs">
+        <span className="mb-1 inline-flex items-center gap-1.5 rounded bg-violet-50 px-2.5 py-1 font-mono text-[10px] font-bold tracking-wider text-violet-700 uppercase">
+          Análise Científica Multidimensional
+        </span>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Painel Analítico</h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Cruzamento de Variáveis: compare 2 a 10 municípios pelos indicadores do Atlas.
+        </p>
+      </div>
 
       <section className="mt-5">
-        <h2 className="text-sm font-semibold text-slate-700">Municípios</h2>
+        <h2 className="font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+          Municípios
+        </h2>
         <div className="mt-2">
           <SeletorMunicipios selecionados={municipios} aoMudarSelecionados={setMunicipios} />
         </div>
       </section>
 
       <section className="mt-5">
-        <h2 className="text-sm font-semibold text-slate-700">Indicadores</h2>
+        <h2 className="font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+          Indicadores
+        </h2>
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
           {INDICADORES_COMPARAVEIS.map((indicador) => (
             <label key={indicador.id} className="flex items-center gap-2 text-sm text-slate-700">
@@ -320,7 +342,9 @@ export function PainelAnalitico() {
           <section className="mt-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-semibold text-slate-700">Tabela comparativa</h2>
+                <h2 className="font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                  Tabela comparativa
+                </h2>
                 <p className="text-xs text-slate-400">
                   Colunas em itálico são médias de referência — nacional sempre; a regional e a
                   estadual só aparecem quando todos os municípios comparados são da mesma região ou
@@ -379,7 +403,9 @@ export function PainelAnalitico() {
           </section>
 
           <section className="mt-6">
-            <h2 className="text-sm font-semibold text-slate-700">Gráfico comparativo</h2>
+            <h2 className="font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+              Gráfico comparativo
+            </h2>
             <div className="mt-2">
               <GraficoComparacao
                 municipios={resultado}
@@ -388,6 +414,17 @@ export function PainelAnalitico() {
               />
             </div>
           </section>
+
+          <section className="mt-6 rounded border border-slate-200 bg-white p-6 shadow-2xs">
+            <h2 className="font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+              Visão multidimensional (radar)
+            </h2>
+            <div className="mt-3">
+              <GraficoRadar municipios={resultado} indicadores={indicadoresSelecionados} />
+            </div>
+          </section>
+
+          <DiagnosticoComparacao diagnostico={diagnostico} />
         </>
       )}
     </div>
