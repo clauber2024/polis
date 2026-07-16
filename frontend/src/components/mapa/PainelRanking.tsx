@@ -33,13 +33,16 @@ interface PainelRankingProps {
   carregandoVazios: boolean;
   aoSelecionarMunicipio: (codigoIbge: string) => void;
   /**
-   * Chamado quando o usuário escolhe uma UF (recebe a sigla) — a PaginaMapa
-   * usa isso para (1) disparar o fetch lazy da classificação de Vazios
-   * (badges RF-032; antes o gatilho era "abrir o painel", que não existe mais
-   * com a sidebar em abas) e (2) enquadrar o estado no mapa (foco por UF,
-   * 14/07/2026).
+   * UF selecionada, controlada pela PaginaMapa — permite que o clique num
+   * estado no mapa (RF-027) atualize o ranking sem duplicar estado.
    */
-  aoEscolherUf?: (uf: string) => void;
+  ufSelecionada: string;
+  /**
+   * Chamado quando o usuário escolhe uma UF (recebe a sigla, ou '' para
+   * limpar) — a PaginaMapa sincroniza com o destaque do mapa, o foco e o
+   * fetch lazy de Vazios de Acesso.
+   */
+  aoEscolherUf: (uf: string) => void;
 }
 
 interface ItemRanking {
@@ -56,9 +59,10 @@ export function PainelRanking({
   codigosVazios,
   carregandoVazios,
   aoSelecionarMunicipio,
+  ufSelecionada,
   aoEscolherUf,
 }: PainelRankingProps) {
-  const [uf, setUf] = useState('');
+  const uf = ufSelecionada;
   const [filtroNome, setFiltroNome] = useState('');
   const [ordem, setOrdem] = useState<'desc' | 'asc'>('desc');
 
@@ -123,10 +127,8 @@ export function PainelRanking({
           aria-label="Estado do ranking"
           value={uf}
           onChange={(evento) => {
-            setUf(evento.target.value);
-            // Chamado também com '' (voltar para "Selecione…") — a página usa
-            // isso para LIMPAR o destaque do estado no mapa.
-            aoEscolherUf?.(evento.target.value);
+            // '' → "Selecione…" limpa o destaque do estado no mapa.
+            aoEscolherUf(evento.target.value);
           }}
           className="mb-2 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-800"
         >

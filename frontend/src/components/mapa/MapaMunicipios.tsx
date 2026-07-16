@@ -61,6 +61,7 @@ const CAMADA_CONTORNO = 'municipios-contorno';
 const CAMADA_DESTAQUE = 'vazios-destaque';
 const CAMADA_HEATMAP = 'vazios-heatmap';
 const CAMADA_ESTADOS = 'estados-contorno';
+const CAMADA_ESTADOS_FILL = 'estados-fill';
 const CAMADA_ESTADO_DESTACADO = 'estado-destacado';
 const CAMADA_MUNICIPIO_DESTACADO = 'municipio-destacado';
 const FONTE_ROTULOS_ESTADOS = 'estados-rotulos';
@@ -80,6 +81,16 @@ const URL_GLYPHS = 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf'
 
 /** Zoom a partir do qual os rótulos de município começam a aparecer. */
 const ZOOM_MINIMO_ROTULOS = 6;
+
+/**
+ * Zoom que separa "selecionar estado" de "selecionar município":
+ * - zoom < ZOOM_CLIQUE_ESTADO: clicar no mapa seleciona a UF (RF-027)
+ * - zoom ≥ ZOOM_CLIQUE_ESTADO: clicar seleciona o município
+ * Alinhado com ZOOM_MINIMO_ROTULOS — quando os nomes dos municípios entram,
+ * faz sentido clicar em município; quando só os nomes dos estados aparecem,
+ * faz sentido clicar em estado.
+ */
+const ZOOM_CLIQUE_ESTADO = ZOOM_MINIMO_ROTULOS;
 
 /**
  * Zoom até o qual os rótulos de ESTADO aparecem — complementar ao dos
@@ -155,6 +166,12 @@ interface MapaMunicipiosProps {
    * município completo a partir do GeoJSON original.
    */
   aoClicarMunicipio: (codigoIbge: string) => void;
+  /**
+   * Chamado quando o usuário clica num estado no mapa (RF-027) — recebe a
+   * sigla da UF. Só ativo abaixo de ZOOM_CLIQUE_ESTADO (visão nacional);
+   * acima desse zoom, clicar seleciona município.
+   */
+  aoClicarEstado?: (uf: string) => void;
 }
 
 function expressaoChoropleth(
@@ -187,14 +204,17 @@ export function MapaMunicipios({
   codigoDestacado,
   codigosVisiveis,
   aoClicarMunicipio,
+  aoClicarEstado,
 }: MapaMunicipiosProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapaRef = useRef<MapaMapLibre | null>(null);
   const [mapaCarregado, setMapaCarregado] = useState(false);
-  // Ref para o callback — os handlers do MapLibre são registrados uma única
+  // Refs para os callbacks — handlers do MapLibre são registrados uma única
   // vez; sem isso capturariam a primeira versão do closure (stale closure).
   const aoClicarRef = useRef(aoClicarMunicipio);
   aoClicarRef.current = aoClicarMunicipio;
+  const aoClicarEstadoRef = useRef(aoClicarEstado);
+  aoClicarEstadoRef.current = aoClicarEstado;
 
   // Tooltip de hover (adicionado 12/07/2026, inspirado no protótipo visual do
   // AI Studio) — só apresentação, mesmo princípio do resto do componente: o
@@ -268,6 +288,10 @@ export function MapaMunicipios({
     mapa.on('load', () => setMapaCarregado(true));
 
     mapa.on('click', CAMADA_PREENCHIMENTO, (evento) => {
+      // Abaixo do limiar de zoom, o click seleciona a UF (via CAMADA_ESTADOS_FILL);
+      // acima, seleciona o município. Os dois handlers coexistem — o zoom é o
+      // único árbitro (CAMADA_ESTADOS_FILL tem maxzoom: ZOOM_CLIQUE_ESTADO).
+      if (mapa.getZoom() < ZOOM_CLIQUE_ESTADO) return;
       const codigoIbge = evento.features?.[0]?.properties?.codigoIbge;
       if (typeof codigoIbge === 'string') {
         aoClicarRef.current(codigoIbge);
@@ -471,6 +495,32 @@ export function MapaMunicipios({
       type: 'geojson',
       data: estados as unknown as GeoJSON.GeoJSON,
     });
+
+    // Fill transparente para detecção de clique em estado (RF-027) — só
+    // renderiza abaixo de ZOOM_CLIQUE_ESTADO (mesma régua dos rótulos de
+    // estado). Opacity 0.001: MapLibre não dispara eventos de ponteiro em
+    // layers com opacity 0; este valor é imperceptível ao olho.
+    mapa.addLayer(
+      {
+        id: CAMADA_ESTADOS_FILL,
+        type: 'fill',
+        source: FONTE_ESTADOS,
+        maxzoom: ZOOM_CLIQUE_ESTADO,
+        paint: { 'fill-color': '#000000', 'fill-opacity': 0.001 },
+      },
+      mapa.getLayer(CAMADA_DESTAQUE) ? CAMADA_DESTAQUE : undefined,
+    );
+    mapa.on('click', CAMADA_ESTADOS_FILL, (evento) => {
+      const uf = evento.features?.[0]?.properties?.uf;
+      if (typeof uf === 'string') aoClicarEstadoRef.current?.(uf);
+    });
+    mapa.on('mouseenter', CAMADA_ESTADOS_FILL, () => {
+      mapa.getCanvas().style.cursor = 'pointer';
+    });
+    mapa.on('mouseleave', CAMADA_ESTADOS_FILL, () => {
+      mapa.getCanvas().style.cursor = '';
+    });
+
     mapa.addLayer(
       {
         id: CAMADA_ESTADOS,

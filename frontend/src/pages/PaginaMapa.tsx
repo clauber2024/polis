@@ -60,8 +60,11 @@ export function PaginaMapa() {
   // lazy dos badges de vazio (RF-032) migrou de "abrir o ranking" para
   // "escolher uma UF" (prop aoEscolherUf do PainelRanking).
   const [abaSidebar, setAbaSidebar] = useState<'ranking' | 'filtros'>('ranking');
-  // UF com contorno destacado no mapa (15/07/2026) — segue a última UF
-  // escolhida no ranking OU no filtro; '' limpa.
+  // UF selecionada no ranking — prop controlada do PainelRanking (RF-027:
+  // o clique num estado no mapa também precisa atualizar o dropdown do ranking,
+  // o que exige que o estado viva aqui e não dentro do PainelRanking).
+  const [ufRanking, setUfRanking] = useState('');
+  // UF com contorno destacado no mapa — segue ufRanking OU o filtro do painel.
   const [ufDestacada, setUfDestacada] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -291,11 +294,27 @@ export function PaginaMapa() {
     );
   }, [codigoBuscado, dados, municipioPorCodigo, setSearchParams]);
 
-  // RF-035: clicar num item do ranking = mesma mecânica da busca do header
-  // (abre o painel de detalhe e enquadra o município no mapa).
+  // RF-035: clicar num item do ranking = mesma mecânica da busca do header.
   function aoSelecionarDoRanking(codigoIbge: string) {
     setMunicipioSelecionado(municipioPorCodigo.get(codigoIbge) ?? null);
     setFoco({ codigoIbge });
+  }
+
+  // Escolher UF — compartilhado pelo PainelRanking (dropdown) e pelo clique
+  // no estado do mapa (RF-027). Atualiza ranking, destaque e foco do mapa.
+  function aoEscolherUfRanking(uf: string) {
+    setUfRanking(uf);
+    setUfDestacada(uf);
+    if (uf) {
+      garantirVaziosCarregados();
+      setFoco({ uf });
+    }
+  }
+
+  // RF-027/028: click num estado no mapa → seleciona UF + troca para aba Ranking.
+  function aoClicarEstadoNoMapa(uf: string) {
+    aoEscolherUfRanking(uf);
+    setAbaSidebar('ranking');
   }
 
   return (
@@ -419,13 +438,8 @@ export function PaginaMapa() {
                 codigosVazios={codigosVazios}
                 carregandoVazios={carregandoVazios}
                 aoSelecionarMunicipio={aoSelecionarDoRanking}
-                aoEscolherUf={(uf) => {
-                  setUfDestacada(uf);
-                  if (uf) {
-                    garantirVaziosCarregados();
-                    setFoco({ uf }); // enquadra o estado no mapa (14/07/2026)
-                  }
-                }}
+                ufSelecionada={ufRanking}
+                aoEscolherUf={aoEscolherUfRanking}
               />
             ) : (
               <PainelFiltrosDashboard
@@ -466,6 +480,7 @@ export function PaginaMapa() {
             aoClicarMunicipio={(codigoIbge) =>
               setMunicipioSelecionado(municipioPorCodigo.get(codigoIbge) ?? null)
             }
+            aoClicarEstado={aoClicarEstadoNoMapa}
           />
 
           {/* Legenda — no modo heatmap (RF-057) o painel do heatmap substitui a
