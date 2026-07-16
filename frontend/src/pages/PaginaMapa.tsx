@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   MapaMunicipios,
-  type FocoMunicipio,
+  type FocoMapa,
   type PontosHeatmap,
 } from '../components/mapa/MapaMunicipios';
 import { Legenda } from '../components/mapa/Legenda';
@@ -11,6 +11,8 @@ import { PainelHeatmapVazios } from '../components/mapa/PainelHeatmapVazios';
 import { PainelMunicipio } from '../components/mapa/PainelMunicipio';
 import { PainelRanking } from '../components/mapa/PainelRanking';
 import { buscarGeoJsonNacional } from '../services/municipios.service';
+import { buscarEstadosGeoJson } from '../services/estados.service';
+import type { EstadosGeoJson } from '../types/api';
 import {
   buscarTodosVaziosDeAcesso,
   type VaziosDeAcessoCompleto,
@@ -38,6 +40,7 @@ export function PaginaMapa() {
   const [dados, setDados] = useState<FeatureCollectionMunicipios | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
+  const [estados, setEstados] = useState<EstadosGeoJson | null>(null);
 
   const [indicadorId, setIndicadorId] = useState(INDICADORES_MAPA[0].id);
   const indicador = INDICADORES_MAPA.find((i) => i.id === indicadorId) ?? INDICADORES_MAPA[0];
@@ -50,15 +53,22 @@ export function PaginaMapa() {
 
   const [municipioSelecionado, setMunicipioSelecionado] =
     useState<MunicipioComIndicadores | null>(null);
-  const [foco, setFoco] = useState<FocoMunicipio | null>(null);
-  const [rankingAberto, setRankingAberto] = useState(false);
+  const [foco, setFoco] = useState<FocoMapa | null>(null);
+  // Sidebar em abas (Ranking | Filtros), sempre visível — layout de 3 colunas
+  // do protótipo AI Studio (13/07/2026). Substitui os antigos painéis
+  // mutuamente exclusivos abertos por botões flutuantes sobre o mapa; o fetch
+  // lazy dos badges de vazio (RF-032) migrou de "abrir o ranking" para
+  // "escolher uma UF" (prop aoEscolherUf do PainelRanking).
+  const [abaSidebar, setAbaSidebar] = useState<'ranking' | 'filtros'>('ranking');
+  // UF com contorno destacado no mapa (15/07/2026) — segue a última UF
+  // escolhida no ranking OU no filtro; '' limpa.
+  const [ufDestacada, setUfDestacada] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Filtros do Dashboard Público (RF-046) + download (RF-047). Painel
   // controlado (ver PainelFiltrosDashboard.tsx) — os valores moram aqui
   // porque o cálculo de codigosVisiveis (abaixo) precisa deles junto com
   // `dados`, que também mora nesta página.
-  const [filtrosAberto, setFiltrosAberto] = useState(false);
   const [filtroUf, setFiltroUf] = useState('');
   const [filtroRegiao, setFiltroRegiao] = useState('');
   const [filtroPotenciaMin, setFiltroPotenciaMin] = useState('');
@@ -77,6 +87,24 @@ export function PaginaMapa() {
       })
       .finally(() => {
         if (ativo) setCarregando(false);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, []);
+
+  // Contornos estaduais (camada de referência, 14/07/2026) — busca em
+  // paralelo com o GeoJSON nacional; falha é silenciosa de propósito (o mapa
+  // funciona sem a camada; a primeira chamada pode demorar alguns segundos
+  // enquanto o backend calcula o ST_Union e aquece o cache).
+  useEffect(() => {
+    let ativo = true;
+    buscarEstadosGeoJson()
+      .then((resultado) => {
+        if (ativo) setEstados(resultado);
+      })
+      .catch(() => {
+        // Sem camada de estados — não bloqueia nada.
       });
     return () => {
       ativo = false;
@@ -233,14 +261,6 @@ export function PaginaMapa() {
     setFiltroPotenciaMax('');
   }
 
-  // Ranking (RF-030) e Filtros (RF-046) são dois painéis laterais do mesmo
-  // tamanho — mantidos mutuamente exclusivos para não disputar espaço à
-  // esquerda do mapa.
-  function alternarFiltros() {
-    setFiltrosAberto((aberto) => !aberto);
-    setRankingAberto(false);
-  }
-
   // Índice codigoIbge → município do GeoJSON original: o clique no mapa só
   // devolve o código (as properties do feature perdem os nulos na conversão
   // interna do MapLibre para tile vetorial — ver MapaMunicipios).
@@ -279,133 +299,176 @@ export function PaginaMapa() {
   }
 
   return (
-    <div className="relative flex h-full">
-      {rankingAberto && dados && (
-        <PainelRanking
-          municipios={listaMunicipios}
-          indicador={indicador}
-          codigosVazios={codigosVazios}
-          carregandoVazios={carregandoVazios}
-          aoSelecionarMunicipio={aoSelecionarDoRanking}
-          aoFechar={() => setRankingAberto(false)}
-        />
-      )}
+    <div className="flex h-full flex-col">
+      {/* Sub-header de indicador e camadas — padrão do protótipo AI Studio:
+          seletor + nota científica do indicador + toggles de Vazios. */}
+      <section className="shrink-0 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <label
+              htmlFor="seletor-indicador"
+              className="mb-1 block font-mono text-[10px] font-semibold tracking-wider text-slate-500 uppercase"
+            >
+              Indicador de Distribuição Espacial
+            </label>
+            <select
+              id="seletor-indicador"
+              value={indicador.id}
+              onChange={(evento) =>
+                setIndicadorId(evento.target.value as (typeof INDICADORES_MAPA)[number]['id'])
+              }
+              className="w-full cursor-pointer rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-800 focus:bg-white focus:ring-1 focus:ring-violet-600 focus:outline-none sm:w-80"
+            >
+              {INDICADORES_MAPA.map((opcao) => (
+                <option key={opcao.id} value={opcao.id}>
+                  {opcao.rotulo}
+                </option>
+              ))}
+            </select>
+          </div>
 
-      {filtrosAberto && dados && (
-        <PainelFiltrosDashboard
-          ufs={ufsDisponiveis}
-          regioes={regioesDisponiveis}
-          uf={filtroUf}
-          regiao={filtroRegiao}
-          potenciaMin={filtroPotenciaMin}
-          potenciaMax={filtroPotenciaMax}
-          totalVisiveis={codigosVisiveis?.length ?? listaMunicipios.length}
-          totalMunicipios={listaMunicipios.length}
-          aoMudarUf={setFiltroUf}
-          aoMudarRegiao={setFiltroRegiao}
-          aoMudarPotenciaMin={setFiltroPotenciaMin}
-          aoMudarPotenciaMax={setFiltroPotenciaMax}
-          aoLimparFiltros={limparFiltrosDashboard}
-          aoFechar={() => setFiltrosAberto(false)}
-        />
-      )}
-
-      <div className="relative min-w-0 flex-1">
-        <MapaMunicipios
-          dados={dados}
-          indicador={indicador}
-          quebras={quebras}
-          codigosDestaque={codigosDestaque}
-          pontosHeatmap={pontosHeatmap}
-          foco={foco}
-          codigosVisiveis={codigosVisiveis}
-          aoClicarMunicipio={(codigoIbge) =>
-            setMunicipioSelecionado(municipioPorCodigo.get(codigoIbge) ?? null)
-          }
-        />
-
-        {/* Controles */}
-        <div className="absolute top-4 left-4 w-72 rounded-lg border border-slate-200 bg-white/95 p-3 shadow">
-          <label htmlFor="seletor-indicador" className="mb-1 block text-xs font-semibold text-slate-600">
-            Indicador do mapa
-          </label>
-          <select
-            id="seletor-indicador"
-            value={indicador.id}
-            onChange={(evento) =>
-              setIndicadorId(evento.target.value as (typeof INDICADORES_MAPA)[number]['id'])
-            }
-            className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-800"
-          >
-            {INDICADORES_MAPA.map((opcao) => (
-              <option key={opcao.id} value={opcao.id}>
-                {opcao.rotulo}
-              </option>
-            ))}
-          </select>
-
-          <button
-            type="button"
-            onClick={() => {
-              setRankingAberto((aberto) => !aberto);
-              setFiltrosAberto(false);
-              if (!rankingAberto) garantirVaziosCarregados();
-            }}
-            className="mt-3 w-full rounded border border-slate-300 px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
-          >
-            {rankingAberto ? 'Fechar ranking estadual' : 'Ranking estadual'}
-          </button>
-
-          <button
-            type="button"
-            onClick={alternarFiltros}
-            className="mt-2 w-full rounded border border-slate-300 px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
-          >
-            {filtrosAberto ? 'Fechar filtros' : 'Filtros (Dashboard Público)'}
-          </button>
-          {filtrosDashboardAtivos && !filtrosAberto && (
-            <p className="mt-1 text-xs text-amber-600">
-              Filtro ativo: {codigosVisiveis?.length ?? 0} de {listaMunicipios.length} municípios
-              visíveis.
-            </p>
+          {/* Esclarecimento metodológico do indicador ativo (quando houver —
+              irradiação e CadÚnico EXIGEM contextualização, ver indicadores.ts). */}
+          {indicador.descricao && (
+            <div className="min-w-0 max-w-xl flex-1 md:mx-6">
+              <span className="block font-mono text-[10px] font-semibold text-violet-700 uppercase">
+                Nota Científica
+              </span>
+              <p className="text-[11px] leading-normal text-slate-500">{indicador.descricao}</p>
+            </div>
           )}
 
-          <label className="mt-3 flex items-center gap-2 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              checked={destaqueLigado}
-              onChange={(evento) => aoAlternarDestaque(evento.target.checked)}
-              className="h-4 w-4"
-            />
-            Destacar Vazios de Acesso
-            {carregandoVazios && <span className="text-xs text-slate-400">carregando…</span>}
-          </label>
-
-          <label className="mt-2 flex items-center gap-2 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              checked={heatmapLigado}
-              onChange={(evento) => aoAlternarHeatmap(evento.target.checked)}
-              className="h-4 w-4"
-            />
-            Heatmap de Vazios de Acesso
-          </label>
-          {heatmapLigado && (
-            <p className="mt-1 text-xs text-slate-400">
-              O indicador do mapa fica esmaecido enquanto o heatmap está ativo.
-            </p>
-          )}
-
-          {erroVazios && <p className="mt-1 text-xs text-red-600">{erroVazios}</p>}
-          {(destaqueLigado || heatmapLigado) && vazios && vazios.avisos.totalPrecisaReextrairMmgd > 0 && (
-            <p className="mt-1 text-xs text-amber-600">
-              {vazios.avisos.totalPrecisaReextrairMmgd.toLocaleString('pt-BR')} municípios fora da
-              classificação (MMGD residencial pendente de re-extração — ver CLAUDE.md).
-            </p>
-          )}
+          <div className="flex shrink-0 items-center gap-4">
+            <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+              <input
+                type="checkbox"
+                checked={destaqueLigado}
+                onChange={(evento) => aoAlternarDestaque(evento.target.checked)}
+                className="h-4 w-4"
+              />
+              Destacar Vazios de Acesso
+              {carregandoVazios && <span className="text-slate-400">carregando…</span>}
+            </label>
+            <button
+              type="button"
+              onClick={() => aoAlternarHeatmap(!heatmapLigado)}
+              className={`flex items-center gap-1.5 rounded-lg border px-4 py-2.5 text-xs font-semibold shadow-xs transition-all ${
+                heatmapLigado
+                  ? 'border-violet-700 bg-violet-600 text-white'
+                  : 'border-violet-200 bg-white text-violet-700 hover:bg-violet-50'
+              }`}
+            >
+              {heatmapLigado ? 'Ver Mapa Normal' : 'Modo Vazios de Acesso (Heatmap)'}
+            </button>
+          </div>
         </div>
 
-        {/* Legenda — no modo heatmap (RF-057) o painel do heatmap substitui a
+        {/* Avisos operacionais do sub-header */}
+        {heatmapLigado && (
+          <p className="mt-2 text-xs text-slate-400">
+            O indicador do mapa fica esmaecido enquanto o heatmap está ativo.
+          </p>
+        )}
+        {erroVazios && <p className="mt-2 text-xs text-red-600">{erroVazios}</p>}
+        {(destaqueLigado || heatmapLigado) && vazios && vazios.avisos.totalPrecisaReextrairMmgd > 0 && (
+          <p className="mt-2 text-xs text-amber-600">
+            {vazios.avisos.totalPrecisaReextrairMmgd.toLocaleString('pt-BR')} municípios fora da
+            classificação (MMGD residencial pendente de re-extração — ver CLAUDE.md).
+          </p>
+        )}
+        {filtrosDashboardAtivos && abaSidebar !== 'filtros' && (
+          <p className="mt-2 text-xs text-amber-600">
+            Filtro ativo: {codigosVisiveis?.length ?? 0} de {listaMunicipios.length} municípios
+            visíveis.
+          </p>
+        )}
+      </section>
+
+      <div className="flex min-h-0 flex-1">
+        {/* Sidebar em abas: Ranking (RF-030 a RF-036) | Filtros (RF-046/047) */}
+        <aside className="flex w-80 shrink-0 flex-col border-r border-slate-200 bg-white">
+          <div className="flex gap-1 border-b border-slate-100 bg-slate-50 p-1">
+            <button
+              type="button"
+              onClick={() => setAbaSidebar('ranking')}
+              className={`flex-1 rounded-md py-2 text-xs font-semibold transition-all ${
+                abaSidebar === 'ranking'
+                  ? 'border border-slate-200/60 bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              Ranking estadual
+            </button>
+            <button
+              type="button"
+              onClick={() => setAbaSidebar('filtros')}
+              className={`flex-1 rounded-md py-2 text-xs font-semibold transition-all ${
+                abaSidebar === 'filtros'
+                  ? 'border border-slate-200/60 bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              Filtros do Mapa
+            </button>
+          </div>
+          <div className="min-h-0 flex-1">
+            {abaSidebar === 'ranking' ? (
+              <PainelRanking
+                municipios={listaMunicipios}
+                indicador={indicador}
+                codigosVazios={codigosVazios}
+                carregandoVazios={carregandoVazios}
+                aoSelecionarMunicipio={aoSelecionarDoRanking}
+                aoEscolherUf={(uf) => {
+                  setUfDestacada(uf);
+                  if (uf) {
+                    garantirVaziosCarregados();
+                    setFoco({ uf }); // enquadra o estado no mapa (14/07/2026)
+                  }
+                }}
+              />
+            ) : (
+              <PainelFiltrosDashboard
+                ufs={ufsDisponiveis}
+                regioes={regioesDisponiveis}
+                uf={filtroUf}
+                regiao={filtroRegiao}
+                potenciaMin={filtroPotenciaMin}
+                potenciaMax={filtroPotenciaMax}
+                totalVisiveis={codigosVisiveis?.length ?? listaMunicipios.length}
+                totalMunicipios={listaMunicipios.length}
+                aoMudarUf={(uf) => {
+                  setFiltroUf(uf);
+                  setUfDestacada(uf);
+                  if (uf) setFoco({ uf }); // mesma UX do ranking: escolher UF enquadra o estado
+                }}
+                aoMudarRegiao={setFiltroRegiao}
+                aoMudarPotenciaMin={setFiltroPotenciaMin}
+                aoMudarPotenciaMax={setFiltroPotenciaMax}
+                aoLimparFiltros={limparFiltrosDashboard}
+              />
+            )}
+          </div>
+        </aside>
+
+        <div className="relative min-w-0 flex-1">
+          <MapaMunicipios
+            dados={dados}
+            indicador={indicador}
+            quebras={quebras}
+            codigosDestaque={codigosDestaque}
+            pontosHeatmap={pontosHeatmap}
+            foco={foco}
+            estados={estados}
+            ufDestacada={ufDestacada || null}
+            codigoDestacado={municipioSelecionado?.codigoIbge ?? null}
+            codigosVisiveis={codigosVisiveis}
+            aoClicarMunicipio={(codigoIbge) =>
+              setMunicipioSelecionado(municipioPorCodigo.get(codigoIbge) ?? null)
+            }
+          />
+
+          {/* Legenda — no modo heatmap (RF-057) o painel do heatmap substitui a
             legenda do choropleth (modo exclusivo: o choropleth está esmaecido). */}
         <div className="absolute bottom-6 left-4">
           {heatmapLigado && vazios ? (
@@ -444,12 +507,13 @@ export function PaginaMapa() {
         )}
       </div>
 
-      {municipioSelecionado && (
-        <PainelMunicipio
-          municipio={municipioSelecionado}
-          aoFechar={() => setMunicipioSelecionado(null)}
-        />
-      )}
+        {municipioSelecionado && (
+          <PainelMunicipio
+            municipio={municipioSelecionado}
+            aoFechar={() => setMunicipioSelecionado(null)}
+          />
+        )}
+      </div>
     </div>
   );
 }

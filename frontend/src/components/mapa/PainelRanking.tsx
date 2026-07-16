@@ -32,7 +32,14 @@ interface PainelRankingProps {
   codigosVazios: ReadonlySet<string> | null;
   carregandoVazios: boolean;
   aoSelecionarMunicipio: (codigoIbge: string) => void;
-  aoFechar: () => void;
+  /**
+   * Chamado quando o usuário escolhe uma UF (recebe a sigla) — a PaginaMapa
+   * usa isso para (1) disparar o fetch lazy da classificação de Vazios
+   * (badges RF-032; antes o gatilho era "abrir o painel", que não existe mais
+   * com a sidebar em abas) e (2) enquadrar o estado no mapa (foco por UF,
+   * 14/07/2026).
+   */
+  aoEscolherUf?: (uf: string) => void;
 }
 
 interface ItemRanking {
@@ -49,7 +56,7 @@ export function PainelRanking({
   codigosVazios,
   carregandoVazios,
   aoSelecionarMunicipio,
-  aoFechar,
+  aoEscolherUf,
 }: PainelRankingProps) {
   const [uf, setUf] = useState('');
   const [filtroNome, setFiltroNome] = useState('');
@@ -102,30 +109,25 @@ export function PainelRanking({
   const corDestaque = indicador.cores[3];
 
   return (
-    <aside className="flex h-full w-80 flex-col border-r border-slate-200 bg-white shadow-xs">
+    <div className="flex h-full flex-col bg-white">
       <div className="border-b border-slate-100 bg-slate-50 p-3">
-        <div className="mb-2 flex items-start justify-between gap-2">
-          <div>
-            <span className="block font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
-              Ordenação Prioritária
-            </span>
-            <h2 className="text-sm font-semibold text-slate-900">Ranking estadual</h2>
-            <p className="text-xs text-slate-500">{indicador.rotulo}</p>
-          </div>
-          <button
-            type="button"
-            onClick={aoFechar}
-            aria-label="Fechar ranking"
-            className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-          >
-            ✕
-          </button>
+        <div className="mb-2">
+          <span className="block font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+            Ordenação Prioritária
+          </span>
+          <h2 className="text-sm font-semibold text-slate-900">Ranking estadual</h2>
+          <p className="text-xs text-slate-500">{indicador.rotulo}</p>
         </div>
 
         <select
           aria-label="Estado do ranking"
           value={uf}
-          onChange={(evento) => setUf(evento.target.value)}
+          onChange={(evento) => {
+            setUf(evento.target.value);
+            // Chamado também com '' (voltar para "Selecione…") — a página usa
+            // isso para LIMPAR o destaque do estado no mapa.
+            aoEscolherUf?.(evento.target.value);
+          }}
           className="mb-2 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-800"
         >
           <option value="">Selecione um estado…</option>
@@ -229,6 +231,6 @@ export function PainelRanking({
           {carregandoVazios && ' · carregando badges…'}
         </p>
       )}
-    </aside>
+    </div>
   );
 }

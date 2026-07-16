@@ -483,6 +483,123 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   já documentado acima). VALIDADO no ambiente do usuário em 13/07/2026
   (`make front-typecheck` limpo + teste manual: download do PDF num
   município qualquer, expansão do detalhamento em São Paulo).
+- **Frontend — adaptação de layout do protótipo AI Studio, fases 2/3
+  (14/07/2026):** o usuário gerou um protótipo visual no Google AI Studio
+  (repo `clauber2024/Atlas-Solar` no GitHub — Gemini, dados 100% mockados,
+  mapa D3 com 18 municípios-ponto) e pediu para adaptar o layout de lá ao
+  frontend real. Decisão de escopo (usuário): adotar SÓ o visual/estrutura
+  de telas; NUNCA a substância fabricada pelo Gemini — em particular o
+  "Índice de Vazio de Acesso 0-100 com pesos 35/30/20/15" do protótipo é
+  INVENTADO (a metodologia real segue sendo medianas nacionais + exclusões,
+  no backend), assim como "esforço energético", "cobertura estimada" e o
+  threshold "GHI > 5.0". Implementado nesta sessão: (1) header do
+  `LayoutApp` (App.tsx) — logo com quadrado violeta + subtítulo mono, abas
+  com `NavLink` (sublinhado violeta na rota ativa), links de Painel
+  Colaborador/Admin como badges âmbar/vermelho; (2) `PaginaMapa`
+  reestruturada no padrão de 3 colunas do protótipo — sub-header (seletor
+  de indicador com label mono + "Nota Científica" exibindo
+  `indicador.descricao` + toggle de heatmap em botão violeta + checkbox de
+  destaque + avisos operacionais) e corpo `flex` com sidebar fixa em ABAS
+  (Ranking | Filtros, substituindo os painéis mutuamente exclusivos
+  abertos por botões flutuantes sobre o mapa) + mapa + `PainelMunicipio`
+  como coluna direita (inalterado); (3) `PainelRanking`/
+  `PainelFiltrosDashboard` viraram conteúdo de aba — perderam `aoFechar`/
+  largura própria; o fetch lazy dos badges de vazio (RF-032) migrou de
+  "abrir o ranking" para "escolher uma UF" (nova prop `aoEscolherUf`).
+  MapLibre, deep links (`?municipio=`), classificação de vazios no backend
+  e notas de ausência: intocados.
+  **Divergências de documentação encontradas nesta sessão** (mesma classe
+  do alerta de 10/07): (a) a "fase 1" dessa adaptação (fontes
+  Inter/Space Grotesk/JetBrains Mono + tokens no `index.css`) e o restyle
+  da landing/painéis JÁ estavam feitos e commitados por sessão de
+  12/07/2026 que não atualizou este arquivo; (b) a rota e página
+  `/ranking-distribuidoras` (`PaginaRankingDistribuidoras.tsx`) não tinha
+  registro aqui — reconstituída via `docs/PLANO_ATUAL.md` (versão anterior
+  a 14/07): é o frontend da tarefa "ranking público de distribuidoras" de
+  10/07/2026 (migration 0026 + `GET /api/ranking-distribuidoras`, backend
+  validado); o `make front-typecheck` daquela página constava como
+  pendente lá — cobre-se junto com a validação desta sessão.
+  Complemento na mesma sessão (pedido do usuário): **zoom por estado** —
+  escolher UF no ranking OU no filtro enquadra o estado no mapa;
+  `FocoMunicipio` virou `FocoMapa` (`{ codigoIbge } | { uf }`), bbox da UF =
+  união dos bboxes dos municípios dela (GeoJSON já carregado).
+  VALIDADO no ambiente do usuário em 14/07/2026 (`make front-typecheck` +
+  teste manual do roteiro completo, confirmado pelo usuário).
+- **Frontend — ideias do protótipo `atlas-mmgd-solar` (14/07/2026, mesma
+  sessão da adaptação de layout):** segundo protótipo do usuário (gerado
+  com Manus — stack MySQL/tRPC/Google Maps NÃO adotada, conflita com o
+  padrão do projeto; só as ideias de produto). Decisões do usuário: manter
+  o header superior (NÃO migrar para a sidebar escura do protótipo) e
+  implementar 3 features: (1) **scatter de quadrantes** no Painel Analítico
+  (`GraficoQuadrantes.tsx`, SVG próprio, sem lib nova) — com os EIXOS REAIS
+  da metodologia (irradiação × MMGD residencial per capita, medianas do
+  backend), NÃO o "MMGD × IVS" do protótipo (IVS é priorização RF-056, não
+  eixo); classificação município a município 100% do backend via
+  `buscarClassificacaoNacionalCompleta()` (paginação completa, ~28
+  requisições, LAZY por botão), eixo Y truncado no p97,5 só para exibição
+  (aviso explícito); (2) **ranking nacional de Vazios de Acesso**
+  (`PaginaVaziosDeAcesso.tsx`, rota `/vazios-de-acesso`) — paginação
+  server-side na ordenação de priorização padrão do backend (IVS
+  decrescente), filtro por UF, nota metodológica sempre visível; (3)
+  **status das bases** (`PaginaStatusDados.tsx`, rota `/status-dados`) —
+  primeira interface do RF-063, em cima de `GET /api/bases-de-dados` (novo
+  espelho `basesDeDados.service.ts` no frontend + tipos em `api.ts`).
+  Refactor colateral: `buscarTodosVaziosDeAcesso` virou wrapper de
+  `paginarClassificacao()` (mesma lógica, agora parametrizada);
+  `VaziosDeAcessoCompleto` ganhou `eixoX`/`eixoY`. Header ganhou os links
+  "Vazios de Acesso" e "Dados" ("Ranking de Distribuidoras" encurtado para
+  "Distribuidoras"). Score composto 40/40/20 de distribuidoras do
+  protótipo NÃO adotado (pesos inventados; nosso ranking tem ADR próprio).
+  "Diagnóstico por IA por município" registrado como ideia, sem decisão.
+  VALIDADO no ambiente do usuário em 14/07/2026 (typecheck + teste manual
+  do scatter, /vazios-de-acesso e /status-dados, confirmado pelo usuário).
+- **Limite de estados no mapa (14/07/2026, mesma sessão):** camada de
+  referência com o contorno das UFs por cima do choropleth (pedido do
+  usuário — "facilita a visualização"). Backend: `GET /api/estados`
+  (`estados.service.ts` + controller/route) — FeatureCollection com o
+  contorno de cada UF via `ST_Union` das geometrias municipais, SEM
+  simplificação adicional de propósito (o union casa exatamente com as
+  divisas municipais desenhadas por baixo; simplificar de novo descolaria
+  os traços em zoom alto). ST_Union nacional é caro (segundos) → cache em
+  memória de processo, calculado na primeira requisição (reiniciar o
+  backend invalida). Frontend: `estados.service.ts` (espelho) + camada
+  `line` em `MapaMunicipios.tsx` (`CAMADA_ESTADOS`, slate-700, largura por
+  zoom), inserida ABAIXO do destaque violeta de Vazios de Acesso de
+  propósito; busca em paralelo com o GeoJSON nacional, falha silenciosa
+  (camada de referência, não bloqueante).
+  **Rótulos de município por zoom (mesma sessão):** symbol layer
+  (`CAMADA_ROTULOS`) com o nome do município aparecendo a partir do zoom 6
+  (tamanho crescente com o zoom, colisão resolvida pelo MapLibre). Pontos =
+  centro do bbox (mesmo helper/ressalva do heatmap). Texto em MapLibre exige
+  servidor de glyphs — estilo ganhou `glyphs:
+  demotiles.maplibre.org/font/...` (endpoint público da própria MapLibre;
+  mesma classe de dependência leve das Google Fonts do index.css — a decisão
+  "sem basemap externo" é sobre TILES, não fontes; alternativa futura é
+  servir PBFs do backend). Rótulos ficam POR CIMA do heatmap (beforeId) e
+  acompanham o filtro do Dashboard Público (RF-046). Fonte usada:
+  "Open Sans Semibold" — se os rótulos não aparecerem na validação, checar
+  no console se o fontstack existe no endpoint.
+  **Validação parcial (15/07/2026):** typecheck limpo e rótulos de município
+  OK, mas o limite estadual NÃO apareceu na primeira validação — correção
+  aplicada: `ST_MakeValid(geom)` antes do `ST_Union` (geometria municipal
+  simplificada no seed pode ser inválida → TopologyException, que a falha
+  silenciosa do frontend engole). Na mesma sessão (15/07, pedidos do
+  usuário): `CAMADA_ESTADO_DESTACADO` — contorno slate-900 mais grosso na
+  UF escolhida no ranking/filtro (estado `ufDestacada` na PaginaMapa;
+  `aoEscolherUf` agora também é chamado com '' para limpar) — e
+  `CAMADA_ROTULOS_ESTADOS` — nome do estado (uppercase, centro do bbox da
+  UF) no zoom amplo, com maxzoom = minzoom dos rótulos de município (6):
+  aproximou, saem estados e entram municípios.
+  VALIDADO no ambiente do usuário em 15/07/2026 (curl do endpoint devolvendo
+  GeoJSON + teste visual completo, confirmado pelo usuário).
+  **Contorno do município selecionado (15/07/2026, mesma sessão):**
+  `CAMADA_MUNICIPIO_DESTACADO` — mesma solução do destaque de estado, agora
+  para o município selecionado (clique/busca/ranking): line slate-900
+  engrossando com o zoom, ACIMA do destaque violeta de Vazios (é a seleção
+  ativa do usuário). Prop `codigoDestacado` em MapaMunicipios, alimentada
+  por `municipioSelecionado` na PaginaMapa — some ao fechar o painel.
+  **AINDA NAO VALIDADO**: `make front-typecheck` + teste visual (selecionar
+  por clique, busca e ranking; fechar o painel remove o contorno).
 
 **NAO implementado ainda** (apesar de descrito em secoes deste documento como padrao):
 - Backend Node/Express: endpoints de LEITURA (`GET /api/vazios-de-acesso`,

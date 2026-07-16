@@ -7,8 +7,12 @@ import maplibregl, {
   type Map as MapaMapLibre,
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import type { FeatureCollectionMunicipios, MunicipioComIndicadores } from '../../types/api';
-import { bboxDaGeometria } from '../../utils/geometria';
+import type {
+  EstadosGeoJson,
+  FeatureCollectionMunicipios,
+  MunicipioComIndicadores,
+} from '../../types/api';
+import { bboxDaGeometria, centroDaGeometria } from '../../utils/geometria';
 import type { IndicadorMapa } from '../../utils/indicadores';
 import { formatarValor } from '../../utils/formatadores';
 
@@ -50,22 +54,59 @@ export const RAMPA_HEATMAP: [number, string][] = [
 
 const FONTE = 'municipios';
 const FONTE_HEATMAP = 'vazios-heatmap';
+const FONTE_ESTADOS = 'estados';
+const FONTE_ROTULOS = 'municipios-rotulos';
 const CAMADA_PREENCHIMENTO = 'municipios-preenchimento';
 const CAMADA_CONTORNO = 'municipios-contorno';
 const CAMADA_DESTAQUE = 'vazios-destaque';
 const CAMADA_HEATMAP = 'vazios-heatmap';
+const CAMADA_ESTADOS = 'estados-contorno';
+const CAMADA_ESTADO_DESTACADO = 'estado-destacado';
+const CAMADA_MUNICIPIO_DESTACADO = 'municipio-destacado';
+const FONTE_ROTULOS_ESTADOS = 'estados-rotulos';
+const CAMADA_ROTULOS_ESTADOS = 'estados-rotulos';
+const CAMADA_ROTULOS = 'municipios-rotulos';
+
+/**
+ * Servidor de glyphs (fontes PBF) para os rótulos de município — texto em
+ * symbol layer EXIGE um endpoint de glyphs, que nosso estilo minimalista não
+ * tinha. Endpoint público mantido pela própria MapLibre; mesma classe de
+ * dependência externa leve das Google Fonts já usadas no index.css (a decisão
+ * de "sem basemap externo" é sobre TILES de mapa, não sobre fontes). Se o
+ * endpoint falhar, os rótulos não aparecem mas o mapa funciona normalmente.
+ * Alternativa futura sem dependência: gerar os PBFs e servir do backend.
+ */
+const URL_GLYPHS = 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf';
+
+/** Zoom a partir do qual os rótulos de município começam a aparecer. */
+const ZOOM_MINIMO_ROTULOS = 6;
+
+/**
+ * Zoom até o qual os rótulos de ESTADO aparecem — complementar ao dos
+ * municípios: visão ampla mostra nomes de estados, aproximou o suficiente
+ * eles saem e entram os nomes de municípios.
+ */
+const ZOOM_MAXIMO_ROTULOS_ESTADOS = 6;
+
+/**
+ * Zoom mínimo para o tooltip de hover (15/07/2026, pedido do usuário): na
+ * visão nacional o tooltip dispara em qualquer movimento do mouse e atrapalha
+ * a navegação. Mesma régua dos rótulos de município — quando os nomes entram,
+ * o tooltip passa a fazer sentido.
+ */
+const ZOOM_MINIMO_TOOLTIP = ZOOM_MINIMO_ROTULOS;
 
 /** Pontos do heatmap (RF-057): centro do município + peso 0–1 (IVS normalizado). */
 export type PontosHeatmap = GeoJSON.FeatureCollection<GeoJSON.Point, { peso: number }>;
 
 /**
- * Comando de enquadramento (busca de município, RF-026). Objeto em vez de
- * string de propósito: repetir a mesma busca cria um objeto novo e re-dispara
- * o efeito de voo mesmo com codigoIbge igual.
+ * Comando de enquadramento. Objeto em vez de string de propósito: repetir a
+ * mesma busca cria um objeto novo e re-dispara o efeito de voo mesmo com o
+ * mesmo alvo. Dois alvos possíveis: um município (busca RF-026, ranking
+ * RF-035) ou uma UF inteira (seleção de estado no ranking/filtros,
+ * 14/07/2026 — o mapa enquadra o estado ao escolhê-lo).
  */
-export interface FocoMunicipio {
-  codigoIbge: string;
-}
+export type FocoMapa = { codigoIbge: string } | { uf: string };
 
 interface MapaMunicipiosProps {
   dados: FeatureCollectionMunicipios | null;
@@ -80,8 +121,26 @@ interface MapaMunicipiosProps {
    * pontos e calcula os pesos é a página — aqui só renderização.
    */
   pontosHeatmap: PontosHeatmap | null;
-  /** Município a enquadrar (fitBounds) ou null. Ver FocoMunicipio. */
-  foco: FocoMunicipio | null;
+  /** Município ou UF a enquadrar (fitBounds) ou null. Ver FocoMapa. */
+  foco: FocoMapa | null;
+  /**
+   * Contornos estaduais (GET /api/estados) ou null enquanto não carregou —
+   * camada de REFERÊNCIA visual (limite de estados por cima do choropleth,
+   * 14/07/2026). Desenhada ABAIXO do destaque de Vazios de Acesso de
+   * propósito: o violeta do destaque continua sendo a linha mais proeminente.
+   */
+  estados: EstadosGeoJson | null;
+  /**
+   * UF com o contorno destacado (estado selecionado no ranking/filtro,
+   * 15/07/2026) ou null/'' para nenhum. Só realce visual — quem decide qual
+   * UF está selecionada é a página.
+   */
+  ufDestacada: string | null;
+  /**
+   * Código IBGE do município selecionado (clique/busca/ranking, 15/07/2026)
+   * — contorno engrossado, mesma solução do destaque de estado.
+   */
+  codigoDestacado: string | null;
   /**
    * Códigos IBGE visíveis no filtro do Dashboard Público (RF-046) ou null
    * quando nenhum filtro está ativo (mostra todos). Municípios fora da lista
@@ -123,6 +182,9 @@ export function MapaMunicipios({
   codigosDestaque,
   pontosHeatmap,
   foco,
+  estados,
+  ufDestacada,
+  codigoDestacado,
   codigosVisiveis,
   aoClicarMunicipio,
 }: MapaMunicipiosProps) {
@@ -153,6 +215,32 @@ export function MapaMunicipios({
     [indicador, quebras],
   );
 
+  // Pontos de rótulo (nome do município conforme o zoom, 14/07/2026): centro
+  // do bbox de cada geometria — mesmo helper e mesma ressalva do heatmap
+  // (centro de bbox pode cair fora de polígono côncavo; para rótulo isso é
+  // aceitável, e o caminho para um ponto garantidamente interno seria
+  // ST_PointOnSurface no backend — ver utils/geometria.ts).
+  const pontosRotulos = useMemo<GeoJSON.FeatureCollection<
+    GeoJSON.Point,
+    { codigoIbge: string; nome: string }
+  > | null>(() => {
+    if (!dados) return null;
+    const features = dados.features.flatMap(
+      (f): GeoJSON.Feature<GeoJSON.Point, { codigoIbge: string; nome: string }>[] => {
+        const centro = f.geometry ? centroDaGeometria(f.geometry) : null;
+        if (!centro) return [];
+        return [
+          {
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: centro },
+            properties: { codigoIbge: f.properties.codigoIbge, nome: f.properties.nome },
+          },
+        ];
+      },
+    );
+    return { type: 'FeatureCollection', features };
+  }, [dados]);
+
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -160,6 +248,7 @@ export function MapaMunicipios({
       container: containerRef.current,
       style: {
         version: 8,
+        glyphs: URL_GLYPHS,
         sources: {},
         layers: [
           { id: 'fundo', type: 'background', paint: { 'background-color': '#f8fafc' } },
@@ -192,10 +281,21 @@ export function MapaMunicipios({
       setHover(null);
     });
     mapa.on('mousemove', CAMADA_PREENCHIMENTO, (evento) => {
+      // Tooltip só a partir de um certo zoom — na visão nacional ele dispara
+      // a cada pixel e atrapalha a navegação (pedido do usuário, 15/07/2026).
+      if (mapa.getZoom() < ZOOM_MINIMO_TOOLTIP) {
+        setHover(null);
+        return;
+      }
       const codigoIbge = evento.features?.[0]?.properties?.codigoIbge;
       if (typeof codigoIbge === 'string') {
         setHover({ x: evento.point.x, y: evento.point.y, codigoIbge });
       }
+    });
+    // Zoom com scroll não dispara mousemove — sem isto, o tooltip ficaria
+    // congelado na tela ao afastar o zoom para baixo do limiar.
+    mapa.on('zoom', () => {
+      if (mapa.getZoom() < ZOOM_MINIMO_TOOLTIP) setHover(null);
     });
 
     mapaRef.current = mapa;
@@ -214,6 +314,11 @@ export function MapaMunicipios({
     const fonte = mapa.getSource(FONTE) as GeoJSONSource | undefined;
     if (fonte) {
       fonte.setData(dados as unknown as GeoJSON.GeoJSON);
+      if (pontosRotulos) {
+        (mapa.getSource(FONTE_ROTULOS) as GeoJSONSource | undefined)?.setData(
+          pontosRotulos as GeoJSON.GeoJSON,
+        );
+      }
       return;
     }
 
@@ -241,7 +346,49 @@ export function MapaMunicipios({
       filter: ['boolean', false],
       paint: { 'line-color': '#7c3aed', 'line-width': 1.4 },
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- corChoropleth é aplicado pelo efeito abaixo nas atualizações
+
+    // Contorno engrossado do município selecionado (15/07/2026) — mesma
+    // solução do destaque de estado; acima do destaque violeta de Vazios
+    // (é a seleção ativa do usuário, a linha mais importante do momento).
+    mapa.addLayer({
+      id: CAMADA_MUNICIPIO_DESTACADO,
+      type: 'line',
+      source: FONTE,
+      filter: ['boolean', false],
+      paint: {
+        'line-color': '#0f172a',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 4, 1.6, 10, 3.4],
+      },
+    });
+
+    // Rótulos de município conforme o zoom (14/07/2026) — última camada
+    // adicionada aqui, então fica por cima de tudo (a colisão de rótulos é
+    // resolvida pelo próprio MapLibre). Some abaixo de ZOOM_MINIMO_ROTULOS
+    // (visão nacional ficaria ilegível com ~5,5 mil nomes).
+    if (pontosRotulos) {
+      mapa.addSource(FONTE_ROTULOS, {
+        type: 'geojson',
+        data: pontosRotulos as GeoJSON.GeoJSON,
+      });
+      mapa.addLayer({
+        id: CAMADA_ROTULOS,
+        type: 'symbol',
+        source: FONTE_ROTULOS,
+        minzoom: ZOOM_MINIMO_ROTULOS,
+        layout: {
+          'text-field': ['get', 'nome'],
+          'text-font': ['Open Sans Semibold'],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 6, 9, 9, 12, 12, 15],
+          'text-padding': 2,
+        },
+        paint: {
+          'text-color': '#334155',
+          'text-halo-color': 'rgba(255, 255, 255, 0.9)',
+          'text-halo-width': 1.2,
+        },
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- corChoropleth é aplicado pelo efeito abaixo nas atualizações; pontosRotulos deriva de dados
   }, [dados, mapaCarregado]);
 
   // Troca de indicador → só repinta a camada (sem recriar fonte). No modo
@@ -283,7 +430,8 @@ export function MapaMunicipios({
       type: 'geojson',
       data: pontosHeatmap as GeoJSON.GeoJSON,
     });
-    mapa.addLayer({
+    mapa.addLayer(
+      {
       id: CAMADA_HEATMAP,
       type: 'heatmap',
       source: FONTE_HEATMAP,
@@ -303,8 +451,129 @@ export function MapaMunicipios({
         ],
         'heatmap-opacity': 0.8,
       } as unknown as HeatmapLayerSpecification['paint'],
-    });
+      },
+      // Rótulos de município ficam por cima do heatmap (referência de leitura).
+      mapa.getLayer(CAMADA_ROTULOS) ? CAMADA_ROTULOS : undefined,
+    );
   }, [pontosHeatmap, mapaCarregado]);
+
+  // Camada de limite dos estados — adicionada quando o GeoJSON de estados
+  // chega. Inserida ANTES (= por baixo) do destaque de Vazios de Acesso,
+  // para o violeta continuar sendo a linha mais proeminente do mapa; e
+  // depende de `dados` porque as camadas municipais precisam existir antes
+  // (senão o beforeId CAMADA_DESTAQUE ainda não existe).
+  useEffect(() => {
+    const mapa = mapaRef.current;
+    if (!mapa || !mapaCarregado || !estados || !dados) return;
+    if (mapa.getSource(FONTE_ESTADOS)) return;
+
+    mapa.addSource(FONTE_ESTADOS, {
+      type: 'geojson',
+      data: estados as unknown as GeoJSON.GeoJSON,
+    });
+    mapa.addLayer(
+      {
+        id: CAMADA_ESTADOS,
+        type: 'line',
+        source: FONTE_ESTADOS,
+        paint: {
+          'line-color': '#334155',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 3, 0.8, 8, 1.8],
+          'line-opacity': 0.75,
+        },
+      },
+      mapa.getLayer(CAMADA_DESTAQUE) ? CAMADA_DESTAQUE : undefined,
+    );
+
+    // Contorno destacado do estado selecionado (ranking/filtro, 15/07/2026).
+    // Filtro começa vazio; o efeito de ufDestacada (abaixo) liga/desliga.
+    mapa.addLayer(
+      {
+        id: CAMADA_ESTADO_DESTACADO,
+        type: 'line',
+        source: FONTE_ESTADOS,
+        filter: ['boolean', false],
+        paint: {
+          'line-color': '#0f172a',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 3, 1.8, 8, 3.2],
+        },
+      },
+      mapa.getLayer(CAMADA_DESTAQUE) ? CAMADA_DESTAQUE : undefined,
+    );
+
+    // Rótulos de ESTADO no zoom amplo (15/07/2026) — pontos no centro do
+    // bbox de cada UF (mesma ressalva de sempre do centro de bbox), texto
+    // some quando os rótulos de município entram (ZOOM_MINIMO_ROTULOS).
+    const pontosEstados: GeoJSON.FeatureCollection<GeoJSON.Point, { nomeEstado: string }> = {
+      type: 'FeatureCollection',
+      features: estados.features.flatMap(
+        (f): GeoJSON.Feature<GeoJSON.Point, { nomeEstado: string }>[] => {
+          const centro = centroDaGeometria(f.geometry);
+          if (!centro) return [];
+          return [
+            {
+              type: 'Feature',
+              geometry: { type: 'Point', coordinates: centro },
+              properties: { nomeEstado: f.properties.nomeEstado },
+            },
+          ];
+        },
+      ),
+    };
+    mapa.addSource(FONTE_ROTULOS_ESTADOS, {
+      type: 'geojson',
+      data: pontosEstados as GeoJSON.GeoJSON,
+    });
+    mapa.addLayer({
+      id: CAMADA_ROTULOS_ESTADOS,
+      type: 'symbol',
+      source: FONTE_ROTULOS_ESTADOS,
+      maxzoom: ZOOM_MAXIMO_ROTULOS_ESTADOS,
+      layout: {
+        'text-field': ['get', 'nomeEstado'],
+        'text-font': ['Open Sans Semibold'],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 3, 10, 6, 14],
+        'text-transform': 'uppercase',
+        'text-letter-spacing': 0.08,
+        'text-padding': 4,
+      },
+      paint: {
+        'text-color': '#475569',
+        'text-halo-color': 'rgba(255, 255, 255, 0.9)',
+        'text-halo-width': 1.4,
+      },
+    });
+  }, [estados, mapaCarregado, dados]);
+
+  // Liga/desliga o contorno destacado do estado selecionado (ranking/filtro).
+  useEffect(() => {
+    const mapa = mapaRef.current;
+    if (!mapa || !mapaCarregado || !mapa.getLayer(CAMADA_ESTADO_DESTACADO)) return;
+    if (ufDestacada) {
+      mapa.setFilter(CAMADA_ESTADO_DESTACADO, [
+        '==',
+        ['get', 'uf'],
+        ufDestacada,
+      ] as unknown as FilterSpecification);
+    } else {
+      mapa.setFilter(CAMADA_ESTADO_DESTACADO, ['boolean', false]);
+    }
+  }, [ufDestacada, mapaCarregado, estados]);
+
+  // Liga/desliga o contorno engrossado do município selecionado.
+  useEffect(() => {
+    const mapa = mapaRef.current;
+    if (!mapa || !mapaCarregado || !mapa.getLayer(CAMADA_MUNICIPIO_DESTACADO)) return;
+    if (codigoDestacado) {
+      mapa.setFilter(CAMADA_MUNICIPIO_DESTACADO, [
+        '==',
+        ['get', 'codigoIbge'],
+        codigoDestacado,
+      ] as unknown as FilterSpecification);
+    } else {
+      mapa.setFilter(CAMADA_MUNICIPIO_DESTACADO, ['boolean', false]);
+    }
+  }, [codigoDestacado, mapaCarregado, dados]);
 
   // Liga/desliga o contorno de destaque dos Vazios de Acesso.
   useEffect(() => {
@@ -337,17 +606,36 @@ export function MapaMunicipios({
         : null;
     mapa.setFilter(CAMADA_PREENCHIMENTO, filtro);
     mapa.setFilter(CAMADA_CONTORNO, filtro);
+    // Rótulos acompanham o filtro — município escondido não mantém o nome.
+    if (mapa.getLayer(CAMADA_ROTULOS)) mapa.setFilter(CAMADA_ROTULOS, filtro);
   }, [codigosVisiveis, mapaCarregado, dados]);
 
-  // Voa até o município buscado (RF-026). fitBounds em vez de flyTo com zoom
-  // fixo: municípios variam de ~3 km² a ~150.000 km² (Altamira/PA), zoom fixo
-  // cortaria os grandes ou afogaria os pequenos.
+  // Voa até o alvo do foco. fitBounds em vez de flyTo com zoom fixo:
+  // municípios variam de ~3 km² a ~150.000 km² (Altamira/PA) e estados idem —
+  // zoom fixo cortaria os grandes ou afogaria os pequenos. Para UF, o bbox é
+  // a UNIÃO dos bboxes dos municípios dela (o GeoJSON nacional já está
+  // carregado — sem geometria estadual dedicada de propósito).
   useEffect(() => {
     const mapa = mapaRef.current;
     if (!mapa || !mapaCarregado || !dados || !foco) return;
-    const feature = dados.features.find((f) => f.properties.codigoIbge === foco.codigoIbge);
-    if (!feature?.geometry) return;
-    const bbox = bboxDaGeometria(feature.geometry);
+
+    let bbox: [[number, number], [number, number]] | null = null;
+    if ('codigoIbge' in foco) {
+      const feature = dados.features.find((f) => f.properties.codigoIbge === foco.codigoIbge);
+      bbox = feature?.geometry ? bboxDaGeometria(feature.geometry) : null;
+    } else {
+      for (const feature of dados.features) {
+        if (feature.properties.uf !== foco.uf || !feature.geometry) continue;
+        const parcial = bboxDaGeometria(feature.geometry);
+        if (!parcial) continue;
+        bbox = bbox
+          ? [
+              [Math.min(bbox[0][0], parcial[0][0]), Math.min(bbox[0][1], parcial[0][1])],
+              [Math.max(bbox[1][0], parcial[1][0]), Math.max(bbox[1][1], parcial[1][1])],
+            ]
+          : parcial;
+      }
+    }
     if (!bbox) return;
     mapa.fitBounds(bbox, { padding: 80, maxZoom: 10, duration: 1400 });
   }, [foco, mapaCarregado, dados]);

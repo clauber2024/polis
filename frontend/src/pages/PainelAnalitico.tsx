@@ -12,7 +12,12 @@ import {
   exportarComparacao,
   buscarMediasMunicipios,
 } from '../services/comparacao.service';
-import { classificarMunicipios } from '../services/vaziosDeAcesso.service';
+import {
+  buscarClassificacaoNacionalCompleta,
+  classificarMunicipios,
+  type VaziosDeAcessoCompleto,
+} from '../services/vaziosDeAcesso.service';
+import { GraficoQuadrantes } from '../components/painel-analitico/GraficoQuadrantes';
 import type {
   MediasMunicipios,
   MunicipioClassificado,
@@ -260,6 +265,30 @@ export function PainelAnalitico() {
     });
   }
 
+  // Scatter nacional de quadrantes (14/07/2026) — LAZY por botão, nunca no
+  // carregamento da página: é a maior rajada de requisições do frontend
+  // (~28 páginas do endpoint de classificação). Mesmo padrão de handler (não
+  // useEffect com loading nas deps) já usado em garantirVaziosCarregados.
+  const [quadrantesNacionais, setQuadrantesNacionais] = useState<VaziosDeAcessoCompleto | null>(
+    null,
+  );
+  const [carregandoQuadrantes, setCarregandoQuadrantes] = useState(false);
+  const [erroQuadrantes, setErroQuadrantes] = useState<string | null>(null);
+
+  function carregarQuadrantesNacionais() {
+    if (quadrantesNacionais || carregandoQuadrantes) return;
+    setCarregandoQuadrantes(true);
+    setErroQuadrantes(null);
+    buscarClassificacaoNacionalCompleta()
+      .then(setQuadrantesNacionais)
+      .catch((causa: unknown) => {
+        setErroQuadrantes(
+          causa instanceof Error ? causa.message : 'Falha ao carregar a classificação nacional.',
+        );
+      })
+      .finally(() => setCarregandoQuadrantes(false));
+  }
+
   async function aoExportar(formato: 'csv' | 'xlsx') {
     setExportando(formato);
     setErroExportacao(null);
@@ -427,6 +456,45 @@ export function PainelAnalitico() {
           <DiagnosticoComparacao diagnostico={diagnostico} />
         </>
       )}
+
+      {/* Scatter nacional de quadrantes — independente da comparação acima
+          (visão do país inteiro, não dos municípios selecionados). */}
+      <section className="mt-8 rounded border border-slate-200 bg-white p-6 shadow-2xs">
+        <h2 className="font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+          Quadrantes nacionais — Vazios de Acesso
+        </h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Dispersão dos ~5,5 mil municípios classificados pelo backend nos eixos reais da
+          metodologia (irradiação solar × MMGD residencial per capita), com as medianas
+          nacionais dividindo os quatro quadrantes.
+        </p>
+
+        {!quadrantesNacionais && (
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={carregarQuadrantesNacionais}
+              disabled={carregandoQuadrantes}
+              className="rounded-lg border border-violet-200 bg-white px-4 py-2.5 text-xs font-semibold text-violet-700 shadow-xs transition-all hover:bg-violet-50 disabled:opacity-50"
+            >
+              {carregandoQuadrantes
+                ? 'Carregando a classificação nacional…'
+                : 'Carregar gráfico de quadrantes'}
+            </button>
+            <p className="mt-1 text-xs text-slate-400">
+              Busca a classificação completa no backend (~28 requisições paginadas) — por isso
+              só carrega quando você pedir.
+            </p>
+            {erroQuadrantes && <p className="mt-1 text-xs text-red-600">{erroQuadrantes}</p>}
+          </div>
+        )}
+
+        {quadrantesNacionais && (
+          <div className="mt-4">
+            <GraficoQuadrantes dados={quadrantesNacionais} />
+          </div>
+        )}
+      </section>
     </div>
   );
 }

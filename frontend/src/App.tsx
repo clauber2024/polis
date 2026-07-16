@@ -1,4 +1,4 @@
-import { Link, Outlet, Route, Routes, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, Route, Routes, useNavigate } from 'react-router-dom';
 import { BuscaMunicipio } from './components/BuscaMunicipio';
 import { RotaProtegida } from './components/RotaProtegida';
 import { useAuth } from './contexts/AuthContext';
@@ -9,6 +9,8 @@ import { PainelAdmin } from './pages/PainelAdmin';
 import { PainelAnalitico } from './pages/PainelAnalitico';
 import { PainelColaborador } from './pages/PainelColaborador';
 import { PaginaRankingDistribuidoras } from './pages/PaginaRankingDistribuidoras';
+import { PaginaVaziosDeAcesso } from './pages/PaginaVaziosDeAcesso';
+import { PaginaStatusDados } from './pages/PaginaStatusDados';
 
 /**
  * Layout do "app interno" (tudo que não é a landing pública): header fixo
@@ -16,53 +18,79 @@ import { PaginaRankingDistribuidoras } from './pages/PaginaRankingDistribuidoras
  * tem header próprio, mais simples (só logo + "Entrar") — por isso NÃO usa
  * este layout, ver App() abaixo.
  */
+/** Aba do header — sublinhado violeta quando a rota está ativa (padrão visual
+ * do protótipo AI Studio; NavLink dá o estado ativo de graça, sem estado manual). */
+function classeAba({ isActive }: { isActive: boolean }) {
+  return `flex h-full items-center border-b-2 px-1 transition-all ${
+    isActive
+      ? 'border-violet-600 text-violet-600'
+      : 'border-transparent text-slate-500 hover:text-violet-600'
+  }`;
+}
+
 function LayoutApp() {
   const navigate = useNavigate();
   const { sessao, sair } = useAuth();
 
   return (
     <div className="flex h-full flex-col font-sans">
-      <header className="flex items-center gap-6 border-b border-slate-200 bg-white px-6 py-3 shadow-2xs">
-        <Link
-          to="/"
-          className="font-display text-base font-bold tracking-tight text-slate-800"
-        >
-          ATLAS SOLAR <span className="text-violet-600">JUSTO</span>
+      <header className="flex h-16 shrink-0 items-center gap-6 border-b border-slate-200 bg-white px-6 shadow-2xs">
+        <Link to="/" className="flex items-center gap-3 transition-opacity hover:opacity-95">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-violet-600">
+            <span className="h-4 w-4 rounded-full border-2 border-white" />
+          </span>
+          <span>
+            <span className="block font-display text-base leading-none font-bold tracking-tight text-slate-800">
+              ATLAS SOLAR JUSTO
+            </span>
+            <span className="mt-1 block font-mono text-[10px] tracking-wider text-slate-400 uppercase">
+              Justiça Energética • Brasil
+            </span>
+          </span>
         </Link>
-        <nav className="flex h-full items-center gap-1 text-xs font-semibold">
-          <Link
-            to="/mapa"
-            className="border-b-2 border-transparent px-1 py-2 text-slate-500 transition-colors hover:border-violet-500/30 hover:text-violet-600"
-          >
-            Mapa
-          </Link>
-          <Link
-            to="/painel-analitico"
-            className="border-b-2 border-transparent px-1 py-2 text-slate-500 transition-colors hover:border-violet-500/30 hover:text-violet-600"
-          >
+        <nav className="flex h-full items-center gap-4 text-xs font-semibold">
+          <NavLink to="/mapa" className={classeAba}>
+            Explorador WebGIS
+          </NavLink>
+          <NavLink to="/painel-analitico" className={classeAba}>
             Painel Analítico
-          </Link>
-          <Link
-            to="/ranking-distribuidoras"
-            className="border-b-2 border-transparent px-1 py-2 text-slate-500 transition-colors hover:border-violet-500/30 hover:text-violet-600"
-          >
-            Ranking de Distribuidoras
-          </Link>
+          </NavLink>
+          <NavLink to="/vazios-de-acesso" className={classeAba}>
+            Vazios de Acesso
+          </NavLink>
+          <NavLink to="/ranking-distribuidoras" className={classeAba}>
+            Distribuidoras
+          </NavLink>
+          <NavLink to="/status-dados" className={classeAba}>
+            Dados
+          </NavLink>
           {sessao && (
-            <Link
+            <NavLink
               to="/colaborador"
-              className="border-b-2 border-transparent px-1 py-2 text-slate-500 transition-colors hover:border-violet-500/30 hover:text-violet-600"
+              className={({ isActive }) =>
+                `rounded-md px-3 py-2 transition-all ${
+                  isActive
+                    ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200'
+                    : 'bg-amber-100/60 text-amber-800 hover:bg-amber-100'
+                }`
+              }
             >
               Painel Colaborador
-            </Link>
+            </NavLink>
           )}
           {sessao?.usuario.papel === 'administrador' && (
-            <Link
+            <NavLink
               to="/admin"
-              className="border-b-2 border-transparent px-1 py-2 text-slate-500 transition-colors hover:border-violet-500/30 hover:text-violet-600"
+              className={({ isActive }) =>
+                `rounded-md px-3 py-2 transition-all ${
+                  isActive
+                    ? 'bg-red-50 text-red-700 ring-1 ring-red-200'
+                    : 'bg-red-100/60 text-red-800 hover:bg-red-100'
+                }`
+              }
             >
               Painel Admin
-            </Link>
+            </NavLink>
           )}
         </nav>
         <div className="ml-auto flex items-center gap-4">
@@ -128,6 +156,8 @@ export function App() {
         <Route path="/mapa" element={<PaginaMapa />} />
         <Route path="/painel-analitico" element={<PainelAnalitico />} />
         <Route path="/ranking-distribuidoras" element={<PaginaRankingDistribuidoras />} />
+        <Route path="/vazios-de-acesso" element={<PaginaVaziosDeAcesso />} />
+        <Route path="/status-dados" element={<PaginaStatusDados />} />
         <Route path="/login" element={<PaginaLogin />} />
         <Route
           path="/colaborador"

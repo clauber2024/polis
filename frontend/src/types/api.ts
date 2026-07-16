@@ -429,3 +429,54 @@ export interface RankingDistribuidorasResultado {
   rankingPrincipal: DistribuidoraRanking[];
   distribuidorasComDadosIncompletos: DistribuidoraRanking[];
 }
+
+// ---------------------------------------------------------------------------
+// Contornos estaduais (GET /api/estados) — camada de referência visual do
+// mapa, ver backend/src/services/estados.service.ts (ST_Union das geometrias
+// municipais por UF; casa exatamente com as divisas municipais desenhadas).
+// ---------------------------------------------------------------------------
+
+/** Espelho de EstadoFeature (GET /api/estados). */
+export interface EstadoFeature {
+  type: 'Feature';
+  geometry: GeoJSON.Geometry;
+  properties: {
+    uf: string;
+    nomeEstado: string;
+    regiao: string;
+  };
+}
+
+/** Espelho de EstadosGeoJson (GET /api/estados). */
+export interface EstadosGeoJson {
+  type: 'FeatureCollection';
+  features: EstadoFeature[];
+}
+
+// ---------------------------------------------------------------------------
+// Status das bases de dados primárias (RF-063) — ver
+// backend/src/services/basesDeDados.service.ts. Status 100% derivado dos
+// dados carregados (cobertura por indicador "âncora" de cada fonte), sem
+// tabela de controle manual.
+// ---------------------------------------------------------------------------
+
+export type StatusFonte = 'completo' | 'parcial' | 'bloqueado';
+
+/** Espelho de StatusFonteDados (GET /api/bases-de-dados). */
+export interface StatusFonteDados {
+  id: string;
+  nome: string;
+  municipiosCobertos: number;
+  percentualCobertura: number;
+  periodoReferenciaMaisRecente: string | null;
+  status: StatusFonte;
+  observacao: string | null;
+}
+
+/** Espelho de StatusBasesDeDadosResultado (GET /api/bases-de-dados). */
+export interface StatusBasesDeDadosResultado {
+  /** Já formatado em America/Sao_Paulo pelo backend. */
+  atualizadoEm: string;
+  totalMunicipios: number;
+  fontes: StatusFonteDados[];
+}

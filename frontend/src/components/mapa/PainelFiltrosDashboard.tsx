@@ -32,7 +32,6 @@ interface PainelFiltrosDashboardProps {
   aoMudarPotenciaMin: (valor: string) => void;
   aoMudarPotenciaMax: (valor: string) => void;
   aoLimparFiltros: () => void;
-  aoFechar: () => void;
 }
 
 export function PainelFiltrosDashboard({
@@ -49,7 +48,6 @@ export function PainelFiltrosDashboard({
   aoMudarPotenciaMin,
   aoMudarPotenciaMax,
   aoLimparFiltros,
-  aoFechar,
 }: PainelFiltrosDashboardProps) {
   const [exportando, setExportando] = useState<'csv' | 'geojson' | null>(null);
   const [erroExportacao, setErroExportacao] = useState<string | null>(null);
@@ -74,26 +72,16 @@ export function PainelFiltrosDashboard({
   }
 
   return (
-    <aside className="flex h-full w-80 flex-col border-r border-slate-200 bg-white shadow-xs">
-      <div className="flex items-start justify-between gap-2 border-b border-slate-100 bg-slate-50 p-3">
-        <div>
-          <span className="block font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
-            Refinar Cobertura
-          </span>
-          <h2 className="text-sm font-semibold text-slate-900">Filtros (Dashboard Público)</h2>
-          <p className="font-mono text-xs text-slate-500">
-            {totalVisiveis.toLocaleString('pt-BR')} de {totalMunicipios.toLocaleString('pt-BR')}{' '}
-            municípios
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={aoFechar}
-          aria-label="Fechar filtros"
-          className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-        >
-          ✕
-        </button>
+    <div className="flex h-full flex-col bg-white">
+      <div className="border-b border-slate-100 bg-slate-50 p-3">
+        <span className="block font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+          Refinar Cobertura
+        </span>
+        <h2 className="text-sm font-semibold text-slate-900">Filtros (Dashboard Público)</h2>
+        <p className="font-mono text-xs text-slate-500">
+          {totalVisiveis.toLocaleString('pt-BR')} de {totalMunicipios.toLocaleString('pt-BR')}{' '}
+          municípios
+        </p>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
@@ -214,6 +202,6 @@ export function PainelFiltrosDashboard({
           </p>
         </div>
       </div>
-    </aside>
+    </div>
   );
 }

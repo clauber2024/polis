@@ -12,6 +12,7 @@ import { colaboradorRouter } from './colaborador.routes.js';
 import { adminRouter } from './admin.routes.js';
 import { estatisticasNacionaisRouter } from './estatisticasNacionais.routes.js';
 import { rankingDistribuidorasRouter } from './rankingDistribuidoras.routes.js';
+import { estadosRouter } from './estados.routes.js';
 
 export const router = Router();
 
@@ -23,3 +24,4 @@ router.use(colaboradorRouter);
 router.use(adminRouter);
 router.use(estatisticasNacionaisRouter);
 router.use(rankingDistribuidorasRouter);
+router.use(estadosRouter);
