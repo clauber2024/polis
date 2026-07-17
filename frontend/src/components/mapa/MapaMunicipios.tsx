@@ -351,7 +351,14 @@ export function MapaMunicipios({
       id: CAMADA_PREENCHIMENTO,
       type: 'fill',
       source: FONTE,
-      paint: { 'fill-color': corChoropleth, 'fill-opacity': 0.85 },
+      paint: {
+        'fill-color': corChoropleth,
+        // RF-022: transições nativas do MapLibre — animam qualquer
+        // setPaintProperty subsequente sem código de interpolação manual.
+        'fill-color-transition': { duration: 500, delay: 0 },
+        'fill-opacity': 0.85,
+        'fill-opacity-transition': { duration: 300, delay: 0 },
+      } as unknown as maplibregl.FillLayerSpecification['paint'],
     });
     mapa.addLayer({
       id: CAMADA_CONTORNO,
@@ -438,15 +445,16 @@ export function MapaMunicipios({
 
     const fonte = mapa.getSource(FONTE_HEATMAP) as GeoJSONSource | undefined;
     if (!pontosHeatmap) {
+      // RF-022: fade out via opacidade (não visibility) — a transição anima.
       if (fonte && mapa.getLayer(CAMADA_HEATMAP)) {
-        mapa.setLayoutProperty(CAMADA_HEATMAP, 'visibility', 'none');
+        mapa.setPaintProperty(CAMADA_HEATMAP, 'heatmap-opacity', 0);
       }
       return;
     }
 
     if (fonte) {
       fonte.setData(pontosHeatmap as GeoJSON.GeoJSON);
-      mapa.setLayoutProperty(CAMADA_HEATMAP, 'visibility', 'visible');
+      mapa.setPaintProperty(CAMADA_HEATMAP, 'heatmap-opacity', 0.8);
       return;
     }
 
@@ -456,29 +464,30 @@ export function MapaMunicipios({
     });
     mapa.addLayer(
       {
-      id: CAMADA_HEATMAP,
-      type: 'heatmap',
-      source: FONTE_HEATMAP,
-      paint: {
-        // Peso 0–1 já vem calculado da página (IVS normalizado, RF-056 como
-        // critério de intensidade — decisão da sessão de 09/07/2026).
-        'heatmap-weight': ['get', 'peso'],
-        // Intensidade/raio crescem com o zoom para o kernel não "sumir" ao
-        // aproximar (padrão recomendado na doc do MapLibre para heatmaps).
-        'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 3, 0.8, 7, 2],
-        'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 3, 14, 6, 36, 9, 90],
-        'heatmap-color': [
-          'interpolate',
-          ['linear'],
-          ['heatmap-density'],
-          ...RAMPA_HEATMAP.flat(),
-        ],
-        'heatmap-opacity': 0.8,
-      } as unknown as HeatmapLayerSpecification['paint'],
+        id: CAMADA_HEATMAP,
+        type: 'heatmap',
+        source: FONTE_HEATMAP,
+        paint: {
+          'heatmap-weight': ['get', 'peso'],
+          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 3, 0.8, 7, 2],
+          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 3, 14, 6, 36, 9, 90],
+          'heatmap-color': [
+            'interpolate',
+            ['linear'],
+            ['heatmap-density'],
+            ...RAMPA_HEATMAP.flat(),
+          ],
+          // RF-022: começa em 0 e faz fade-in via requestAnimationFrame abaixo.
+          'heatmap-opacity': 0,
+          'heatmap-opacity-transition': { duration: 400, delay: 0 },
+        } as unknown as HeatmapLayerSpecification['paint'],
       },
-      // Rótulos de município ficam por cima do heatmap (referência de leitura).
       mapa.getLayer(CAMADA_ROTULOS) ? CAMADA_ROTULOS : undefined,
     );
+    // Dispara o fade-in após o layer ser adicionado ao canvas.
+    requestAnimationFrame(() => {
+      mapaRef.current?.setPaintProperty(CAMADA_HEATMAP, 'heatmap-opacity', 0.8);
+    });
   }, [pontosHeatmap, mapaCarregado]);
 
   // Camada de limite dos estados — adicionada quando o GeoJSON de estados
