@@ -34,6 +34,9 @@ export const CRITERIOS_ORDENACAO_MUNICIPIO = [
   'potenciaResidencialKw',
   'mmgdPer1000Hab',
   'mmgdResidencialPer1000Hab',
+  'numeroContratosReformaCasaBrasilSolar',
+  'valorLiberadoReformaCasaBrasilSolar',
+  'contratosReformaCasaBrasilSolarPer10000Hab',
   'areaKm2',
 ] as const;
 

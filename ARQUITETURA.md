@@ -176,6 +176,39 @@ Tabela `unidades_espaciais`:
   contra numero nacional: 86.522 obitos / 7.487.033 nascidos (periodo
   2022-2024) = 11,56 por mil, compativel com a taxa oficial do Brasil.
   Extractor: `backend/src/etl/loaders/extrair_capital_humano_mortalidade_infantil.py`.
+- **Reforma Casa Brasil - modalidade Solar** - fechado 17/07/2026, migration
+  `0027_indicadores_sociais_reforma_casa_brasil_solar.sql`. Motivacao: capitulo
+  "Atlas das experiencias de MMGD solar" (Instituto Polis, relatorio em
+  elaboracao pelo usuario como consultor) cita o programa Reforma Casa Brasil
+  (Caixa/Ministerio das Cidades) como fonte a checar para responder "quem tem
+  acesso a tecnologia solar". **DIFERENTE DE TODAS AS OUTRAS FONTES DESTA
+  SECAO: nao e publica/automatizavel.** O usuario forneceu um PDF (extrato
+  pontual do sistema interno da Caixa, SIC) ja filtrado para a modalidade
+  solar, cobrindo nov/2025 a abr/2026 (6 meses): 3.253 contratos, R$
+  61.377.571,09 liberados, 1.093 municipios. Nao ha URL publica conhecida
+  para reproduzir/atualizar esta carga - atualizacao futura exige novo
+  extrato manual no mesmo formato. Um segundo arquivo fornecido junto
+  ("Reforma casa brasil - geral.pdf", todas as modalidades, 333 paginas) NAO
+  foi ingerido - decisao do usuario, escopo limitado a solar.
+  Casamento de municipio: a fonte so tem nome+UF (sem codigo IBGE), em
+  maiusculas sem acento. Normalizacao (maiusculas/sem acento/hifen vira
+  espaco/apostrofo removido sem espaco, ver `extrair_reforma_casa_brasil_
+  solar.py::normalizar`) resolveu 1091/1093; os 2 restantes sao grafias
+  divergentes do nome oficial IBGE - "ACU"/RN (municipio renomeado de "Acu"
+  para "Assu" em 2013, a fonte da Caixa nao acompanhou) e "ITAPAGE"/CE (nome
+  oficial "Itapaje") - tratados via alias explicito no extractor, nao fuzzy
+  matching (risco de casamento errado em escala nacional).
+  Granularidade: agregado unico por municipio (soma dos 6 meses e das 2
+  faixas de renda, Faixa 1 e Faixa 2, renda familiar bruta ate R$9.600) -
+  mesma decisao de "sem serie temporal" ja usada em `unidades_habitacionais_
+  fgts`. `valor_liberado` (VR_LIBERADO da fonte) escolhido em vez do valor
+  so contratado (VF_TOTAL), por representar o que foi de fato desembolsado.
+  Municipio sem contrato no periodo fica NULL (nao e zero documentado - o
+  municipio pode simplesmente nao ter tido contrato nesse recorte de 6
+  meses). Exposto no frontend com um campo derivado per-capita
+  (`contratosReformaCasaBrasilSolarPer10000Hab`) para virar camada de mapa
+  comparavel entre municipios de tamanhos diferentes - mesmo padrao ja usado
+  para MMGD (`mmgdPer1000Hab`).
 
 ## Estado das migrations (corrigido 06/07/2026)
 

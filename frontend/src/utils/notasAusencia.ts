@@ -67,6 +67,18 @@ export function notaAusencia(
     return 'Indicador aguardando publicação da ANEEL (dados de jan/2026 em diante, com a nova subclasse "Residencial Desconto Social").';
   }
 
+  // Diferente das demais notas desta função (lacuna de fonte), "—" aqui
+  // normalmente significa que não houve contrato no período coberto, não
+  // ausência de dado — mas como o extrato (SIC/Caixa) não é público/
+  // automatizável, vale deixar isso explícito em vez de um "—" mudo.
+  if (
+    campo === 'numeroContratosReformaCasaBrasilSolar' ||
+    campo === 'valorLiberadoReformaCasaBrasilSolar' ||
+    campo === 'contratosReformaCasaBrasilSolarPer10000Hab'
+  ) {
+    return 'Sem contrato registrado no extrato usado (nov/2025–abr/2026) — não é lacuna de cobertura, é o valor real observado no período. Fonte pontual, não pública (extrato do SIC/Caixa).';
+  }
+
   if (campo === 'irradiacaoMediaKwhM2Dia' && SEM_IRRADIACAO_INPE.has(municipio.codigoIbge)) {
     return 'Ausente do Atlas Brasileiro de Energia Solar 2017 (LABREN/CCST/INPE), fonte deste indicador.';
   }

@@ -58,6 +58,22 @@ export interface MunicipioComIndicadores {
   numeroUcsResidencial: number | null;
   mmgdPer1000Hab: number | null;
   mmgdResidencialPer1000Hab: number | null;
+  /**
+   * Contratos da modalidade SOLAR do programa Reforma Casa Brasil
+   * (Caixa/Ministério das Cidades), somados nov/2025-abr/2026. Fonte NÃO
+   * pública/automatizável (extrato pontual do SIC/Caixa) — ver migration
+   * 0027 e extrair_reforma_casa_brasil_solar.py. NULL = sem contrato
+   * registrado no período, não é zero documentado.
+   */
+  numeroContratosReformaCasaBrasilSolar: number | null;
+  /** Valor efetivamente liberado (R$) dos mesmos contratos acima. */
+  valorLiberadoReformaCasaBrasilSolar: number | null;
+  /**
+   * Derivado: contratos por 10.000 habitantes (população estimada) — mesma
+   * lógica de mmgdPer1000Hab, para tornar o indicador comparável entre
+   * municípios de tamanhos diferentes (o absoluto favorece cidades grandes).
+   */
+  contratosReformaCasaBrasilSolarPer10000Hab: number | null;
   periodoReferenciaMmgd: string | null;
   periodoReferenciaIrradiacao: string | null;
 }
@@ -83,6 +99,8 @@ interface LinhaBruta {
   potenciaResidencialKw: number | null;
   numeroUcsComMmgd: number | null;
   numeroUcsResidencial: number | null;
+  numeroContratosReformaCasaBrasilSolar: number | null;
+  valorLiberadoReformaCasaBrasilSolar: number | null;
   periodoReferenciaMmgd: string | null;
   periodoReferenciaIrradiacao: string | null;
 }
@@ -128,6 +146,8 @@ const SELECT_BASE = sql`
       vsc.taxa_alfabetizacao              AS "taxaAlfabetizacao",
       vsc.taxa_mortalidade_infantil       AS "taxaMortalidadeInfantil",
       vsc.tarifa_energia_residencial      AS "tarifaEnergiaResidencial",
+      vsc.numero_contratos_reforma_casa_brasil_solar AS "numeroContratosReformaCasaBrasilSolar",
+      vsc.valor_liberado_reforma_casa_brasil_solar AS "valorLiberadoReformaCasaBrasilSolar",
       irr.irradiacao_media_kwh_m2_dia     AS "irradiacaoMediaKwhM2Dia",
       mmgd.potencia_instalada_kw          AS "potenciaInstaladaKw",
       mmgd.potencia_residencial_kw        AS "potenciaResidencialKw",
@@ -193,6 +213,13 @@ function calcularDerivados(linha: LinhaBruta): MunicipioComIndicadores {
       ? (linha.potenciaResidencialKw / populacaoEstimada) * 1000
       : null;
 
+  const contratosReformaCasaBrasilSolarPer10000Hab =
+    populacaoEstimada !== null &&
+    populacaoEstimada > 0 &&
+    linha.numeroContratosReformaCasaBrasilSolar !== null
+      ? (linha.numeroContratosReformaCasaBrasilSolar / populacaoEstimada) * 10000
+      : null;
+
   return {
     ...linha,
     // Arredondada: é estimativa (densidade × área), casas decimais passariam
@@ -200,6 +227,7 @@ function calcularDerivados(linha: LinhaBruta): MunicipioComIndicadores {
     populacaoEstimada: populacaoEstimada !== null ? Math.round(populacaoEstimada) : null,
     mmgdPer1000Hab,
     mmgdResidencialPer1000Hab,
+    contratosReformaCasaBrasilSolarPer10000Hab,
   };
 }
 

@@ -124,6 +124,26 @@ export const INDICADORES_MAPA: IndicadorMapa[] = [
     metadados: { natureza: 'Observado', confianca: 'Média', fonte: 'ANEEL — Tarifas Residenciais Homologadas' },
   },
   {
+    id: 'contratosReformaCasaBrasilSolarPer10000Hab',
+    rotulo: 'Acesso ao Reforma Casa Brasil Solar',
+    unidade: 'contratos/10.000 hab',
+    formato: 'numero',
+    sentido: 'positivo',
+    // Fonte pontual (extrato do SIC/Caixa, não pública/automatizável) e
+    // recorte curto (6 meses) — bem diferente das demais fontes deste
+    // catálogo (censitárias/administrativas de cobertura nacional contínua).
+    descricao:
+      'Contratos da modalidade solar do programa Reforma Casa Brasil (Caixa/Ministério ' +
+      'das Cidades), por 10.000 habitantes — extrato pontual nov/2025–abr/2026, não é ' +
+      'série histórica nem fonte pública automatizável.',
+    cores: RAMPA_VERDE,
+    metadados: {
+      natureza: 'Observado',
+      confianca: 'Média',
+      fonte: 'Caixa Econômica Federal — Programa Reforma Casa Brasil (extrato pontual SIC)',
+    },
+  },
+  {
     id: 'taxaAlfabetizacao',
     rotulo: 'Taxa de alfabetização',
     unidade: null,

@@ -227,6 +227,32 @@ export const indicadoresSociais = pgTable(
      */
     tarifaEnergiaResidencial: doublePrecision("tarifa_energia_residencial"),
 
+    /**
+     * Número de contratos da modalidade SOLAR do programa Reforma Casa
+     * Brasil (Caixa/Ministério das Cidades), somado nov/2025-abr/2026
+     * (Faixa 1 + Faixa 2, renda familiar bruta mensal até R$9.600).
+     *
+     * FONTE NÃO É PÚBLICA/AUTOMATIZÁVEL — diferente dos demais indicadores
+     * desta tabela: veio de um extrato pontual do sistema interno da Caixa
+     * (SIC), fornecido manualmente pelo usuário (não há URL pública para
+     * reproduzir/atualizar esta carga). Ver
+     * backend/src/etl/loaders/extrair_reforma_casa_brasil_solar.py.
+     * Motivação: capítulo "Atlas das experiências de MMGD solar" (Instituto
+     * Pólis) sobre "quem tem acesso à tecnologia solar" — ver migration 0027.
+     *
+     * NULL = sem contrato registrado no período (município não aparece no
+     * extrato) — NÃO é o mesmo que zero documentado, mesmo tratamento já
+     * dado a `unidadesHabitacionaisFgts` para municípios sem MCMV/FGTS.
+     */
+    numeroContratosReformaCasaBrasilSolar: integer("numero_contratos_reforma_casa_brasil_solar"),
+
+    /**
+     * Valor efetivamente liberado (R$, campo VR_LIBERADO da fonte, não o
+     * valor apenas contratado) dos mesmos contratos de
+     * `numeroContratosReformaCasaBrasilSolar` — mesma fonte/limitações.
+     */
+    valorLiberadoReformaCasaBrasilSolar: doublePrecision("valor_liberado_reforma_casa_brasil_solar"),
+
     criadoEm: timestamp('criado_em', { withTimezone: true }).defaultNow().notNull(),
   },
   (tabela) => ({

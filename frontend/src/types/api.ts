@@ -41,6 +41,18 @@ export interface MunicipioComIndicadores {
   numeroUcsResidencial: number | null;
   mmgdPer1000Hab: number | null;
   mmgdResidencialPer1000Hab: number | null;
+  /**
+   * Contratos da modalidade SOLAR do programa Reforma Casa Brasil (Caixa/
+   * Ministério das Cidades), somados nov/2025-abr/2026. Fonte pontual, NÃO
+   * pública/automatizável (extrato do SIC/Caixa) — ver
+   * backend/src/etl/loaders/extrair_reforma_casa_brasil_solar.py. NULL = sem
+   * contrato no período, não é lacuna de cobertura.
+   */
+  numeroContratosReformaCasaBrasilSolar: number | null;
+  /** Valor efetivamente liberado (R$) dos mesmos contratos acima. */
+  valorLiberadoReformaCasaBrasilSolar: number | null;
+  /** Derivado: contratos por 10.000 habitantes (população estimada). */
+  contratosReformaCasaBrasilSolarPer10000Hab: number | null;
   periodoReferenciaMmgd: string | null;
   periodoReferenciaIrradiacao: string | null;
 }

@@ -183,6 +183,23 @@ export function PainelMunicipio({ municipio, aoFechar }: PainelMunicipioProps) {
       ],
     },
     {
+      titulo: 'Acesso a financiamento',
+      linhas: [
+        {
+          campo: 'numeroContratosReformaCasaBrasilSolar',
+          rotulo: 'Contratos Reforma Casa Brasil Solar',
+          formato: 'inteiro',
+          descricao:
+            'Programa Reforma Casa Brasil (Caixa/Ministério das Cidades), modalidade solar — extrato pontual nov/2025–abr/2026, fonte não pública.',
+        },
+        {
+          campo: 'valorLiberadoReformaCasaBrasilSolar',
+          rotulo: 'Valor liberado (Reforma Casa Brasil Solar)',
+          formato: 'moeda',
+        },
+      ],
+    },
+    {
       titulo: 'Território',
       linhas: [
         {
