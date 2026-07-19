@@ -34,6 +34,7 @@ export function PaginaLogin() {
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const [mostrarAvisoSenha, setMostrarAvisoSenha] = useState(false);
 
   // Default '/mapa', não '/' — "/" é a landing pública (RF-001), não faz
   // sentido devolver quem acabou de logar pra lá.
@@ -123,6 +124,22 @@ export function PaginaLogin() {
             autoComplete="current-password"
             className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 focus:bg-white focus:ring-1 focus:ring-violet-600 focus:outline-none"
           />
+          <button
+            type="button"
+            onClick={() => setMostrarAvisoSenha((atual) => !atual)}
+            className="text-xs font-medium text-violet-700 hover:underline"
+          >
+            Esqueci minha senha
+          </button>
+          {/* RF-010: o Atlas não tem fluxo de recuperação por e-mail — aviso honesto em
+              vez de simular um "e-mail enviado" que nunca chegaria a lugar nenhum. */}
+          {mostrarAvisoSenha && (
+            <p className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-600">
+              Este é um ambiente de prototipagem sem fluxo automático de recuperação de senha.
+              Use um dos perfis de demonstração abaixo ou contate o administrador do projeto para
+              redefinir o acesso.
+            </p>
+          )}
         </div>
 
         <button

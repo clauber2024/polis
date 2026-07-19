@@ -59,11 +59,12 @@ export function CartaoNotasMetodologicas() {
   return (
     <section className="rounded border border-slate-200 bg-white p-4 shadow-2xs">
       <h2 className="text-base font-semibold text-slate-900">
-        Notas metodológicas (RF-064/065/066)
+        Documentação metodológica (RF-062, RF-064/065/066)
       </h2>
       <p className="mb-3 text-xs text-slate-500">
-        Cada registro entra como uma nova linha no histórico do tópico — nunca substitui a
-        anterior.
+        Visualizador + registro de notas metodológicas — cada envio entra como uma nova linha no
+        histórico do tópico, nunca substitui a anterior. Inclui notas de inspiração no OBEPE e de
+        limitações de granularidade (ex.: MMGD municipal) quando registradas.
       </p>
 
       <form onSubmit={aoSubmeter} className="mb-3 space-y-2">
@@ -117,7 +118,14 @@ export function CartaoNotasMetodologicas() {
               <p className="font-medium text-slate-700">
                 {nota.topico}
                 {nota.forcaAchado !== null && (
-                  <span className="ml-2 text-xs text-slate-400">força {nota.forcaAchado}/5</span>
+                  <span
+                    className="ml-2 text-xs tracking-tight text-amber-500"
+                    title={`Força do achado: ${nota.forcaAchado}/5`}
+                    aria-label={`Força do achado: ${nota.forcaAchado} de 5`}
+                  >
+                    {'★'.repeat(nota.forcaAchado)}
+                    <span className="text-slate-300">{'★'.repeat(5 - nota.forcaAchado)}</span>
+                  </span>
                 )}
               </p>
               <p className="whitespace-pre-wrap text-slate-800">{nota.conteudo}</p>
