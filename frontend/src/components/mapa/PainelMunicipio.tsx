@@ -16,10 +16,20 @@ interface PainelMunicipioProps {
  * indicador padrão — potência total é o mais direto de justificar aqui).
  */
 function DetalhamentoSetores({ setores }: { setores: SetorCensitario[] }) {
-  const ordenados = [...setores].sort(
-    (a, b) => (b.potenciaInstaladaKw ?? 0) - (a.potenciaInstaladaKw ?? 0),
-  );
-  const maximo = Math.max(1, ...ordenados.map((s) => s.potenciaInstaladaKw ?? 0));
+  // Nulo nunca vira 0: um setor sem potência medida não é "setor com potência
+  // zero" (mesma regra de ordenarMunicipios em municipios.service.ts) — nulos
+  // sempre por último, independente do valor, para não sugerir uma magnitude
+  // que a fonte não mediu.
+  const ordenados = [...setores].sort((a, b) => {
+    if (a.potenciaInstaladaKw === null && b.potenciaInstaladaKw === null) return 0;
+    if (a.potenciaInstaladaKw === null) return 1;
+    if (b.potenciaInstaladaKw === null) return -1;
+    return b.potenciaInstaladaKw - a.potenciaInstaladaKw;
+  });
+  const valoresValidos = ordenados
+    .map((s) => s.potenciaInstaladaKw)
+    .filter((valor): valor is number => valor !== null);
+  const maximo = Math.max(1, ...valoresValidos);
 
   return (
     <ol className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
@@ -32,12 +42,14 @@ function DetalhamentoSetores({ setores }: { setores: SetorCensitario[] }) {
             </span>
           </div>
           <div className="mt-1 h-1 overflow-hidden rounded-full bg-slate-100">
-            <div
-              className="h-full rounded-full bg-violet-400"
-              style={{
-                width: `${Math.max(2, ((setor.potenciaInstaladaKw ?? 0) / maximo) * 100)}%`,
-              }}
-            />
+            {setor.potenciaInstaladaKw !== null && (
+              <div
+                className="h-full rounded-full bg-violet-400"
+                style={{
+                  width: `${Math.max(2, (setor.potenciaInstaladaKw / maximo) * 100)}%`,
+                }}
+              />
+            )}
           </div>
           <div className="mt-1 flex justify-between text-slate-400">
             <span>{formatarValor(setor.areaKm2, 'numero')} km²</span>
