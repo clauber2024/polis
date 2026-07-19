@@ -21,6 +21,7 @@ export const QUADRANTES_VALIDOS = [
 
 export const CRITERIOS_ORDENACAO = [
   'ivs',
+  'ivsh',
   'rendaMediaDomiciliar',
   'percentualPobrezaCadunico',
   'irradiacaoMediaKwhM2Dia',

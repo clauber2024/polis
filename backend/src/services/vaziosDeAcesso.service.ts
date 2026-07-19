@@ -23,7 +23,12 @@
  *     per capita (< mediana).
  *   - Priorização padrão (RF-056): IVS Consolidado (indicador NEGATIVO —
  *     maior = mais vulnerável), mas a API aceita reordenar por outros
- *     critérios (ver schemas/vaziosDeAcesso.schema.ts).
+ *     critérios (ver schemas/vaziosDeAcesso.schema.ts) — incluindo `ivsh`
+ *     (migration 0028, ver vw_ivsh_consolidado): IVS + precariedade
+ *     habitacional + insegurança da posse, para quem quer priorizar
+ *     considerando moradia (o IVS puro exclui moradia de propósito, ver
+ *     migration 0015 — `ivsh` é a alternativa para quem precisa da leitura
+ *     combinada, sem alterar o IVS original).
  *
  * RESSALVA METODOLÓGICA (RF-055/RF-056; ver `notaMetodologica` no retorno de
  * `listarVaziosDeAcesso` — precisa aparecer na resposta da API, não só aqui):
@@ -59,6 +64,7 @@ interface LinhaPainelBruta {
   potenciaResidencialKw: number | null;
   irradiacaoMediaKwhM2Dia: number | null;
   ivs: number | null;
+  ivsh: number | null;
   rendaMediaDomiciliar: number | null;
   percentualPobrezaCadunico: number | null;
 }
@@ -73,6 +79,7 @@ export interface MunicipioClassificado {
   quadrante: Quadrante | null;
   quadranteRotulo: string | null;
   ivs: number | null;
+  ivsh: number | null;
   rendaMediaDomiciliar: number | null;
   percentualPobrezaCadunico: number | null;
 }
@@ -123,6 +130,7 @@ async function buscarPainelBruto(): Promise<LinhaPainelBruta[]> {
         mmgd.potencia_residencial_kw      AS "potenciaResidencialKw",
         irr.irradiacao_media_kwh_m2_dia   AS "irradiacaoMediaKwhM2Dia",
         vsc.ivs                           AS "ivs",
+        ivsh.ivsh                         AS "ivsh",
         vsc.renda_media_domiciliar        AS "rendaMediaDomiciliar",
         vsc.percentual_pobreza_cadunico   AS "percentualPobrezaCadunico"
     FROM municipios m
@@ -131,6 +139,7 @@ async function buscarPainelBruto(): Promise<LinhaPainelBruta[]> {
     LEFT JOIN mmgd_latest mmgd ON mmgd.unidade_espacial_id = ue.id
     LEFT JOIN vw_indicadores_sociais_consolidado vsc ON vsc.unidade_espacial_id = ue.id
     LEFT JOIN irr_latest irr ON irr.codigo_ibge = m.codigo_ibge
+    LEFT JOIN vw_ivsh_consolidado ivsh ON ivsh.codigo_ibge = m.codigo_ibge
     ORDER BY m.codigo_ibge;
   `);
 
@@ -256,6 +265,7 @@ function classificarPainel(linhas: LinhaPainelBruta[]): PainelClassificado {
       quadrante,
       quadranteRotulo: quadrante ? ROTULOS_QUADRANTE[quadrante] : null,
       ivs: linha.ivs,
+      ivsh: linha.ivsh,
       rendaMediaDomiciliar: linha.rendaMediaDomiciliar,
       percentualPobrezaCadunico: linha.percentualPobrezaCadunico,
     };
@@ -283,7 +293,12 @@ const NOTA_METODOLOGICA =
   'desperdiçado. Isso não invalida o resultado para fins de RF-055/RF-056 (que pedem ' +
   'justamente esse corte simples, potencial x acesso), mas deve ser lido com essa ' +
   'ressalva — mesmo cuidado metodológico já previsto para o Índice de Pobreza Energética ' +
-  'Regional (RF-080). Ver ARQUITETURA.md, seção "Identificação e ranking de Vazios de Acesso".';
+  'Regional (RF-080). Ver ARQUITETURA.md, seção "Identificação e ranking de Vazios de Acesso". ' +
+  'O campo "ivsh" (IVS + precariedade habitacional + insegurança da posse, migration 0028) é ' +
+  'uma alternativa de priorização para quem quer considerar moradia — auditoria de 18/07/2026 ' +
+  '(docs/RELATORIO_AUDITORIA_MORADIA_SOLAR.md) confirmou que precariedade habitacional e este ' +
+  'quadrante (potencial solar x MMGD residencial) são dimensões parcialmente independentes: o ' +
+  'IVS puro (usado como padrão) não captura moradia de propósito (migration 0015).';
 
 export interface ListarVaziosDeAcessoResultado {
   metodologia: {
@@ -365,7 +380,10 @@ export async function listarVaziosDeAcesso(
       criterioQuadrante:
         'Mediana nacional de cada eixo. "Vazio de Acesso" = irradiação >= mediana E MMGD residencial per capita < mediana.',
       criterioPriorizacaoPadrao:
-        'IVS Consolidado, decrescente (indicador negativo — maior valor = mais vulnerável primeiro). Reordenável via ?ordenarPor.',
+        'IVS Consolidado, decrescente (indicador negativo — maior valor = mais vulnerável primeiro). ' +
+        'Reordenável via ?ordenarPor — inclui "ivsh" (IVS + precariedade habitacional + insegurança ' +
+        'da posse, migration 0028) para priorização que considera moradia, já que o IVS puro exclui ' +
+        'essa dimensão de propósito (ver notaMetodologica).',
       medianaNacional: {
         potencialSolarKwhM2Dia: painel.medianaIrradiacao,
         mmgdResidencialPer1000Hab: painel.medianaMmgdResidencialPerCapita,

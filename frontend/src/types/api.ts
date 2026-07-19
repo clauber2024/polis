@@ -169,6 +169,12 @@ export interface MunicipioClassificado {
   quadrante: Quadrante | null;
   quadranteRotulo: string | null;
   ivs: number | null;
+  /**
+   * IVS + precariedade habitacional + insegurança da posse (vw_ivsh_
+   * consolidado, migration 0028) — campo real do backend
+   * (vaziosDeAcesso.service.ts) que faltava neste espelho.
+   */
+  ivsh: number | null;
   rendaMediaDomiciliar: number | null;
   percentualPobrezaCadunico: number | null;
 }
