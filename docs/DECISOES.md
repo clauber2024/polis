@@ -5,6 +5,62 @@ API, padrão de código, segurança, estrutura de pastas, autenticação, testes
 Critério e processo completo em `CLAUDE.md`, seção "🔟 Fluxo de Trabalho do Assistente
 de IA" → "Decisões técnicas".
 
+## Infraestrutura estatística integrada — motor fixo materializado via ETL — 2026-07-18
+
+**Contexto:**
+`docs/RELATORIO_AUDITORIA_MORADIA_SOLAR.md`, Seção 2.2, apontou a "ausência de
+infraestrutura estatística no backend hoje" — o cálculo de correlações parciais (ex.:
+testar se a adoção solar é barrada pela má condição de moradia, controlando irradiação e
+renda) ficava restrito a scripts exploratórios em `backend/src/etl/analises/`
+(`analisar_correlacao_mmgd_renda.py`), sem persistência nem exposição via API. A
+Recomendação Priorizada #3 do mesmo relatório pedia para testar formalmente esse modelo
+controlado. Antes de implementar, era preciso decidir ONDE essa computação estatística
+roda — decisão explicitamente pedida ao usuário (não presumida).
+
+**Decisão:**
+Motor **fixo, materializado via ETL** — um script Python roda a análise já validada
+(mesmo algoritmo de correlação parcial de Spearman por resíduo de postos do script
+exploratório) e grava o resultado numa tabela nova (`analises_estatisticas`, migration
+`0029`); o backend Node/Express só lê e serve via `GET /api/analises-estatisticas`. Sem
+novo runtime, sem nova dependência de deploy — mesmo padrão já usado no produto "ranking
+público de distribuidoras" (migration `0026`, ADR abaixo). Escopo desta primeira
+implementação: só a hipótese literal da Recomendação #3 (MMGD residencial per capita ~
+`indice_precariedade_moradia` e `indice_seguranca_posse`, controlando **renda e
+irradiação em conjunto**) — não a bateria completa de indicadores do script exploratório,
+nem um motor genérico para variáveis arbitrárias.
+
+**Alternativas consideradas:**
+- **Microsserviço Python sob demanda** (FastAPI, chamado via HTTP interno pelo Node) —
+  verdadeiramente dinâmico, reutiliza scipy sem reimplementar a matemática, mas introduz
+  um segundo runtime em produção (hoje só Postgres existe — ver Seção 8 do CLAUDE.md,
+  deploy ainda é especificação) e exige desenhar autenticação/rede interna do zero, sem
+  demanda real que justifique esse custo agora.
+- **Reimplementação em TypeScript** (rank + OLS por resíduo + Pearson, portado para
+  Node) — evita segundo runtime, mas duplica a lógica estatística validada em duas
+  linguagens (risco real de divergência silenciosa entre o número publicado no relatório
+  e o que a API devolveria), e regressões mais complexas exigiriam biblioteca nova no
+  Node (hoje nenhuma existe).
+- **`child_process` chamando o script Python por request** — reutiliza o código exato
+  sem duplicar, mas spawnar um processo Python (import de pandas/scipy) por request
+  síncrono de API é frágil para uma rota pública interativa, e mistura o papel do venv
+  (ferramenta de ETL/dev) com servir tráfego de produção.
+- **Não implementar agora** — deixaria a Recomendação #3 (já formalmente priorizada)
+  sem resposta; descartada porque a pergunta específica já estava madura o suficiente
+  para materializar sem ambiguidade de escopo.
+
+**Consequências:**
+`analises_estatisticas` fica deliberadamente estreita (hoje 2 linhas) — cada hipótese
+nova exige rodar/estender
+`backend/src/etl/loaders/calcular_analise_estatistica_moradia_mmgd.py` e um novo
+`INSERT`, não uma chamada de API parametrizada. Se o Pólis um dia precisar de análises
+interativas com variáveis escolhidas pelo usuário na interface, essa é a bifurcação para
+reabrir esta decisão a favor do microsserviço (opção descartada acima) — não uma
+extensão natural do modelo atual. Exposição no frontend ficou fora do escopo desta
+sessão (mesmo precedente do IVSH — API primeiro, UI depois, ver
+`docs/RELATORIO_AUDITORIA_MORADIA_SOLAR.md`, Seção 3.1).
+
+---
+
 ## Ranking público de distribuidoras — exibição, ponderação e nota metodológica — 2026-07-10
 
 **Contexto:**

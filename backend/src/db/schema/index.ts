@@ -14,3 +14,4 @@ export * from './metadados_bases_dados.js';
 export * from './aprovacoes_indicadores.js';
 export * from './versoes_publicadas.js';
 export * from './desempenho_conexao_distribuidoras.js';
+export * from './analises_estatisticas.js';
