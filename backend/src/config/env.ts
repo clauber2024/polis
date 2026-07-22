@@ -43,4 +43,15 @@ export const env = {
     'dev-secret-local-nao-usar-em-producao-ver-backend-env-example',
   ),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '8h',
+
+  /**
+   * Origens permitidas para CORS, separadas por vírgula (ex: URL do frontend
+   * na Vercel). Sem valor definido (dev local, onde o Vite faz proxy de /api
+   * e portanto nunca envia Origin cross-site "de verdade" nesse fluxo) o
+   * middleware libera qualquer origem — ver app.ts. Definir em produção.
+   */
+  frontendUrls: (process.env.FRONTEND_URL ?? '')
+    .split(',')
+    .map((url) => url.trim())
+    .filter(Boolean),
 };

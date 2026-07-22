@@ -16,11 +16,24 @@
  */
 
 import express from 'express';
+import cors from 'cors';
+import { env } from './config/env.js';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler.js';
 import { router } from './routes/index.js';
 
 export function criarApp() {
   const app = express();
+
+  /**
+   * Sem FRONTEND_URL definida (dev local), libera qualquer origem — o Vite já
+   * evita CORS de verdade via proxy, então isso só importa em produção, onde
+   * frontend (Vercel) e backend (Railway) vivem em domínios diferentes.
+   */
+  app.use(
+    cors({
+      origin: env.frontendUrls.length > 0 ? env.frontendUrls : true,
+    }),
+  );
 
   app.use(express.json());
 

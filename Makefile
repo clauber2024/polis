@@ -15,25 +15,40 @@
 #     -> nao ha ferramenta de lint configurada no projeto ainda.
 #   make send
 #     -> fluxo de commit/push interativo, nao implementado por ora.
+#
+# 'migrate-prod'/'db-prod' NAO fazem parte da Secao 8 (arquitetura de producao
+# planejada) — sao para o deploy publico TEMPORARIO via Railway/Vercel, ver
+# docs/DEPLOY_TEMPORARIO.md e o ADR em docs/DECISOES.md ("Hospedagem publica
+# temporaria").
 
-.PHONY: help up down db migrate seed etl etl-source fresh dev typecheck build front front-typecheck front-build
+.PHONY: help up down db migrate migrate-prod db-prod seed etl etl-source fresh dev typecheck build front front-typecheck front-build
 
-COMPOSE    := docker compose
-DB_USER    := atlas
-DB_NAME    := atlas_solar_justo
-MIGRATIONS := backend/src/db/migrations
-LOADERS    := backend/src/etl/loaders
-VENV_PY    := backend/src/etl/venv/bin/python3
-PSQL_EXEC  := $(COMPOSE) exec -T postgres psql -U $(DB_USER) -d $(DB_NAME)
+COMPOSE      := docker compose
+DB_USER      := atlas
+DB_NAME      := atlas_solar_justo
+MIGRATIONS   := backend/src/db/migrations
+LOADERS      := backend/src/etl/loaders
+VENV_PY      := backend/src/etl/venv/bin/python3
+PSQL_EXEC    := $(COMPOSE) exec -T postgres psql -U $(DB_USER) -d $(DB_NAME)
+POSTGIS_IMG  := postgis/postgis:16-3.4
 
 help:
 	@echo "Atlas Solar Justo — comandos disponiveis:"
 	@echo "  make up                              sobe o Postgres/PostGIS local"
 	@echo "  make down                             derruba os containers (mantem o volume)"
 	@echo "  make db                               abre um client psql interativo"
-	@echo "  make migrate                          aplica todas as migrations 0000-0024,"
-	@echo "                                         na ordem certa (inclui o schema de"
-	@echo "                                         Qualidade de Fornecimento antes da 0011)"
+	@echo "  make migrate                          aplica todas as migrations em"
+	@echo "                                         backend/src/db/migrations/*.sql, na ordem"
+	@echo "                                         numerica (inclui o schema de Qualidade de"
+	@echo "                                         Fornecimento antes da 0011) — pega qualquer"
+	@echo "                                         migration nova automaticamente, sem editar"
+	@echo "                                         este Makefile"
+	@echo "  make migrate-prod DATABASE_URL_PROD=...  mesma coisa, contra o Postgres do Railway"
+	@echo "                                         (deploy publico temporario, ver"
+	@echo "                                         docs/DEPLOY_TEMPORARIO.md) — reative o TCP"
+	@echo "                                         Proxy do Railway antes de rodar"
+	@echo "  make db-prod DATABASE_URL_PROD=...    abre um psql interativo contra o Postgres"
+	@echo "                                         do Railway (mesmo pre-requisito acima)"
 	@echo "  make seed                              popula o territorio (seed_municipios.py)"
 	@echo "  make etl                               roda a pipeline ETL completa, na ordem"
 	@echo "                                          documentada no README"
@@ -78,6 +93,48 @@ migrate:
 	@echo "Migrations aplicadas. Falta a carga de dados: 'make etl' (ETL/loaders) e,"
 	@echo "para Qualidade de Fornecimento, 'python3 backend/src/etl/etl_indqual.py' manualmente"
 	@echo "(fora do padrao loaders/, ver CLAUDE.md Secao 2)."
+
+# Mesma logica do 'migrate' acima, mas contra o Postgres remoto do deploy publico
+# temporario (Railway) em vez do container local — ver docs/DEPLOY_TEMPORARIO.md.
+# Roda via a MESMA imagem Docker do Postgres local ($(POSTGIS_IMG)), so pra ter
+# 'psql' disponivel sem precisar instalar nada no host. Usa 'psql' puro (sem
+# ON_ERROR_STOP), entao migrations ja aplicadas no dump/restore inicial vao
+# gerar erros esperados ("relation/column already exists") e serem puladas —
+# mesmo comportamento tolerante ja documentado no 'migrate' local contra um
+# banco ja provisionado.
+#
+# DATABASE_URL_PROD e a URL PUBLICA do Postgres do Railway (o TCP Proxy precisa
+# estar ativado em Settings -> Networking do servico postgres no Railway antes
+# de rodar isso — e recomendado desativar de novo depois, ver Secao 4.4 de
+# docs/DEPLOY_TEMPORARIO.md).
+migrate-prod:
+	@test -n "$(DATABASE_URL_PROD)" || { \
+		echo "Uso: make migrate-prod DATABASE_URL_PROD=postgresql://usuario:senha@host:porta/banco"; \
+		echo "(URL publica do Postgres do Railway com o TCP Proxy ativado — ver docs/DEPLOY_TEMPORARIO.md)"; \
+		exit 1; \
+	}
+	@for f in $(MIGRATIONS)/*.sql; do \
+		base=$$(basename $$f); \
+		if [ "$$base" = "0011_qualidade_dec_fec_real.sql" ]; then \
+			echo "-> backend/src/etl/schema_qualidade.sql (schema INDQUAL, fora do padrao de migrations)"; \
+			docker run --rm -v "$(CURDIR):/repo" $(POSTGIS_IMG) \
+				psql "$(DATABASE_URL_PROD)" -f /repo/backend/src/etl/schema_qualidade.sql; \
+		fi; \
+		echo "-> $$f"; \
+		docker run --rm -v "$(CURDIR):/repo" $(POSTGIS_IMG) \
+			psql "$(DATABASE_URL_PROD)" -f /repo/$$f; \
+	done
+	@echo "Migrations aplicadas no Postgres do Railway. Erros do tipo 'relation/column"
+	@echo "already exists' sao esperados para migrations que ja vieram no dump/restore"
+	@echo "inicial — confira se sobrou algum erro DIFERENTE desses antes de considerar ok."
+	@echo "Lembre de desativar o TCP Proxy no Railway se so o ativou para isto."
+
+db-prod:
+	@test -n "$(DATABASE_URL_PROD)" || { \
+		echo "Uso: make db-prod DATABASE_URL_PROD=postgresql://usuario:senha@host:porta/banco"; \
+		exit 1; \
+	}
+	docker run --rm -it $(POSTGIS_IMG) psql "$(DATABASE_URL_PROD)"
 
 seed:
 	$(VENV_PY) $(LOADERS)/seed_municipios.py
