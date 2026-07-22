@@ -20,6 +20,7 @@ const CAMPOS_NUMERICOS = [
   'densidadePopulacional',
   'populacaoEstimada',
   'ivs',
+  'ivsh',
   'rendaMediaDomiciliar',
   'percentualCadunico',
   'percentualPobrezaCadunico',

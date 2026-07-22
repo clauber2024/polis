@@ -48,6 +48,10 @@ docker-compose.override.yml
 tmp/
 temp/
 
+# Dumps do Postgres (ex: para migrar dados entre ambientes) - nunca versionar
+# dado, so os scripts/comandos que o geram (ver docs/DEPLOY_TEMPORARIO.md)
+*.dump
+
 backend/.env
 *.zip
 BR_Municipios_2025/

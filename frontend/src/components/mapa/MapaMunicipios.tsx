@@ -59,6 +59,7 @@ const FONTE_ROTULOS = 'municipios-rotulos';
 const CAMADA_PREENCHIMENTO = 'municipios-preenchimento';
 const CAMADA_CONTORNO = 'municipios-contorno';
 const CAMADA_DESTAQUE = 'vazios-destaque';
+const CAMADA_DESTAQUE_DESCOMPASSO = 'descompasso-destaque';
 const CAMADA_HEATMAP = 'vazios-heatmap';
 const CAMADA_ESTADOS = 'estados-contorno';
 const CAMADA_ESTADOS_FILL = 'estados-fill';
@@ -126,6 +127,14 @@ interface MapaMunicipiosProps {
   quebras: number[];
   /** Códigos IBGE a destacar (quadrante Vazio de Acesso) ou null para desligar. */
   codigosDestaque: string[] | null;
+  /**
+   * Códigos IBGE com alerta de Descompasso Morfológico ativo (21/07/2026,
+   * `descompassoMorfologico` do backend) ou null para desligar — camada
+   * independente do destaque de Vazios de Acesso (um município pode ter os
+   * dois ao mesmo tempo, por isso cores/traço diferentes em vez de reusar
+   * CAMADA_DESTAQUE).
+   */
+  codigosDescompasso: string[] | null;
   /**
    * Pontos do heatmap de Vazios de Acesso (RF-057) ou null para desligar.
    * Não-nulo também ESMAECE o choropleth (modo exclusivo). Quem monta os
@@ -197,6 +206,7 @@ export function MapaMunicipios({
   indicador,
   quebras,
   codigosDestaque,
+  codigosDescompasso,
   pontosHeatmap,
   foco,
   estados,
@@ -235,11 +245,14 @@ export function MapaMunicipios({
     [indicador, quebras],
   );
 
-  // Pontos de rótulo (nome do município conforme o zoom, 14/07/2026): centro
-  // do bbox de cada geometria — mesmo helper e mesma ressalva do heatmap
-  // (centro de bbox pode cair fora de polígono côncavo; para rótulo isso é
-  // aceitável, e o caminho para um ponto garantidamente interno seria
-  // ST_PointOnSurface no backend — ver utils/geometria.ts).
+  // Pontos de rótulo (nome do município conforme o zoom, 14/07/2026):
+  // `pontoRotulo` vem do backend (ST_PointOnSurface, GARANTIDAMENTE dentro
+  // do polígono) — ver docs/DECISOES.md, 21/07/2026. Bug real corrigido: o
+  // centro do bbox (client-side, `centroDaGeometria`) caía FORA do polígono
+  // para municípios côncavos/pequenos (região metropolitana do Recife —
+  // Camaragibe, Paulista, Abreu e Lima), jogando o rótulo em cima do
+  // vizinho. `centroDaGeometria` como fallback só para o caso defensivo de
+  // `pontoRotulo` nulo (não deveria ocorrer com geometria presente).
   const pontosRotulos = useMemo<GeoJSON.FeatureCollection<
     GeoJSON.Point,
     { codigoIbge: string; nome: string }
@@ -247,12 +260,13 @@ export function MapaMunicipios({
     if (!dados) return null;
     const features = dados.features.flatMap(
       (f): GeoJSON.Feature<GeoJSON.Point, { codigoIbge: string; nome: string }>[] => {
-        const centro = f.geometry ? centroDaGeometria(f.geometry) : null;
-        if (!centro) return [];
+        const ponto =
+          f.properties.pontoRotulo ?? (f.geometry ? centroDaGeometria(f.geometry) : null);
+        if (!ponto) return [];
         return [
           {
             type: 'Feature',
-            geometry: { type: 'Point', coordinates: centro },
+            geometry: { type: 'Point', coordinates: ponto },
             properties: { codigoIbge: f.properties.codigoIbge, nome: f.properties.nome },
           },
         ];
@@ -376,6 +390,18 @@ export function MapaMunicipios({
       source: FONTE,
       filter: ['boolean', false],
       paint: { 'line-color': '#7c3aed', 'line-width': 1.4 },
+    });
+
+    // Descompasso Morfológico (21/07/2026) — traço tracejado vermelho,
+    // deliberadamente diferente do violeta sólido de Vazios de Acesso: um
+    // município pode ter os dois alertas ao mesmo tempo, e as duas camadas
+    // precisam continuar distinguíveis quando sobrepostas.
+    mapa.addLayer({
+      id: CAMADA_DESTAQUE_DESCOMPASSO,
+      type: 'line',
+      source: FONTE,
+      filter: ['boolean', false],
+      paint: { 'line-color': '#dc2626', 'line-width': 1.6, 'line-dasharray': [2, 1.5] },
     });
 
     // Contorno engrossado do município selecionado (15/07/2026) — mesma
@@ -560,19 +586,23 @@ export function MapaMunicipios({
       mapa.getLayer(CAMADA_DESTAQUE) ? CAMADA_DESTAQUE : undefined,
     );
 
-    // Rótulos de ESTADO no zoom amplo (15/07/2026) — pontos no centro do
-    // bbox de cada UF (mesma ressalva de sempre do centro de bbox), texto
-    // some quando os rótulos de município entram (ZOOM_MINIMO_ROTULOS).
+    // Rótulos de ESTADO no zoom amplo (15/07/2026) — `pontoRotulo` do backend
+    // (ST_PointOnSurface, GARANTIDAMENTE dentro do polígono), não mais o
+    // centro do bbox: o Espírito Santo tem a Ilha da Trindade (~1.140 km da
+    // costa, parte oficial de Vitória) na malha, e o bbox da união estadual
+    // jogava o rótulo no meio do Atlântico — ver docs/DECISOES.md,
+    // 21/07/2026. `centroDaGeometria` como fallback defensivo. Texto some
+    // quando os rótulos de município entram (ZOOM_MINIMO_ROTULOS).
     const pontosEstados: GeoJSON.FeatureCollection<GeoJSON.Point, { nomeEstado: string }> = {
       type: 'FeatureCollection',
       features: estados.features.flatMap(
         (f): GeoJSON.Feature<GeoJSON.Point, { nomeEstado: string }>[] => {
-          const centro = centroDaGeometria(f.geometry);
-          if (!centro) return [];
+          const ponto = f.properties.pontoRotulo ?? centroDaGeometria(f.geometry);
+          if (!ponto) return [];
           return [
             {
               type: 'Feature',
-              geometry: { type: 'Point', coordinates: centro },
+              geometry: { type: 'Point', coordinates: ponto },
               properties: { nomeEstado: f.properties.nomeEstado },
             },
           ];
@@ -648,6 +678,22 @@ export function MapaMunicipios({
       mapa.setFilter(CAMADA_DESTAQUE, ['boolean', false]);
     }
   }, [codigosDestaque, mapaCarregado, dados]);
+
+  // Liga/desliga o contorno de destaque de Descompasso Morfológico (mesmo
+  // padrão do destaque de Vazios de Acesso acima, camada independente).
+  useEffect(() => {
+    const mapa = mapaRef.current;
+    if (!mapa || !mapaCarregado || !mapa.getLayer(CAMADA_DESTAQUE_DESCOMPASSO)) return;
+    if (codigosDescompasso && codigosDescompasso.length > 0) {
+      mapa.setFilter(CAMADA_DESTAQUE_DESCOMPASSO, [
+        'in',
+        ['get', 'codigoIbge'],
+        ['literal', codigosDescompasso],
+      ] as unknown as FilterSpecification);
+    } else {
+      mapa.setFilter(CAMADA_DESTAQUE_DESCOMPASSO, ['boolean', false]);
+    }
+  }, [codigosDescompasso, mapaCarregado, dados]);
 
   // Filtro do Dashboard Público (RF-046) — esconde (não esmaece) municípios
   // fora da faixa/estado/região selecionados, no preenchimento E no contorno.

@@ -1,8 +1,24 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { buscarVaziosDeAcesso } from '../services/vaziosDeAcesso.service';
-import type { ListarVaziosDeAcessoResultado } from '../types/api';
+import type { ClassificacaoIvsh, ListarVaziosDeAcessoResultado } from '../types/api';
 import { formatarValor } from '../utils/formatadores';
+import { AlternadorPriorizacaoIvsh } from '../components/vazios-de-acesso/AlternadorPriorizacaoIvsh';
+
+/**
+ * Rótulo + cor por quintil de IVSH (21/07/2026, pedido do usuário: "uma
+ * classificação estatística dos municípios do ranking") — quintil calculado
+ * pelo backend SOBRE o quadrante vazio_de_acesso (não nacional), ver
+ * vaziosDeAcesso.service.ts, `calcularClassificacaoIvsh`. IVSH é indicador
+ * negativo — muito_alto = pior 20% deste ranking.
+ */
+const CLASSIFICACAO_IVSH_INFO: Record<ClassificacaoIvsh, { rotulo: string; classe: string }> = {
+  muito_alto: { rotulo: 'Muito alto', classe: 'bg-red-50 text-red-700 border-red-200' },
+  alto: { rotulo: 'Alto', classe: 'bg-amber-50 text-amber-700 border-amber-200' },
+  medio: { rotulo: 'Médio', classe: 'bg-slate-100 text-slate-600 border-slate-200' },
+  baixo: { rotulo: 'Baixo', classe: 'bg-teal-50 text-teal-700 border-teal-200' },
+  muito_baixo: { rotulo: 'Muito baixo', classe: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+};
 
 /**
  * Ranking nacional de "potencial não aproveitado" (14/07/2026 — ideia
@@ -24,6 +40,8 @@ const UFS = [
 export function PaginaVaziosDeAcesso() {
   const [pagina, setPagina] = useState(1);
   const [uf, setUf] = useState('');
+  const [classificacaoIvsh, setClassificacaoIvsh] = useState('');
+  const [ivshLigado, setIvshLigado] = useState(false);
   const [resultado, setResultado] = useState<ListarVaziosDeAcessoResultado | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
@@ -36,7 +54,9 @@ export function PaginaVaziosDeAcesso() {
       quadrante: 'vazio_de_acesso',
       pagina: String(pagina),
       porPagina: String(POR_PAGINA),
+      ordenarPor: ivshLigado ? 'ivsh' : 'ivs',
       ...(uf ? { uf } : {}),
+      ...(classificacaoIvsh ? { classificacaoIvsh } : {}),
     })
       .then((resposta) => {
         if (ativo) setResultado(resposta);
@@ -52,7 +72,15 @@ export function PaginaVaziosDeAcesso() {
     return () => {
       ativo = false;
     };
-  }, [pagina, uf]);
+  }, [pagina, uf, classificacaoIvsh, ivshLigado]);
+
+  function aoAlternarIvsh(ligado: boolean) {
+    setIvshLigado(ligado);
+    // Desliga o filtro de classificação junto — não faz sentido ele ficar
+    // aplicado (mesmo que desabilitado na UI) quando o critério volta a ser IVS.
+    if (!ligado) setClassificacaoIvsh('');
+    setPagina(1);
+  }
 
   const totalPaginas = resultado?.paginacao.totalPaginas ?? 1;
 
@@ -67,7 +95,9 @@ export function PaginaVaziosDeAcesso() {
         </h1>
         <p className="mt-1 text-sm text-slate-500">
           Municípios com alta irradiação solar e baixa adoção de MMGD residencial, ordenados
-          pela priorização padrão do Atlas (IVS decrescente — mais vulnerável primeiro).
+          por {ivshLigado ? 'IVSH' : 'IVS'} decrescente — mais vulnerável primeiro. A
+          classificação do quadrante (quem é Vazio de Acesso) não muda com o critério de
+          priorização, só a ordem dentro dele.
         </p>
         {resultado && (
           <p className="mt-2 font-mono text-xs text-slate-400">
@@ -79,26 +109,60 @@ export function PaginaVaziosDeAcesso() {
         )}
       </div>
 
-      <div className="mt-4 flex items-center gap-3">
-        <label htmlFor="filtro-uf-vazios" className="text-xs font-semibold text-slate-600">
-          Filtrar por estado
-        </label>
-        <select
-          id="filtro-uf-vazios"
-          value={uf}
-          onChange={(evento) => {
-            setUf(evento.target.value);
-            setPagina(1);
-          }}
-          className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-800 focus:bg-white focus:ring-1 focus:ring-violet-500 focus:outline-none"
-        >
-          <option value="">Todos os estados</option>
-          {UFS.map((sigla) => (
-            <option key={sigla} value={sigla}>
-              {sigla}
-            </option>
-          ))}
-        </select>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <label htmlFor="filtro-uf-vazios" className="text-xs font-semibold text-slate-600">
+            Filtrar por estado
+          </label>
+          <select
+            id="filtro-uf-vazios"
+            value={uf}
+            onChange={(evento) => {
+              setUf(evento.target.value);
+              setPagina(1);
+            }}
+            className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-800 focus:bg-white focus:ring-1 focus:ring-violet-500 focus:outline-none"
+          >
+            <option value="">Todos os estados</option>
+            {UFS.map((sigla) => (
+              <option key={sigla} value={sigla}>
+                {sigla}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Filtro por classificação de IVSH (21/07/2026) — só faz sentido
+            junto do modo IVSH ligado, já que a classificação é sobre esse
+            índice; desabilitado (não escondido) quando IVS está ativo, para
+            deixar claro que a opção existe. */}
+        <div className="flex items-center gap-3">
+          <label htmlFor="filtro-classificacao-ivsh" className="text-xs font-semibold text-slate-600">
+            Classificação IVSH
+          </label>
+          <select
+            id="filtro-classificacao-ivsh"
+            value={classificacaoIvsh}
+            disabled={!ivshLigado}
+            onChange={(evento) => {
+              setClassificacaoIvsh(evento.target.value);
+              setPagina(1);
+            }}
+            className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-800 focus:bg-white focus:ring-1 focus:ring-violet-500 focus:outline-none disabled:opacity-50"
+            title={!ivshLigado ? 'Ligue o critério IVSH acima para filtrar por classificação' : undefined}
+          >
+            <option value="">Todas</option>
+            {(Object.entries(CLASSIFICACAO_IVSH_INFO) as [ClassificacaoIvsh, { rotulo: string }][]).map(
+              ([valor, info]) => (
+                <option key={valor} value={valor}>
+                  {info.rotulo}
+                </option>
+              ),
+            )}
+          </select>
+        </div>
+
+        <AlternadorPriorizacaoIvsh ligado={ivshLigado} aoAlternar={aoAlternarIvsh} />
       </div>
 
       {carregando && <p className="mt-6 text-sm text-slate-500">Carregando ranking…</p>}
@@ -114,6 +178,8 @@ export function PaginaVaziosDeAcesso() {
                   <th className="px-3 py-2">Município</th>
                   <th className="px-3 py-2">UF</th>
                   <th className="px-3 py-2 text-right">IVS</th>
+                  {ivshLigado && <th className="px-3 py-2 text-right">IVSH</th>}
+                  {ivshLigado && <th className="px-3 py-2">Classificação IVSH</th>}
                   <th className="px-3 py-2 text-right">Pobreza CadÚnico</th>
                   <th className="px-3 py-2 text-right">MMGD res. (kW/1.000 hab)</th>
                   <th className="px-3 py-2 text-right">Irradiação (kWh/m²·dia)</th>
@@ -141,6 +207,24 @@ export function PaginaVaziosDeAcesso() {
                     <td className="px-3 py-2 text-right font-mono font-semibold text-violet-700">
                       {m.ivs !== null ? formatarValor(m.ivs, 'numero') : '—'}
                     </td>
+                    {ivshLigado && (
+                      <td className="px-3 py-2 text-right font-mono font-semibold text-violet-700">
+                        {m.ivsh !== null ? formatarValor(m.ivsh, 'numero') : '—'}
+                      </td>
+                    )}
+                    {ivshLigado && (
+                      <td className="px-3 py-2">
+                        {m.classificacaoIvsh ? (
+                          <span
+                            className={`inline-block rounded border px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap ${CLASSIFICACAO_IVSH_INFO[m.classificacaoIvsh].classe}`}
+                          >
+                            {CLASSIFICACAO_IVSH_INFO[m.classificacaoIvsh].rotulo}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-400">—</span>
+                        )}
+                      </td>
+                    )}
                     <td className="px-3 py-2 text-right font-mono text-slate-700">
                       {m.percentualPobrezaCadunico !== null
                         ? `${formatarValor(m.percentualPobrezaCadunico, 'numero')}%`

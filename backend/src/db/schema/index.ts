@@ -15,3 +15,4 @@ export * from './aprovacoes_indicadores.js';
 export * from './versoes_publicadas.js';
 export * from './desempenho_conexao_distribuidoras.js';
 export * from './analises_estatisticas.js';
+export * from './indicadores_energia_nacional.js';

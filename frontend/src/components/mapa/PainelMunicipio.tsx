@@ -3,10 +3,15 @@ import type { MunicipioComIndicadores, SetorCensitario, SetoresCensitariosResult
 import { baixarRelatorioTerritorio, buscarSetoresCensitarios } from '../../services/municipios.service';
 import { formatarValor, type FormatoIndicador } from '../../utils/formatadores';
 import { NOTAS_MUNICIPIO, notaAusencia, type CampoNumerico } from '../../utils/notasAusencia';
+import { CartaoDescompassoMorfologico } from './CartaoDescompassoMorfologico';
 
 interface PainelMunicipioProps {
   municipio: MunicipioComIndicadores;
   aoFechar: () => void;
+  /** Mediana nacional de irradiação (GET /api/vazios-de-acesso, mesmo lazy load do destaque/heatmap) — usada pelo CartaoDescompassoMorfologico; null enquanto não carregou. */
+  medianaIrradiacao: number | null;
+  /** Percentil 90 nacional de precariedade habitacional (mesmo lazy load acima) — usado pelo CartaoDescompassoMorfologico; null enquanto não carregou. */
+  limiarPrecariedadeHabitacionalAlta: number | null;
 }
 
 /**
@@ -80,7 +85,12 @@ interface LinhaIndicador {
  * mapeada. Municípios especiais (ex.: instalado em 2025, distrito estadual)
  * ganham uma nota geral no topo do painel.
  */
-export function PainelMunicipio({ municipio, aoFechar }: PainelMunicipioProps) {
+export function PainelMunicipio({
+  municipio,
+  aoFechar,
+  medianaIrradiacao,
+  limiarPrecariedadeHabitacionalAlta,
+}: PainelMunicipioProps) {
   // RF-058: geração do relatório-resumo em PDF do território selecionado.
   const [gerandoRelatorio, setGerandoRelatorio] = useState(false);
   const [erroRelatorio, setErroRelatorio] = useState<string | null>(null);
@@ -274,6 +284,12 @@ export function PainelMunicipio({ municipio, aoFechar }: PainelMunicipioProps) {
           {notaMunicipio}
         </p>
       )}
+
+      <CartaoDescompassoMorfologico
+        municipio={municipio}
+        medianaIrradiacao={medianaIrradiacao}
+        limiarPrecariedadeHabitacionalAlta={limiarPrecariedadeHabitacionalAlta}
+      />
 
       {grupos.map((grupo) => (
         <section key={grupo.titulo} className="border-b border-slate-100 p-4">

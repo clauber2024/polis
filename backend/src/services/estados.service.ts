@@ -27,6 +27,14 @@ interface EstadoFeature {
     uf: string;
     nomeEstado: string;
     regiao: string;
+    /**
+     * Ponto GARANTIDAMENTE dentro do polígono (ST_PointOnSurface) — usado
+     * pelo frontend para o rótulo da UF. Antes disso, o rótulo usava o
+     * centro do bounding box (client-side), que caía no meio do Atlântico
+     * para o Espírito Santo (Ilha da Trindade, ~1.140 km da costa, parte
+     * oficial do território de Vitória) — ver docs/DECISOES.md, 21/07/2026.
+     */
+    pontoRotulo: [number, number] | null;
   };
 }
 
@@ -43,28 +51,43 @@ async function calcularEstadosGeoJson(): Promise<EstadosGeoJson> {
   // (~10 m) e simplificação pode gerar polígonos tecnicamente inválidos
   // (self-intersection) — ST_Union puro aborta com TopologyException nesses
   // casos. ST_MakeValid conserta sem mudar o traçado visível.
+  // CTE calcula o union UMA vez só — ST_PointOnSurface roda em cima do
+  // resultado já unido, não recalcula o ST_Union (que já é caro sozinho).
   const resultado = await db.execute(sql`
+    WITH uniao AS (
+      SELECT
+        uf,
+        MIN(nome_estado) AS nome_estado,
+        MIN(regiao)      AS regiao,
+        ST_Union(ST_MakeValid(geom)) AS geom_uniao
+      FROM municipios
+      GROUP BY uf
+    )
     SELECT
       uf,
-      MIN(nome_estado) AS nome_estado,
-      MIN(regiao)      AS regiao,
-      ST_AsGeoJSON(ST_Union(ST_MakeValid(geom)), 6) AS geometria
-    FROM municipios
-    GROUP BY uf
+      nome_estado,
+      regiao,
+      ST_AsGeoJSON(geom_uniao, 6) AS geometria,
+      ST_AsGeoJSON(ST_PointOnSurface(geom_uniao), 6) AS ponto_rotulo
+    FROM uniao
     ORDER BY uf;
   `);
 
   const features: EstadoFeature[] = resultado.rows.map((linha) => {
-    const { uf, nome_estado, regiao, geometria } = linha as {
+    const { uf, nome_estado, regiao, geometria, ponto_rotulo } = linha as {
       uf: string;
       nome_estado: string;
       regiao: string;
       geometria: string;
+      ponto_rotulo: string | null;
     };
+    const pontoRotulo = ponto_rotulo
+      ? (JSON.parse(ponto_rotulo) as { coordinates: [number, number] }).coordinates
+      : null;
     return {
       type: 'Feature',
       geometry: JSON.parse(geometria) as unknown,
-      properties: { uf, nomeEstado: nome_estado, regiao },
+      properties: { uf, nomeEstado: nome_estado, regiao, pontoRotulo },
     };
   });
 

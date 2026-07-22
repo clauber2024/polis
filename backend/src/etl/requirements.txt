@@ -3,6 +3,7 @@ cffi==2.1.0
 charset-normalizer==3.4.9
 cryptography==49.0.0
 db-dtypes==1.7.1
+et-xmlfile==2.0.0
 geopandas==1.1.4
 google-api-core==2.31.0
 google-auth==2.55.2
@@ -16,6 +17,7 @@ grpcio==1.82.1
 grpcio-status==1.82.1
 idna==3.18
 numpy==2.5.1
+openpyxl==3.1.5
 packaging==26.2
 pandas==3.0.3
 proto-plus==1.28.1

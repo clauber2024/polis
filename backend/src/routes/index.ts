@@ -14,6 +14,7 @@ import { estatisticasNacionaisRouter } from './estatisticasNacionais.routes.js';
 import { rankingDistribuidorasRouter } from './rankingDistribuidoras.routes.js';
 import { estadosRouter } from './estados.routes.js';
 import { analisesEstatisticasRouter } from './analisesEstatisticas.routes.js';
+import { notaMetodologicaRouter } from './notaMetodologica.routes.js';
 
 export const router = Router();
 
@@ -27,3 +28,4 @@ router.use(estatisticasNacionaisRouter);
 router.use(rankingDistribuidorasRouter);
 router.use(estadosRouter);
 router.use(analisesEstatisticasRouter);
+router.use(notaMetodologicaRouter);

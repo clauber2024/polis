@@ -13,9 +13,9 @@
  * dados já carregados: 'completo' (cobertura >= 95%), 'parcial' (0% < x <
  * 95%) ou 'bloqueado' (0%, com observação do motivo).
  *
- * Nomenclatura das 6 fontes segue literalmente o texto do RF-063 (ANEEL,
- * IBGE, CadÚnico, TSEE, IVS/IPEA, INPE) — cada uma representada por um
- * indicador "âncora" carregado a partir dela:
+ * Nomenclatura das 6 fontes originais segue literalmente o texto do RF-063
+ * (ANEEL, IBGE, CadÚnico, TSEE, IVS/IPEA, INPE) — cada uma representada por
+ * um indicador "âncora" carregado a partir dela:
  *   - ANEEL      -> mmgd_indicadores.potencia_instalada_kw (MMGD)
  *   - IBGE       -> indicadores_sociais.percentual_agua_inadequada (Censo,
  *                   bloco Infraestrutura Urbana)
@@ -24,6 +24,27 @@
  *                   ver CLAUDE.md, aguardando dado ANEEL pós-jan/2026)
  *   - IVS/IPEA   -> indicadores_sociais.ivs (índice próprio, não o IVS oficial)
  *   - INPE       -> irradiacao_solar.irradiacao_media_kwh_m2_dia
+ *
+ * Expandido em 21/07/2026 (pedido do usuário: "atualizar o status da base
+ * de dados... com todas as bases") para as demais fontes reais que o Atlas
+ * já usa, mas que RF-063 não citava literalmente (mesma lacuna já corrigida
+ * na Landing Page — ver PaginaLanding.tsx, FONTES_DE_DADOS):
+ *   - RAIS       -> indicadores_sociais.renda_media_domiciliar (via BigQuery)
+ *   - DATASUS    -> indicadores_sociais.taxa_mortalidade_infantil (SIM+SINASC)
+ *   - MCMV       -> indicadores_sociais.unidades_habitacionais_fgts OU
+ *                   empreendimentos_ogu (Caixa/FGTS + Ministério das
+ *                   Cidades/OGU)
+ *   - ZEIS/AEIS  -> unidades_espaciais.tipo IN ('zeis','aeis') — cobertura
+ *                   aqui é DELIBERADAMENTE baixa (só 8 municípios têm seed:
+ *                   São Paulo, Recife, Rio Branco, Belo Horizonte, Contagem,
+ *                   Fortaleza, Salvador, Rio de Janeiro — confirmado via
+ *                   consulta direta ao banco em 21/07/2026), não é lacuna de
+ *                   carga, é o alcance real da fonte (perímetros de ZEIS só
+ *                   existem publicados nessas prefeituras)
+ *   - Reforma Casa Brasil Solar -> indicadores_sociais.
+ *                   numero_contratos_reforma_casa_brasil_solar (Caixa, fonte
+ *                   pontual não pública, extrato nov/2025-abr/2026 — baixa
+ *                   cobertura é o recorte real do programa, não lacuna)
  * ============================================================================
  */
 
@@ -109,17 +130,65 @@ async function cobrirIrradiacaoSolar(): Promise<{ cobertos: number; periodo: str
   return { cobertos: Number(linha.cobertos), periodo: linha.periodo };
 }
 
+/**
+ * MCMV (Caixa/FGTS + Ministério das Cidades/OGU) — cobertura conta município
+ * com QUALQUER uma das duas colunas preenchida (são 2 extractors/faixas de
+ * financiamento diferentes, ver extrair_mcmv_fgts.py/extrair_mcmv_ogu.py),
+ * não uma coluna única como cobrirColunaIndicadoresSociais assume.
+ */
+async function cobrirMcmv(): Promise<{ cobertos: number; periodo: string | null }> {
+  const resultado = await db.execute(sql`
+    SELECT
+      COUNT(DISTINCT ue.id) FILTER (
+        WHERE i.unidades_habitacionais_fgts IS NOT NULL OR i.empreendimentos_ogu IS NOT NULL
+      ) AS cobertos,
+      MAX(i.periodo_referencia) FILTER (
+        WHERE i.unidades_habitacionais_fgts IS NOT NULL OR i.empreendimentos_ogu IS NOT NULL
+      ) AS periodo
+    FROM municipios m
+    JOIN unidades_espaciais ue
+      ON ue.municipio_pai_codigo_ibge = m.codigo_ibge AND ue.tipo = 'municipio'
+    LEFT JOIN indicadores_sociais i ON i.unidade_espacial_id = ue.id;
+  `);
+  const linha = resultado.rows[0] as { cobertos: string | number; periodo: string | null };
+  return { cobertos: Number(linha.cobertos), periodo: linha.periodo };
+}
+
+/**
+ * ZEIS/AEIS (prefeituras municipais) — granularidade diferente das demais
+ * fontes: não é uma coluna de `indicadores_sociais`, é presença de QUALQUER
+ * unidade espacial tipo 'zeis'/'aeis' filha do município (seeds por
+ * capital). Sem periodo_referencia nessa tabela — sempre null, mesmo padrão
+ * já usado para TSEE bloqueado.
+ */
+async function cobrirZeisAeis(): Promise<{ cobertos: number; periodo: string | null }> {
+  const resultado = await db.execute(sql`
+    SELECT COUNT(DISTINCT m.codigo_ibge) AS cobertos
+    FROM municipios m
+    JOIN unidades_espaciais ze
+      ON ze.municipio_pai_codigo_ibge = m.codigo_ibge AND ze.tipo IN ('zeis', 'aeis');
+  `);
+  const linha = resultado.rows[0] as { cobertos: string | number };
+  return { cobertos: Number(linha.cobertos), periodo: null };
+}
+
 export async function buscarStatusBasesDeDados(): Promise<StatusBasesDeDadosResultado> {
   const totalResultado = await db.execute(sql`SELECT COUNT(*) AS total FROM municipios;`);
   const totalMunicipios = Number((totalResultado.rows[0] as { total: string | number }).total);
 
-  const [mmgd, ibge, cadunico, ivs, irradiacao] = await Promise.all([
-    cobrirMmgd(),
-    cobrirColunaIndicadoresSociais('percentual_agua_inadequada'),
-    cobrirColunaIndicadoresSociais('percentual_pobreza_cadunico'),
-    cobrirColunaIndicadoresSociais('ivs'),
-    cobrirIrradiacaoSolar(),
-  ]);
+  const [mmgd, ibge, cadunico, ivs, irradiacao, rais, datasus, mcmv, zeisAeis, reformaSolar] =
+    await Promise.all([
+      cobrirMmgd(),
+      cobrirColunaIndicadoresSociais('percentual_agua_inadequada'),
+      cobrirColunaIndicadoresSociais('percentual_pobreza_cadunico'),
+      cobrirColunaIndicadoresSociais('ivs'),
+      cobrirIrradiacaoSolar(),
+      cobrirColunaIndicadoresSociais('renda_media_domiciliar'),
+      cobrirColunaIndicadoresSociais('taxa_mortalidade_infantil'),
+      cobrirMcmv(),
+      cobrirZeisAeis(),
+      cobrirColunaIndicadoresSociais('numero_contratos_reforma_casa_brasil_solar'),
+    ]);
 
   function montarFonte(
     id: string,
@@ -162,6 +231,38 @@ export async function buscarStatusBasesDeDados(): Promise<StatusBasesDeDadosResu
       'Construção própria do Atlas (média de 3 blocos normalizados), não o IVS oficial do IPEA — ver ARQUITETURA.md, "Índices compostos e metodologia de cruzamentos".',
     ),
     montarFonte('inpe', 'INPE — Irradiação Solar (Atlas Brasileiro de Energia Solar)', irradiacao),
+    montarFonte(
+      'rais',
+      'RAIS — Ministério do Trabalho (Renda e Trabalho, via BigQuery)',
+      rais,
+    ),
+    montarFonte(
+      'datasus',
+      'DATASUS — Mortalidade Infantil (SIM + SINASC)',
+      datasus,
+    ),
+    montarFonte(
+      'mcmv',
+      'Caixa/FGTS e Ministério das Cidades — Minha Casa Minha Vida',
+      mcmv,
+    ),
+    montarFonte(
+      'zeis_aeis',
+      'Prefeituras municipais — Zonas Especiais de Interesse Social (ZEIS/AEIS)',
+      zeisAeis,
+      'Cobertura baixa por desenho, não por lacuna de carga: perímetros de ZEIS/AEIS só ' +
+        'existem publicados hoje em 8 prefeituras (São Paulo, Recife, Rio Branco, Belo ' +
+        'Horizonte, Contagem, Fortaleza, Salvador, Rio de Janeiro) — não há fonte nacional ' +
+        'única e estruturada para essa camada.',
+    ),
+    montarFonte(
+      'reforma_casa_brasil_solar',
+      'Caixa Econômica Federal — Reforma Casa Brasil Solar',
+      reformaSolar,
+      'Cobertura parcial por desenho, não por lacuna de carga: fonte pontual e NÃO pública ' +
+        '(extrato via Lei de Acesso à Informação, nov/2025–abr/2026), reflete o alcance real ' +
+        'do programa no período, não uma extração incompleta.',
+    ),
   ];
 
   return {

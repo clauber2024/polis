@@ -23,6 +23,7 @@ import { REGIOES_VALIDAS } from './vaziosDeAcesso.schema.js';
 export const CRITERIOS_ORDENACAO_MUNICIPIO = [
   'nome',
   'ivs',
+  'ivsh',
   'rendaMediaDomiciliar',
   'percentualPobrezaCadunico',
   'percentualTarifaSocial',

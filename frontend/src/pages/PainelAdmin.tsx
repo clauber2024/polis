@@ -1,4 +1,5 @@
 import { CartaoAprovacoesIndicadores } from '../components/admin/CartaoAprovacoesIndicadores';
+import { CartaoAtualizacaoIndicadoresExternos } from '../components/admin/CartaoAtualizacaoIndicadoresExternos';
 import { CartaoGestaoUsuarios } from '../components/admin/CartaoGestaoUsuarios';
 import { CartaoMetadadosBasesDados } from '../components/admin/CartaoMetadadosBasesDados';
 import { CartaoVersoesPublicadas } from '../components/admin/CartaoVersoesPublicadas';
@@ -53,6 +54,7 @@ export function PainelAdmin() {
       </section>
 
       <CartaoMetadadosBasesDados />
+      <CartaoAtualizacaoIndicadoresExternos />
       <CartaoAprovacoesIndicadores />
       <CartaoVersoesPublicadas />
       <CartaoGestaoUsuarios />

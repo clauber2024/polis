@@ -43,6 +43,15 @@ export interface MunicipioComIndicadores {
    */
   populacaoEstimada: number | null;
   ivs: number | null;
+  /**
+   * IVSH — Índice de Vulnerabilidade Socio-Habitacional-Energética
+   * (vw_ivsh_consolidado, migration 0028) = média de IVS + precariedade
+   * habitacional + insegurança da posse. Diferente de `ivs`: inclui moradia
+   * de propósito (o IVS geral a exclui para não diluir a hipótese MMGD x
+   * moradia — ver docs/RELATORIO_AUDITORIA_MORADIA_SOLAR.md). Uso de
+   * priorização, não substitui `ivs` nas demais telas.
+   */
+  ivsh: number | null;
   rendaMediaDomiciliar: number | null;
   /** Cobertura: pessoas cadastradas no CadÚnico ÷ população (Censo 2022) × 100. */
   percentualCadunico: number | null;
@@ -74,6 +83,19 @@ export interface MunicipioComIndicadores {
    * municípios de tamanhos diferentes (o absoluto favorece cidades grandes).
    */
   contratosReformaCasaBrasilSolarPer10000Hab: number | null;
+  /**
+   * Índice de precariedade habitacional (vw_indices_compostos_moradia_
+   * infraestrutura, migration 0014) — normalização min-max NACIONAL de
+   * cortiço/parede inadequada/população em favela (0 = melhor, 1 = pior).
+   * Mesmo componente usado no IVSH (migration 0028).
+   */
+  indicePrecariedadeMoradia: number | null;
+  /**
+   * % de domicílios do tipo "Apartamento" (Censo 2022, SIDRA 9928, migration
+   * 0016) — proxy de tipologia habitacional densa/sem telhado próprio
+   * individual, testado como barreira física ao net metering.
+   */
+  percentualApartamento: number | null;
   periodoReferenciaMmgd: string | null;
   periodoReferenciaIrradiacao: string | null;
 }
@@ -87,6 +109,7 @@ interface LinhaBruta {
   areaKm2: number | null;
   densidadePopulacional: number | null;
   ivs: number | null;
+  ivsh: number | null;
   rendaMediaDomiciliar: number | null;
   percentualCadunico: number | null;
   percentualPobrezaCadunico: number | null;
@@ -101,6 +124,8 @@ interface LinhaBruta {
   numeroUcsResidencial: number | null;
   numeroContratosReformaCasaBrasilSolar: number | null;
   valorLiberadoReformaCasaBrasilSolar: number | null;
+  indicePrecariedadeMoradia: number | null;
+  percentualApartamento: number | null;
   periodoReferenciaMmgd: string | null;
   periodoReferenciaIrradiacao: string | null;
 }
@@ -139,6 +164,7 @@ const SELECT_BASE = sql`
       m.area_km2                          AS "areaKm2",
       vsc.densidade_populacional          AS "densidadePopulacional",
       vsc.ivs                             AS "ivs",
+      ivsh.ivsh                           AS "ivsh",
       vsc.renda_media_domiciliar          AS "rendaMediaDomiciliar",
       vsc.percentual_cadunico             AS "percentualCadunico",
       vsc.percentual_pobreza_cadunico     AS "percentualPobrezaCadunico",
@@ -148,6 +174,8 @@ const SELECT_BASE = sql`
       vsc.tarifa_energia_residencial      AS "tarifaEnergiaResidencial",
       vsc.numero_contratos_reforma_casa_brasil_solar AS "numeroContratosReformaCasaBrasilSolar",
       vsc.valor_liberado_reforma_casa_brasil_solar AS "valorLiberadoReformaCasaBrasilSolar",
+      vsc.percentual_apartamento          AS "percentualApartamento",
+      moradia.indice_precariedade_moradia AS "indicePrecariedadeMoradia",
       irr.irradiacao_media_kwh_m2_dia     AS "irradiacaoMediaKwhM2Dia",
       mmgd.potencia_instalada_kw          AS "potenciaInstaladaKw",
       mmgd.potencia_residencial_kw        AS "potenciaResidencialKw",
@@ -160,6 +188,8 @@ const SELECT_BASE = sql`
       ON ue.municipio_pai_codigo_ibge = m.codigo_ibge AND ue.tipo = 'municipio'
   LEFT JOIN mmgd_latest mmgd ON mmgd.unidade_espacial_id = ue.id
   LEFT JOIN vw_indicadores_sociais_consolidado vsc ON vsc.unidade_espacial_id = ue.id
+  LEFT JOIN vw_indices_compostos_moradia_infraestrutura moradia ON moradia.codigo_ibge = m.codigo_ibge
+  LEFT JOIN vw_ivsh_consolidado ivsh ON ivsh.codigo_ibge = m.codigo_ibge
   LEFT JOIN irr_latest irr ON irr.codigo_ibge = m.codigo_ibge
 `;
 
@@ -475,7 +505,18 @@ export async function exportarMunicipiosCsv(query: ExportarMunicipiosQuery): Pro
 interface FeatureMunicipio {
   type: 'Feature';
   geometry: unknown;
-  properties: MunicipioComIndicadores;
+  properties: MunicipioComIndicadores & {
+    /**
+     * Ponto GARANTIDAMENTE dentro do polígono (ST_PointOnSurface, PostGIS) —
+     * usado pelo frontend para posicionar o rótulo do nome do município.
+     * Bug real, 21/07/2026: municípios côncavos/pequenos (ex.: região
+     * metropolitana do Recife — Camaragibe, Paulista, Abreu e Lima) tinham
+     * o centro do bounding box caindo FORA do próprio polígono, jogando o
+     * rótulo em cima do vizinho — ver docs/DECISOES.md. `null` só se a
+     * geometria for nula (não deveria ocorrer para município com registro).
+     */
+    pontoRotulo: [number, number] | null;
+  };
 }
 
 export interface FeatureCollectionMunicipios {
@@ -483,13 +524,21 @@ export interface FeatureCollectionMunicipios {
   features: FeatureMunicipio[];
 }
 
+interface GeometriaMunicipio {
+  geojson: unknown;
+  pontoRotulo: [number, number] | null;
+}
+
 /**
  * Geometria (GeoJSON) de um conjunto de municípios, via ST_AsGeoJSON nativo
  * do PostGIS — evita reimplementar conversão de geometria em JS. Usa o mesmo
  * padrão `IN (...) + sql.join` de buscarMunicipiosBrutoPorCodigos (NÃO
- * `ANY(array)`, que falha em runtime — ver nota lá).
+ * `ANY(array)`, que falha em runtime — ver nota lá). Também calcula
+ * `pontoRotulo` (ST_PointOnSurface) — ver docstring de FeatureMunicipio.
  */
-async function buscarGeometriasPorCodigos(codigos: string[]): Promise<Map<string, unknown>> {
+async function buscarGeometriasPorCodigos(
+  codigos: string[],
+): Promise<Map<string, GeometriaMunicipio>> {
   if (codigos.length === 0) return new Map();
 
   const listaCodigos = sql.join(
@@ -497,14 +546,27 @@ async function buscarGeometriasPorCodigos(codigos: string[]): Promise<Map<string
     sql`, `,
   );
   const resultado = await db.execute(sql`
-    SELECT codigo_ibge AS "codigoIbge", ST_AsGeoJSON(geom) AS "geojson"
+    SELECT
+      codigo_ibge AS "codigoIbge",
+      ST_AsGeoJSON(geom) AS "geojson",
+      ST_AsGeoJSON(ST_PointOnSurface(geom)) AS "pontoRotulo"
     FROM municipios
     WHERE codigo_ibge IN (${listaCodigos});
   `);
 
-  const mapa = new Map<string, unknown>();
-  for (const linha of resultado.rows as Array<{ codigoIbge: string; geojson: string | null }>) {
-    mapa.set(linha.codigoIbge, linha.geojson ? JSON.parse(linha.geojson) : null);
+  const mapa = new Map<string, GeometriaMunicipio>();
+  for (const linha of resultado.rows as Array<{
+    codigoIbge: string;
+    geojson: string | null;
+    pontoRotulo: string | null;
+  }>) {
+    const ponto = linha.pontoRotulo
+      ? ((JSON.parse(linha.pontoRotulo) as { coordinates: [number, number] }).coordinates)
+      : null;
+    mapa.set(linha.codigoIbge, {
+      geojson: linha.geojson ? JSON.parse(linha.geojson) : null,
+      pontoRotulo: ponto,
+    });
   }
   return mapa;
 }
@@ -523,11 +585,14 @@ export async function exportarMunicipiosGeoJson(
 
   return {
     type: 'FeatureCollection',
-    features: municipios.map((municipio) => ({
-      type: 'Feature',
-      geometry: geometrias.get(municipio.codigoIbge) ?? null,
-      properties: municipio,
-    })),
+    features: municipios.map((municipio) => {
+      const geometria = geometrias.get(municipio.codigoIbge);
+      return {
+        type: 'Feature',
+        geometry: geometria?.geojson ?? null,
+        properties: { ...municipio, pontoRotulo: geometria?.pontoRotulo ?? null },
+      };
+    }),
   };
 }
 

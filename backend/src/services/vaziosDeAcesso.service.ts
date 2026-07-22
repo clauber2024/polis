@@ -42,7 +42,10 @@
 
 import { sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
+import { CLASSIFICACAO_IVSH_VALIDAS } from '../schemas/vaziosDeAcesso.schema.js';
 import type { ListarVaziosDeAcessoQuery } from '../schemas/vaziosDeAcesso.schema.js';
+
+export type ClassificacaoIvsh = (typeof CLASSIFICACAO_IVSH_VALIDAS)[number];
 
 export const ROTULOS_QUADRANTE = {
   vazio_de_acesso: 'Vazio de Acesso (alto potencial, baixo MMGD residencial)',
@@ -67,6 +70,8 @@ interface LinhaPainelBruta {
   ivsh: number | null;
   rendaMediaDomiciliar: number | null;
   percentualPobrezaCadunico: number | null;
+  indicePrecariedadeMoradia: number | null;
+  percentualApartamento: number | null;
 }
 
 export interface MunicipioClassificado {
@@ -82,6 +87,21 @@ export interface MunicipioClassificado {
   ivsh: number | null;
   rendaMediaDomiciliar: number | null;
   percentualPobrezaCadunico: number | null;
+  /**
+   * Mesma condição de CartaoDescompassoMorfologico.tsx (frontend), agora
+   * calculada uma vez aqui para poder virar camada nacional do mapa: alta
+   * irradiação (>= mediana nacional) desperdiçada por alta precariedade
+   * habitacional (indicePrecariedadeMoradia > P90 nacional) OU alta
+   * verticalização (percentualApartamento > 50%). Nunca true se algum dos
+   * indicadores envolvidos estiver ausente.
+   */
+  descompassoMorfologico: boolean;
+  /**
+   * Quintil de IVSH dentro do quadrante vazio_de_acesso (não nacional) — só
+   * preenchido por `listarVaziosDeAcesso` (é ranking-específico); `null` nos
+   * demais usos de MunicipioClassificado (Painel Analítico, RF-058).
+   */
+  classificacaoIvsh: ClassificacaoIvsh | null;
 }
 
 /**
@@ -132,7 +152,9 @@ async function buscarPainelBruto(): Promise<LinhaPainelBruta[]> {
         vsc.ivs                           AS "ivs",
         ivsh.ivsh                         AS "ivsh",
         vsc.renda_media_domiciliar        AS "rendaMediaDomiciliar",
-        vsc.percentual_pobreza_cadunico   AS "percentualPobrezaCadunico"
+        vsc.percentual_pobreza_cadunico   AS "percentualPobrezaCadunico",
+        moradia.indice_precariedade_moradia AS "indicePrecariedadeMoradia",
+        vsc.percentual_apartamento        AS "percentualApartamento"
     FROM municipios m
     JOIN unidades_espaciais ue
         ON ue.municipio_pai_codigo_ibge = m.codigo_ibge AND ue.tipo = 'municipio'
@@ -140,6 +162,7 @@ async function buscarPainelBruto(): Promise<LinhaPainelBruta[]> {
     LEFT JOIN vw_indicadores_sociais_consolidado vsc ON vsc.unidade_espacial_id = ue.id
     LEFT JOIN irr_latest irr ON irr.codigo_ibge = m.codigo_ibge
     LEFT JOIN vw_ivsh_consolidado ivsh ON ivsh.codigo_ibge = m.codigo_ibge
+    LEFT JOIN vw_indices_compostos_moradia_infraestrutura moradia ON moradia.codigo_ibge = m.codigo_ibge
     ORDER BY m.codigo_ibge;
   `);
 
@@ -153,6 +176,27 @@ function mediana(valores: number[]): number | null {
   return ordenados.length % 2 === 0
     ? (ordenados[meio - 1] + ordenados[meio]) / 2
     : ordenados[meio];
+}
+
+/**
+ * Percentil por rank mais próximo (mesmo método já usado no scatter de
+ * quadrantes do frontend, GraficoQuadrantes.tsx) — usado para o limiar de
+ * "alta precariedade habitacional" do CartaoDescompassoMorfologico. Corte
+ * fixo (0,5) testado antes era inatingível na prática: `indice_precariedade_
+ * moradia` é a média de 3 sub-índices cada um normalizado min-max
+ * independentemente (migration 0014), então o composto nacional real nunca
+ * chega perto de 1 — máximo observado em 20/07/2026 era 0,358 (Fernando de
+ * Noronha), mediana 0,0066. O corte precisa vir da distribuição real, não de
+ * um valor assumido.
+ */
+function percentil(valores: number[], p: number): number | null {
+  if (valores.length === 0) return null;
+  const ordenados = [...valores].sort((a, b) => a - b);
+  const indice = Math.min(
+    ordenados.length - 1,
+    Math.max(0, Math.ceil(p * ordenados.length) - 1),
+  );
+  return ordenados[indice];
 }
 
 function classificarQuadrante(
@@ -172,10 +216,71 @@ function classificarQuadrante(
   return 'baixo_potencial_baixa_adocao';
 }
 
+/**
+ * Mesma lógica de CartaoDescompassoMorfologico.tsx (frontend, 18-20/07/2026),
+ * agora calculada no backend para virar camada nacional do mapa em vez de só
+ * um alerta por município selecionado. Nenhum limiar fabricado: mediana de
+ * irradiação e P90 de precariedade vêm da distribuição real (mesmos usados
+ * no quadrante), e 50% de verticalização é leitura direta (maioria dos
+ * domicílios sem telhado individual) — ver docstring do componente frontend
+ * para o histórico completo (inclusive a correção do corte fixo 0,5 que
+ * nunca disparava).
+ */
+function calcularDescompassoMorfologico(
+  linha: LinhaPainelBruta,
+  medianaIrradiacao: number,
+  precariedadeHabitacionalAltaP90: number,
+): boolean {
+  if (linha.irradiacaoMediaKwhM2Dia === null) return false;
+  if (linha.indicePrecariedadeMoradia === null && linha.percentualApartamento === null) return false;
+
+  const irradiacaoAlta = linha.irradiacaoMediaKwhM2Dia >= medianaIrradiacao;
+  const precariedadeAlta =
+    linha.indicePrecariedadeMoradia !== null &&
+    linha.indicePrecariedadeMoradia > precariedadeHabitacionalAltaP90;
+  const verticalizacaoAlta = linha.percentualApartamento !== null && linha.percentualApartamento > 50;
+
+  return irradiacaoAlta && (precariedadeAlta || verticalizacaoAlta);
+}
+
+/**
+ * Quintil de IVSH dentro de uma população específica (ex.: só o quadrante
+ * vazio_de_acesso, não os ~5.570 municípios do país) — "muito_alto" = 20%
+ * mais vulneráveis (IVSH é indicador negativo). Município sem IVSH fica de
+ * fora do Map (classificacaoIvsh permanece null no resultado final).
+ */
+function calcularClassificacaoIvsh(populacao: MunicipioClassificado[]): Map<string, ClassificacaoIvsh> {
+  const valores = populacao
+    .map((m) => m.ivsh)
+    .filter((valor): valor is number => valor !== null);
+
+  const mapa = new Map<string, ClassificacaoIvsh>();
+  if (valores.length === 0) return mapa;
+
+  const p20 = percentil(valores, 0.2) as number;
+  const p40 = percentil(valores, 0.4) as number;
+  const p60 = percentil(valores, 0.6) as number;
+  const p80 = percentil(valores, 0.8) as number;
+
+  for (const municipio of populacao) {
+    if (municipio.ivsh === null) continue;
+    let classificacao: ClassificacaoIvsh;
+    if (municipio.ivsh <= p20) classificacao = 'muito_baixo';
+    else if (municipio.ivsh <= p40) classificacao = 'baixo';
+    else if (municipio.ivsh <= p60) classificacao = 'medio';
+    else if (municipio.ivsh <= p80) classificacao = 'alto';
+    else classificacao = 'muito_alto';
+    mapa.set(municipio.codigoIbge, classificacao);
+  }
+  return mapa;
+}
+
 interface PainelClassificado {
   municipios: MunicipioClassificado[];
   medianaIrradiacao: number;
   medianaMmgdResidencialPerCapita: number;
+  /** Percentil 90 nacional de indice_precariedade_moradia — ver `percentil()`. */
+  precariedadeHabitacionalAltaP90: number;
   totalMunicipios: number;
   totalClassificados: number;
   totalExcluidosSemDado: number;
@@ -233,6 +338,17 @@ function classificarPainel(linhas: LinhaPainelBruta[]): PainelClassificado {
     subsetValido.map(({ mmgdResidencialPer1000Hab }) => mmgdResidencialPer1000Hab as number),
   );
 
+  // Distribuição nacional de precariedade habitacional — independente dos
+  // dois eixos acima (irradiação/MMGD), por isso calculada sobre TODAS as
+  // linhas com o indicador presente, não só `subsetValido`.
+  const precariedadeHabitacionalAltaP90 =
+    percentil(
+      linhas
+        .map((linha) => linha.indicePrecariedadeMoradia)
+        .filter((valor): valor is number => valor !== null),
+      0.9,
+    ) ?? 0;
+
   // Só ocorre se não houver NENHUM município com os dois eixos válidos
   // (ex: banco recém-criado, sem irradiação ou MMGD carregados ainda).
   if (medianaIrradiacao === null || medianaMmgdResidencialPerCapita === null) {
@@ -240,6 +356,7 @@ function classificarPainel(linhas: LinhaPainelBruta[]): PainelClassificado {
       municipios: [],
       medianaIrradiacao: 0,
       medianaMmgdResidencialPerCapita: 0,
+      precariedadeHabitacionalAltaP90,
       totalMunicipios: linhas.length,
       totalClassificados: 0,
       totalExcluidosSemDado: linhas.length,
@@ -268,6 +385,12 @@ function classificarPainel(linhas: LinhaPainelBruta[]): PainelClassificado {
       ivsh: linha.ivsh,
       rendaMediaDomiciliar: linha.rendaMediaDomiciliar,
       percentualPobrezaCadunico: linha.percentualPobrezaCadunico,
+      descompassoMorfologico: calcularDescompassoMorfologico(
+        linha,
+        medianaIrradiacao,
+        precariedadeHabitacionalAltaP90,
+      ),
+      classificacaoIvsh: null,
     };
   });
 
@@ -277,6 +400,7 @@ function classificarPainel(linhas: LinhaPainelBruta[]): PainelClassificado {
     municipios,
     medianaIrradiacao,
     medianaMmgdResidencialPerCapita,
+    precariedadeHabitacionalAltaP90,
     totalMunicipios: linhas.length,
     totalClassificados,
     totalExcluidosSemDado: linhas.length - totalClassificados,
@@ -284,7 +408,7 @@ function classificarPainel(linhas: LinhaPainelBruta[]): PainelClassificado {
   };
 }
 
-const NOTA_METODOLOGICA =
+export const NOTA_METODOLOGICA =
   'Esta classificação é um corte bivariado simples (irradiação solar x MMGD residencial ' +
   'per capita), SEM controlar renda. A análise de correlação MMGD x indicadores sociais ' +
   'já mostrou que renda é o preditor mais robusto de MMGD nacionalmente — parte da ' +
@@ -310,6 +434,8 @@ export interface ListarVaziosDeAcessoResultado {
       potencialSolarKwhM2Dia: number;
       mmgdResidencialPer1000Hab: number;
     };
+    /** Percentil 90 nacional de indice_precariedade_moradia — limiar de "alta precariedade habitacional" usado pelo CartaoDescompassoMorfologico (frontend). Não é um corte fixo: recalculado a partir da distribuição real a cada requisição, ver `percentil()`. */
+    limiarPrecariedadeHabitacionalAlta: number;
   };
   notaMetodologica: string;
   avisos: {
@@ -319,10 +445,14 @@ export interface ListarVaziosDeAcessoResultado {
     totalPrecisaReextrairMmgd: number;
   };
   resumoPorQuadrante: Record<Quadrante, number>;
+  /** Contagem de municípios com descompassoMorfologico=true no recorte já filtrado por geografia (não por quadrante — o alerta é independente de quadrante). */
+  resumoDescompasso: number;
   filtrosAplicados: {
     uf: string | null;
     regiao: string | null;
     quadrante: string | null;
+    classificacaoIvsh: string | null;
+    descompassoMorfologico: boolean | null;
   };
   paginacao: {
     pagina: number;
@@ -339,11 +469,22 @@ export async function listarVaziosDeAcesso(
   const linhasBrutas = await buscarPainelBruto();
   const painel = classificarPainel(linhasBrutas);
 
+  // classificacaoIvsh é quintil DENTRO do quadrante vazio_de_acesso (não
+  // nacional) — calculado sobre a população NACIONAL desse quadrante, antes
+  // do filtro de geografia, pelo mesmo motivo das medianas de quadrante: um
+  // filtro por UF não pode mudar o que "muito_alto" significa.
+  const populacaoVazioDeAcesso = painel.municipios.filter((m) => m.quadrante === 'vazio_de_acesso');
+  const mapaClassificacaoIvsh = calcularClassificacaoIvsh(populacaoVazioDeAcesso);
+  const municipiosComClassificacaoIvsh = painel.municipios.map((municipio) => ({
+    ...municipio,
+    classificacaoIvsh: mapaClassificacaoIvsh.get(municipio.codigoIbge) ?? null,
+  }));
+
   // Filtro geográfico (uf/regiao) é aplicado DEPOIS da classificação — as
   // medianas que definem os quadrantes são sempre NACIONAIS (mesma decisão
   // do script de validação: um filtro geográfico não pode mudar o que
   // "alto potencial"/"alto MMGD" significa).
-  const filtradoPorGeografia = painel.municipios.filter((municipio) => {
+  const filtradoPorGeografia = municipiosComClassificacaoIvsh.filter((municipio) => {
     if (query.uf && municipio.uf !== query.uf) return false;
     if (query.regiao && municipio.regiao !== query.regiao) return false;
     return true;
@@ -361,12 +502,22 @@ export async function listarVaziosDeAcesso(
       baixo_potencial_baixa_adocao: 0,
     } as Record<Quadrante, number>,
   );
+  const resumoDescompasso = filtradoPorGeografia.filter((m) => m.descompassoMorfologico).length;
 
   const filtradoPorQuadrante = query.quadrante
     ? filtradoPorGeografia.filter((municipio) => municipio.quadrante === query.quadrante)
     : filtradoPorGeografia;
 
-  const ordenado = ordenarMunicipios(filtradoPorQuadrante, query.ordenarPor, query.ordem);
+  const filtradoPorIvsh = query.classificacaoIvsh
+    ? filtradoPorQuadrante.filter((municipio) => municipio.classificacaoIvsh === query.classificacaoIvsh)
+    : filtradoPorQuadrante;
+
+  const filtradoPorDescompasso =
+    query.descompassoMorfologico === undefined
+      ? filtradoPorIvsh
+      : filtradoPorIvsh.filter((municipio) => municipio.descompassoMorfologico === query.descompassoMorfologico);
+
+  const ordenado = ordenarMunicipios(filtradoPorDescompasso, query.ordenarPor, query.ordem);
 
   const totalResultados = ordenado.length;
   const totalPaginas = Math.max(1, Math.ceil(totalResultados / query.porPagina));
@@ -388,6 +539,7 @@ export async function listarVaziosDeAcesso(
         potencialSolarKwhM2Dia: painel.medianaIrradiacao,
         mmgdResidencialPer1000Hab: painel.medianaMmgdResidencialPerCapita,
       },
+      limiarPrecariedadeHabitacionalAlta: painel.precariedadeHabitacionalAltaP90,
     },
     notaMetodologica: NOTA_METODOLOGICA,
     avisos: {
@@ -397,10 +549,13 @@ export async function listarVaziosDeAcesso(
       totalPrecisaReextrairMmgd: painel.totalPrecisaReextrairMmgd,
     },
     resumoPorQuadrante,
+    resumoDescompasso,
     filtrosAplicados: {
       uf: query.uf ?? null,
       regiao: query.regiao ?? null,
       quadrante: query.quadrante ?? null,
+      classificacaoIvsh: query.classificacaoIvsh ?? null,
+      descompassoMorfologico: query.descompassoMorfologico ?? null,
     },
     paginacao: {
       pagina: query.pagina,

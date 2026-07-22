@@ -27,27 +27,28 @@
  * `pessoasBeneficiadas`, sempre com o rótulo "estimativa" e a fonte — nunca
  * como contagem exata.
  *
- * (5) e (6) ainda exigem dado que o Atlas não tem:
- * - "participação na matriz elétrica nacional" precisa do total de geração
- *   do Brasil (denominador fora do nosso banco) — permanece como KPI
- *   indisponível aqui (nunca calculado pelo Atlas). DECISÃO DO USUÁRIO
- *   (10/07/2026): em vez de fabricar ou de simplesmente esconder o dado, o
- *   número oficial mais recente (EPE, Balanço Energético Nacional 2026,
- *   ano-base 2025: MMGD = 7,0% da geração elétrica nacional em 2025) é
- *   citado como referência externa na seção "Referências metodológicas" da
- *   landing (`PaginaLanding.tsx`) — mesmo tratamento já dado ao OBEPE:
- *   citação rotulada com fonte/ano, nunca misturada aos KPIs computados pelo
- *   próprio Atlas. Por isso o `motivo` abaixo aponta pra essa seção. Ver
- *   ARQUITETURA.md, seção "RF-005", para o histórico completo (inclusive por
- *   que o valor de 2024/PDE 2035 citado numa sessão anterior, 5,6%, não deve
- *   ser reaproveitado — vem de outro documento/ano-base, não do BEN 2026);
- * - "projeção futura" é modelo de projeção — achado nesta sessão que o
- *   schema JÁ comporta histórico (`mmgd_indicadores` tem chave única em
- *   unidade_espacial_id + periodo_referencia, não só unidade_espacial_id),
- *   mas ainda não se sabe se já existem múltiplos períodos carregados de
- *   fato (ver ARQUITETURA.md para o passo de verificação).
- * Mesmo princípio já seguido no resto do projeto (RF-034/TSEE): nunca
- * fabricar número — expor como indicador indisponível, com o motivo.
+ * (5) "participação na matriz elétrica nacional" — RESOLVIDO em 21/07/2026:
+ * migration 0030 (`indicadores_energia_nacional`) + dois extractors manuais
+ * (`extrair_geracao_eletrica_nacional_epe.py`, denominador via BEN Anexo X;
+ * `extrair_geracao_mmgd_epe_pdgd.py`, numerador via PDGD "Estimativa da
+ * Geração no Ano"). Ver docs/DECISOES.md, ADR "Integração da participação
+ * da MMGD na matriz elétrica nacional (EPE/PDGD)". Nenhuma das duas fontes
+ * tem API — snapshot repetível sob demanda, não automático (mesmo padrão de
+ * irradiação solar/INPE e Reforma Casa Brasil Solar). Validação: o
+ * percentual calculado para 2025 (~7,02%) bate com o número da EPE já
+ * citado nas Referências Metodológicas da landing (7,0%). Exposto agora em
+ * `participacaoMatrizNacional` (não mais em indicadoresIndisponiveis) — pode
+ * vir `null` se os extractors nunca rodaram no ambiente, mas não é o caso
+ * aqui.
+ *
+ * (6) ainda exige dado que o Atlas não tem: "projeção futura" é modelo de
+ * projeção — achado em sessão anterior que o schema JÁ comporta histórico
+ * (`mmgd_indicadores` tem chave única em unidade_espacial_id +
+ * periodo_referencia, não só unidade_espacial_id), mas ainda não se sabe se
+ * já existem múltiplos períodos carregados de fato (ver ARQUITETURA.md para
+ * o passo de verificação). Mesmo princípio já seguido no resto do projeto
+ * (RF-034/TSEE): nunca fabricar número — expor como indicador indisponível,
+ * com o motivo.
  * ============================================================================
  */
 
@@ -55,9 +56,25 @@ import { sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
 
 export interface IndicadorIndisponivel {
-  id: 'participacaoMatrizNacional' | 'projecaoFuturaPotencia';
+  id: 'projecaoFuturaPotencia';
   rotulo: string;
   motivo: string;
+}
+
+/**
+ * Participação da MMGD na geração elétrica nacional (RF-005 item 5) —
+ * calculada como geracaoMmgdGwh / geracaoEletricaNacionalGwh, mesmo ano.
+ * `null` se nenhum dos dois extractors de indicadores_energia_nacional
+ * rodou ainda neste ambiente — nunca fabricar um percentual sem os dois
+ * lados carregados. Ver docstring do módulo para a metodologia e fontes.
+ */
+export interface ParticipacaoMatrizNacional {
+  periodoReferencia: string;
+  geracaoMmgdGwh: number;
+  geracaoEletricaNacionalGwh: number;
+  participacaoPercentual: number;
+  fonteGeracaoNacional: string | null;
+  fonteMmgd: string | null;
 }
 
 /**
@@ -92,6 +109,7 @@ export interface EstatisticasNacionais {
   /** Período de referência mais recente entre os snapshots de MMGD usados no cálculo. */
   periodoReferencia: string | null;
   pessoasBeneficiadas: PessoasBeneficiadasEstimativa;
+  participacaoMatrizNacional: ParticipacaoMatrizNacional | null;
   indicadoresIndisponiveis: IndicadorIndisponivel[];
 }
 
@@ -118,19 +136,53 @@ const FONTE_MEDIA_PESSOAS_POR_DOMICILIO =
 
 const INDICADORES_INDISPONIVEIS: IndicadorIndisponivel[] = [
   {
-    id: 'participacaoMatrizNacional',
-    rotulo: 'Participação da solar distribuída na matriz elétrica nacional',
-    motivo:
-      'Exige o total de geração elétrica do Brasil como denominador (ex.: EPE/ONS), fonte não integrada ao Atlas. ' +
-      'O número mais recente da EPE (MMGD = 7,0% da geração elétrica nacional em 2025, Balanço Energético ' +
-      'Nacional 2026) está citado como referência externa na seção "Referências metodológicas" desta página.',
-  },
-  {
     id: 'projecaoFuturaPotencia',
     rotulo: 'Projeção futura de potência instalada',
     motivo: 'É uma projeção/modelo, não um fato observado nas fontes primárias já carregadas.',
   },
 ];
+
+interface LinhaParticipacaoMatriz {
+  periodoReferencia: string;
+  geracaoMmgdGwh: string | number;
+  geracaoEletricaNacionalGwh: string | number;
+  fonteGeracaoNacional: string | null;
+  fonteMmgd: string | null;
+}
+
+/**
+ * Ano mais recente com AMBOS os lados carregados (geração MMGD e geração
+ * nacional) — nunca calcula participação com um dos dois em falta.
+ */
+async function buscarParticipacaoMatrizNacional(): Promise<ParticipacaoMatrizNacional | null> {
+  const resultado = await db.execute(sql`
+    SELECT
+        periodo_referencia          AS "periodoReferencia",
+        geracao_mmgd_gwh            AS "geracaoMmgdGwh",
+        geracao_eletrica_nacional_gwh AS "geracaoEletricaNacionalGwh",
+        fonte_geracao_nacional      AS "fonteGeracaoNacional",
+        fonte_mmgd                  AS "fonteMmgd"
+    FROM indicadores_energia_nacional
+    WHERE geracao_mmgd_gwh IS NOT NULL AND geracao_eletrica_nacional_gwh IS NOT NULL
+    ORDER BY periodo_referencia DESC
+    LIMIT 1;
+  `);
+
+  const linha = resultado.rows[0] as unknown as LinhaParticipacaoMatriz | undefined;
+  if (!linha) return null;
+
+  const geracaoMmgdGwh = Number(linha.geracaoMmgdGwh);
+  const geracaoEletricaNacionalGwh = Number(linha.geracaoEletricaNacionalGwh);
+
+  return {
+    periodoReferencia: linha.periodoReferencia,
+    geracaoMmgdGwh,
+    geracaoEletricaNacionalGwh,
+    participacaoPercentual: (geracaoMmgdGwh / geracaoEletricaNacionalGwh) * 100,
+    fonteGeracaoNacional: linha.fonteGeracaoNacional,
+    fonteMmgd: linha.fonteMmgd,
+  };
+}
 
 /**
  * Reaproveita a mesma CTE `mmgd_latest` (DISTINCT ON por período mais
@@ -166,6 +218,7 @@ export async function calcularEstatisticasNacionais(): Promise<EstatisticasNacio
   const linha = resultado.rows[0] as unknown as LinhaAgregada;
 
   const totalUcsResidenciaisBeneficiadas = Number(linha.totalUcsResidenciaisBeneficiadas ?? 0);
+  const participacaoMatrizNacional = await buscarParticipacaoMatrizNacional();
 
   return {
     totalUcsBeneficiadas: Number(linha.totalUcsBeneficiadas ?? 0),
@@ -184,6 +237,7 @@ export async function calcularEstatisticasNacionais(): Promise<EstatisticasNacio
         totalUcsResidenciaisBeneficiadas * MEDIA_PESSOAS_POR_DOMICILIO_IBGE_2022,
       ),
     },
+    participacaoMatrizNacional,
     indicadoresIndisponiveis: INDICADORES_INDISPONIVEIS,
   };
 }

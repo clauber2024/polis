@@ -28,6 +28,20 @@ export const CRITERIOS_ORDENACAO = [
   'mmgdResidencialPer1000Hab',
 ] as const;
 
+/**
+ * Quintil de IVSH DENTRO da população nacional do quadrante vazio_de_acesso
+ * (não dos ~5.570 municípios do país inteiro) — "muito_alto" = 20% mais
+ * vulneráveis (IVSH é indicador negativo), "muito_baixo" = 20% menos
+ * vulneráveis. Ver vaziosDeAcesso.service.ts, `calcularClassificacaoIvsh`.
+ */
+export const CLASSIFICACAO_IVSH_VALIDAS = [
+  'muito_alto',
+  'alto',
+  'medio',
+  'baixo',
+  'muito_baixo',
+] as const;
+
 export const listarVaziosDeAcessoQuerySchema = z.object({
   uf: z
     .string()
@@ -39,6 +53,14 @@ export const listarVaziosDeAcessoQuerySchema = z.object({
   regiao: z.enum(REGIOES_VALIDAS).optional(),
 
   quadrante: z.enum(QUADRANTES_VALIDOS).optional(),
+
+  classificacaoIvsh: z.enum(CLASSIFICACAO_IVSH_VALIDAS).optional(),
+
+  /** Filtra só municípios com o alerta de descompasso morfológico ativo (ver `descompassoMorfologico` em MunicipioClassificado). String, não boolean nativo — query param é sempre texto. */
+  descompassoMorfologico: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((valor) => (valor === undefined ? undefined : valor === 'true')),
 
   ordenarPor: z.enum(CRITERIOS_ORDENACAO).default('ivs'),
 

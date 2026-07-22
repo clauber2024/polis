@@ -135,7 +135,7 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   `qualidade_conjunto_municipio` criadas FORA do Drizzle, via
   `backend/src/etl/schema_qualidade.sql` (ver nota de inconsistencia arquitetural na
   Secao 2)
-- Migrations incrementais 0000 a 0025 - ver `backend/src/db/migrations/`. Numeracao
+- Migrations incrementais 0000 a 0029 - ver `backend/src/db/migrations/`. Numeracao
   formal NAO cobre o schema de qualidade (criado fora do sistema de migrations ate a
   migration 0011, que so adiciona as views DEC/FEC "real" em cima do schema ja existente).
   0014-0017: indices compostos + views consolidadas (`vw_indicadores_sociais_consolidado`,
@@ -162,16 +162,32 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   de escrita do Colaborador e Painel Admin" acima. 0025: `numero_empreendimentos`
   em `mmgd_indicadores` (correção de rótulo do RF-005, ver bloco "Correção de
   rótulo em RF-005 + migration 0025" acima) - aplicada e validada no ambiente
-  do usuário em 10/07/2026.
-- 20 extractors Python funcionais em `backend/src/etl/loaders/` (territorio, MMGD/ANEEL,
+  do usuário em 10/07/2026. 0026: tabela `desempenho_conexao_distribuidoras`
+  (ranking público de distribuidoras, ver bloco correspondente). 0027:
+  `numero_contratos_reforma_casa_brasil_solar` e `valor_liberado_reforma_
+  casa_brasil_solar` em `indicadores_sociais` (ver bloco "Indicador Reforma
+  Casa Brasil Solar" acima) - aplicada e validada nesta sessão, 17/07/2026. 0028:
+  view `vw_ivsh_consolidado` (IVSH - Índice de Vulnerabilidade Socio-Habitacional-
+  Energética = média de IVS + precariedade habitacional + insegurança da posse) -
+  ver bloco "Auditoria analítica e IVSH" abaixo - aplicada e validada em 18/07/2026.
+  0029: tabela `analises_estatisticas` (infraestrutura estatística integrada,
+  resultados de correlação parcial de Spearman materializados via ETL) - ver
+  bloco "Infraestrutura estatística integrada" acima - aplicada e validada em
+  18/07/2026.
+- 21 extractors Python funcionais em `backend/src/etl/loaders/` (territorio, MMGD/ANEEL,
   Infraestrutura Urbana/Censo, Renda e Trabalho/RAIS via BigQuery, Alfabetizacao/Censo,
   Mortalidade Infantil/SIM+SINASC via BigQuery, Moradia/Censo, Tipo de Domicilio/Censo,
   RDPC/Censo, Inadequacao Habitacional, MCMV/FGTS, MCMV/OGU, Favelas/FCU (seed + extract),
   ZEIS/AEIS por capital - SP, Recife, Rio Branco, Rio de Janeiro -, Irradiacao Solar/INPE,
-  Tarifa Residencial/ANEEL, Precipitacao Mensal/MERGE-CPTEC-INPE) + 2 scripts fora do
+  Tarifa Residencial/ANEEL, Precipitacao Mensal/MERGE-CPTEC-INPE, Reforma Casa Brasil
+  Solar/Caixa - unica fonte NAO publica/automatizavel, extrato pontual fornecido pelo
+  usuario, ver bloco "Indicador Reforma Casa Brasil Solar" acima) + 2 scripts fora do
   padrao `loaders/`: `backend/src/etl/etl_indqual.py` e
   `backend/src/etl/schema_qualidade.sql` (Qualidade de Fornecimento/ANEEL - ver nota na
-  Secao 2)
+  Secao 2). Dentro de `loaders/`, mas fora do padrao "extractor de fonte externa" -
+  `calcular_analise_estatistica_moradia_mmgd.py` (18/07/2026): nao baixa/le nenhuma
+  fonte nova, so computa e persiste resultado estatistico sobre dado ja no Postgres -
+  ver bloco "Infraestrutura estatistica integrada" acima.
 - Banco PostgreSQL+PostGIS local via `docker-compose.yml`, sem variante de producao ainda
 - Todas as 8 dimensoes de dados planejadas no DRF estao completas: Territorio, MMGD,
   Infraestrutura Urbana, Renda e Trabalho, Moradia, Qualidade de Fornecimento, Capital
@@ -598,8 +614,238 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   engrossando com o zoom, ACIMA do destaque violeta de Vazios (é a seleção
   ativa do usuário). Prop `codigoDestacado` em MapaMunicipios, alimentada
   por `municipioSelecionado` na PaginaMapa — some ao fechar o painel.
-  **AINDA NAO VALIDADO**: `make front-typecheck` + teste visual (selecionar
-  por clique, busca e ranking; fechar o painel remove o contorno).
+  VALIDADO no ambiente do usuário em 17/07/2026 (teste manual no navegador:
+  selecionar por clique/busca/ranking engrossa o contorno, fechar o painel
+  remove — ver bloco abaixo, mesma sessão de validação).
+- **Seleção de estado por clique no mapa (16/07/2026, RF-027/028) e transições
+  visuais suaves ao alternar camadas (16/07/2026, RF-022):** dois commits
+  (`e82eea1`, `ce3e4b8`) feitos em sessão que não atualizou este arquivo —
+  reconstituídos por inspeção de `git log`/`git show` em 17/07/2026 (mesma
+  classe de divergência de documentação já registrada acima em 10/07 e
+  14/07; **não é o mesmo problema que a checagem de sincronização do topo
+  deste arquivo cobre** — não havia commit remoto ausente, o histórico local
+  e remoto estavam iguais, só este arquivo ficou desatualizado). RF-027/028:
+  abaixo do zoom 6 (visão nacional), clicar num estado seleciona a UF —
+  enquadra o estado, destaca o contorno (`CAMADA_ESTADO_DESTACADO`,
+  reaproveitada) e muda a sidebar para a aba Ranking com o dropdown
+  pré-selecionado. Implementado via `CAMADA_ESTADOS_FILL` (fill transparente,
+  `opacity: 0.001`, `maxzoom: 6`) sobre `FONTE_ESTADOS`, capturando cliques
+  antes do handler de clique de município (que retorna cedo abaixo do mesmo
+  zoom — o `maxzoom` da camada de estado é o árbitro de qual clique
+  "ganha"). `PainelRanking` virou componente controlado (`ufSelecionada`
+  como prop, substitui o `useState` interno) para o clique no mapa e o
+  dropdown do painel atualizarem o mesmo estado sem duplicação — unificados
+  em `aoEscolherUfRanking` na `PaginaMapa`. RF-022: transições nativas do
+  MapLibre via propriedades `*-transition` no paint (sem interpolação manual
+  nem `requestAnimationFrame`, exceto o fade-in inicial do heatmap, que
+  precisa de um frame para o layer existir no canvas antes do
+  `setPaintProperty`) — `fill-color-transition`/`fill-opacity-transition` no
+  choropleth (500ms/300ms, cobre troca de indicador e o esmaecimento ao
+  ligar o heatmap) e `heatmap-opacity-transition` (400ms) no heatmap, que
+  trocou de `setLayoutProperty('visibility')` para `setPaintProperty
+  ('heatmap-opacity', 0 | 0.8)` — `visibility` não anima, opacidade sim.
+  **VALIDADO no ambiente do usuário em 17/07/2026**: `make front-typecheck` e
+  `make typecheck` (backend) limpos, ambos executados diretamente nesta sessão
+  (o bash sandbox conseguiu montar o caminho do projeto desta vez — WSL nativo,
+  não UNC do Windows; reavaliar se a exceção da Seção 10 ainda se aplica em
+  sessões futuras). Backend (`make dev`) e frontend (`make front`) subidos e
+  testados manualmente pelo usuário no navegador: contorno de seleção de
+  município, clique em estado (enquadra + destaca contorno + abre aba Ranking
+  com UF pré-selecionada) e transições suaves de indicador/heatmap — os três
+  confirmados funcionando.
+- **Indicador Reforma Casa Brasil Solar (17/07/2026):** primeira fonte do
+  Atlas que NÃO é pública/automatizável — o usuário forneceu um PDF (extrato
+  pontual do sistema interno da Caixa, SIC), não uma URL de dado aberto.
+  Motivação: capítulo "Atlas das experiências de MMGD solar" (Instituto
+  Pólis, relatório que o usuário está redigindo como consultor) cita o
+  programa Reforma Casa Brasil como pista para responder "quem tem acesso à
+  tecnologia solar". Migration `0027_indicadores_sociais_reforma_casa_
+  brasil_solar.sql`: `numero_contratos_reforma_casa_brasil_solar` e
+  `valor_liberado_reforma_casa_brasil_solar` em `indicadores_sociais`
+  (+ `vw_indicadores_sociais_consolidado` atualizada). Extractor novo
+  `backend/src/etl/loaders/extrair_reforma_casa_brasil_solar.py` (dependência
+  nova no venv: `pypdf`, ver `requirements.txt`) — lê o PDF direto de
+  `BASE_DOWNLOADS` (mesmo padrão dos `seed_zeis_*`), casa município por
+  nome+UF normalizado (sem código IBGE na fonte; 2 exceções de grafia via
+  alias explícito — ver docstring do extractor) e agrega os 6 meses cobertos
+  (nov/2025–abr/2026) num total único por município, sem série temporal
+  (mesmo padrão de `unidades_habitacionais_fgts`). Rodado e validado contra o
+  banco local nesta sessão: 1.093 municípios, 3.253 contratos, R$
+  61.377.571,09 liberados — bate exatamente com o PDF; idempotência
+  confirmada (2 execuções, mesma contagem). Backend: `municipios.service.ts`
+  expõe as duas colunas + derivado `contratosReformaCasaBrasilSolarPer10000Hab`
+  (per capita, mesmo padrão de `mmgdPer1000Hab`, necessário porque o valor
+  absoluto favoreceria cidades grandes). Frontend: nova camada de mapa
+  "Acesso ao Reforma Casa Brasil Solar" (`utils/indicadores.ts`, usa o
+  per-capita) + novo grupo "Acesso a financiamento" no painel RF-025
+  (`PainelMunicipio.tsx`, valores absolutos) + nota explícita em
+  `notasAusencia.ts` (município sem contrato no período fica `null`, mas
+  isso não é lacuna de cobertura como as demais notas desta função — é
+  ausência real de contrato no recorte de 6 meses de uma fonte pontual).
+  Um segundo PDF fornecido junto ("Reforma casa brasil - geral.pdf", todas as
+  modalidades, 333 páginas) NÃO foi ingerido — decisão do usuário, escopo
+  limitado à modalidade solar. Ver ARQUITETURA.md, seção "Decisões de
+  fontes", para o achado completo (inclusive as 2 exceções de casamento de
+  nome). VALIDADO nesta sessão: migration aplicada, extractor executado com
+  0 falhas, `make typecheck`/`make front-typecheck` limpos (rodados direto
+  nesta sessão), endpoint `GET /api/municipios/:codigoIbge` testado ao vivo
+  (curl) confirmando os novos campos. Teste manual no navegador (nova camada
+  de mapa, novo grupo do painel) ainda NÃO foi feito nesta sessão — fica para
+  quando o usuário abrir a aplicação.
+- **Auditoria analítica moradia×solar e IVSH (18/07/2026):** a pedido do
+  usuário, produzido `docs/RELATORIO_AUDITORIA_MORADIA_SOLAR.md` — auditoria
+  do motor de dados sob a lente de moradia como eixo transversal do acesso à
+  MMGD (contexto: capítulo "Atlas das experiências de MMGD solar", Instituto
+  Pólis). A auditoria corrigiu 3 premissas desatualizadas com base em leitura
+  direta do código (não do enunciado do pedido): ZEIS/AEIS já cobre 8
+  municípios, não 4 (commit `9c29c8e`, já presente no histórico antes desta
+  sessão); o piloto de setor censitário de São Paulo (migration 0021) é
+  SINTÉTICO — distribui um total municipal real proporcionalmente por área
+  numa grade artificial, não é uma leitura fina real do Censo; e o
+  cruzamento MCMV × Reforma Casa Brasil Solar só é possível em nível
+  municipal-agregado (a fonte da migration 0027 não tem chave de
+  indivíduo/domicílio). Achado central: o IVS Consolidado (`vw_ivs_
+  consolidado`, migration 0015) EXCLUI moradia por decisão de arquitetura
+  documentada (evitar endogeneidade ao testar "MMGD x moradia") — o que
+  significa que a priorização padrão de Vazios de Acesso (RF-056) não
+  captura vulnerabilidade habitacional. Rodadas nesta sessão, direto contra
+  o banco local, 3 consultas analíticas replicando fielmente a metodologia
+  de `vaziosDeAcesso.service.ts` (medianas nacionais, mesma regra de
+  exclusão de município pendente de reextração de MMGD): confirmaram que
+  precariedade habitacional (`indice_precariedade_moradia`, migration 0014)
+  e o quadrante Vazio de Acesso são dimensões PARCIALMENTE INDEPENDENTES —
+  municípios com contrato Reforma Casa Brasil Solar têm ~51-70% mais
+  precariedade habitacional média que os sem contrato, mas isso não se
+  traduz em maior presença no quadrante Vazio de Acesso (que na verdade é
+  proporcionalmente MENOR nos municípios com contrato — 20,8% vs 27,3% —,
+  e quando ocorre recebe 31% menos recurso per capita que nos municípios já
+  bem servidos). Ver o relatório para as 3 tabelas completas. A partir
+  desse achado, implementado nesta mesma sessão o **IVSH** (Índice de
+  Vulnerabilidade Sócio-Habitacional-Energética) — migration 0028
+  (`vw_ivsh_consolidado` = média de IVS + precariedade habitacional +
+  insegurança da posse), SEM alterar `vw_ivs_consolidado` nem `vw_indices_
+  compostos_moradia_infraestrutura` existentes — e novo valor `ivsh` em
+  `CRITERIOS_ORDENACAO` (`vaziosDeAcesso.schema.ts`) + campo `ivsh` em
+  `MunicipioClassificado`/`buscarPainelBruto` (`vaziosDeAcesso.service.ts`),
+  disponível via `GET /api/vazios-de-acesso?ordenarPor=ivsh`. VALIDADO nesta
+  sessão: migration aplicada no banco local (5.573 municípios com IVSH
+  calculado), `npx tsc --noEmit` do backend limpo, endpoint testado ao vivo
+  com o backend rodando localmente (`npm run dev` + curl, processo encerrado
+  ao final do teste). **NÃO implementado nesta sessão**: nenhuma mudança de
+  frontend — `ivsh` existe na API mas ainda não há seletor de critério de
+  priorização na interface (o frontend usa sempre o padrão do backend, que
+  continua sendo `ivs`, não `ivsh`).
+- **Verificação das "rotas de leitura pendentes" do DRF + 2 lacunas reais
+  fechadas (18/07/2026):** pedido do usuário partiu da premissa de que só
+  `GET /api/vazios-de-acesso` existia como leitura real — checado o código
+  em `backend/src/routes/` e isso está desatualizado: municípios (detalhe,
+  lista com filtros, comparação, exportação CSV/GeoJSON/XLSX, médias de
+  referência, relatório PDF, setores censitários), bases de dados,
+  estatísticas nacionais, estados e ranking de distribuidoras já são leitura
+  real e pública. Das lacunas genuínas remanescentes, verificadas por
+  inspeção direta do banco local (`docker exec polis_postgres psql`) nesta
+  sessão: **RF-034 (ranking por variação no período) permanece IMPOSSÍVEL de
+  implementar com dado real hoje, confirmado (não só assumido)** —
+  `mmgd_indicadores` e `irradiacao_solar` têm 1 único `periodo_referencia`
+  cada; `indicadores_sociais` tem 6 valores distintos de `periodo_referencia`
+  (2022-01-01 a 2026-07-06), mas são timestamps de EXECUÇÃO de extractores
+  diferentes carregando COLUNAS diferentes (Censo 2022, CadÚnico, Reforma
+  Casa Brasil Solar etc.), não medições repetidas do mesmo indicador — a
+  view `vw_indicadores_sociais_consolidado` já faz `MAX(coluna)` por
+  `unidade_espacial_id` corretamente para lidar com isso, mas não existe
+  nenhum indicador com 2+ medições reais no tempo para calcular variação.
+  Implementar RF-034 agora exigiria fabricar uma "variação" sempre igual a
+  zero — mantido como exclusão documentada, não pendência de código.
+  Implementado de fato nesta sessão: (1) **RF-010** — link "Esqueci minha
+  senha" em `PaginaLogin.tsx`, com aviso honesto (não existe fluxo de
+  recuperação por e-mail no protótipo) em vez de simular um envio que nunca
+  chegaria a lugar nenhum; (2) **RF-062/066** — `CartaoNotasMetodologicas.tsx`
+  (Painel Colaborador) já era, na prática, o "visualizador de documentação
+  metodológica" pedido pelo RF-062 (GET `/api/notas-metodologicas` é
+  público), só não estava rotulado como tal — cabeçalho atualizado para
+  citar RF-062 explicitamente; "força do achado" trocou de número plano
+  (`força 3/5`) para escala visual de estrelas (RF-066 pede exatamente
+  "escala de estrelas ou barras"). VALIDADO nesta sessão: `npx tsc -b` do
+  frontend limpo. Teste manual no navegador (link de senha, estrelas no
+  cartão de notas) ainda NÃO feito — fica para quando o usuário abrir a
+  aplicação.
+- **Infraestrutura estatística integrada (18/07/2026):** implementação da
+  Recomendação Priorizada #3 de `docs/RELATORIO_AUDITORIA_MORADIA_SOLAR.md`
+  ("testar formalmente o modelo controlado de MMGD residencial per capita
+  sobre `indice_precariedade_moradia`, controlando irradiação e renda").
+  Decisão de escopo pedida explicitamente ao usuário antes de implementar
+  (não presumida) — ver `docs/DECISOES.md`, ADR "Infraestrutura estatística
+  integrada": motor **fixo, materializado via ETL** (mesmo padrão do
+  "ranking público de distribuidoras", migration `0026`), não microsserviço
+  Python sob demanda nem reimplementação em TypeScript nem motor genérico
+  para variáveis arbitrárias. Migration `0029_analises_estatisticas.sql`
+  cria a tabela `analises_estatisticas` (uma linha por par
+  variável-x/variável-y testado).
+  Script novo `backend/src/etl/loaders/calcular_analise_estatistica_moradia_
+  mmgd.py` — reutiliza o algoritmo de correlação parcial de Spearman por
+  resíduo de postos já validado em
+  `backend/src/etl/analises/analisar_correlacao_mmgd_renda.py`, mas
+  controlando **renda e irradiação simultaneamente** (controle conjunto que
+  o script exploratório não fazia) e lendo `potencia_residencial_kw` direto
+  do Postgres (migration `0020`) em vez de reprocessar o Parquet bruto da
+  ANEEL. Testa as 2 variáveis do eixo moradia (`indice_precariedade_moradia`,
+  `indice_seguranca_posse`) contra `mmgd_potencia_residencial_per_1000_hab`,
+  com checagem de robustez regional (sinal mantido em quantas das 5
+  regiões). **Bug real encontrado e corrigido nesta sessão**: `psycopg2` não
+  adapta `numpy.float64` (retorno nativo de scipy/numpy) — o valor caía no
+  fallback `repr()` do SQLAlchemy e gerava SQL inválido
+  (`np.float64(0.1524)` lido como referência a um schema `np`); corrigido
+  convertendo para `float()` nativo antes do upsert. Backend: novo endpoint
+  público `GET /api/analises-estatisticas`
+  (`analisesEstatisticas.service/controller/routes.ts`, mesmo padrão sem
+  query params de `rankingDistribuidoras.*`, envelope sempre com
+  `metodologia` + `notaMetodologica`). **Resultado real (n=5.570
+  municípios)**: Precariedade Habitacional confirma a hipótese do Pólis
+  (rho parcial −0,1524, robusto em 4/5 regiões, efeito não diluído por
+  renda/irradiação); Segurança da Posse teve sinal invertido face ao
+  esperado (rho parcial −0,2976, não investigado a fundo) — achado
+  reportado com transparência, não suavizado, ver
+  `docs/RELATORIO_AUDITORIA_MORADIA_SOLAR.md`, "Registro de Implementação —
+  Infraestrutura Estatística" para a leitura completa e o próximo passo
+  sugerido. VALIDADO nesta sessão: migration aplicada no banco local, script
+  rodado 2x (idempotência confirmada via `ON CONFLICT (variavel_x,
+  variavel_y) DO UPDATE`), `npx tsc --noEmit` do backend limpo, endpoint
+  testado ao vivo (`npm run dev` + curl, processo encerrado ao final).
+  **NÃO feito nesta sessão**: nenhuma mudança de frontend (mesmo precedente
+  do IVSH — API primeiro, UI depois).
+- **Auditoria de blindagem contra mau uso de proxies (18/07/2026):** a
+  pedido do usuário, revisão de ponta a ponta da política de "ausência
+  justificada de dado" (`frontend/src/utils/notasAusencia.ts`, citada no
+  próprio `docs/RELATORIO_AUDITORIA_MORADIA_SOLAR.md`, Seção 4) e do
+  isolamento do piloto sintético de setores censitários de São Paulo
+  (migration 0021, `e_dado_ilustrativo = 'true'`). **Confirmado como já
+  correto** (nenhuma mudança necessária): todo service que agrega
+  `mmgd_indicadores` em nível municipal/nacional (`municipios.service.ts`,
+  `vaziosDeAcesso.service.ts`, `estatisticasNacionais.service.ts`,
+  `basesDeDados.service.ts`, e o script Python
+  `calcular_analise_estatistica_moradia_mmgd.py`) filtra
+  `ue.tipo = 'municipio'` no JOIN com `unidades_espaciais` — as 28+ linhas
+  sintéticas por setor de São Paulo nunca contaminam nenhum agregado
+  nacional nem o cálculo de correlação estatística; e
+  `setoresCensitarios.service.ts` já expõe `eDadoIlustrativo` por setor +
+  `avisoIlustrativo` agregado, nunca fabricando o aviso quando não há dado
+  ilustrativo. **Bug real encontrado e corrigido** nesta auditoria:
+  `DetalhamentoSetores` (dentro de `PainelMunicipio.tsx`, drill-down
+  RF-043) usava `potenciaInstaladaKw ?? 0` tanto na ordenação quanto no
+  cálculo da barra proporcional — um setor sem potência medida (`null`)
+  virava visualmente "setor com potência ≈0" (barra de 2% de largura) em
+  vez de "sem dado", violando a mesma regra que `formatarValor` já respeita
+  no rótulo textual ao lado (`'sem dado'`) e que `ordenarMunicipios` já
+  respeita em `municipios.service.ts` (nulo sempre por último, nunca tratado
+  como extremo). Corrigido: ordenação com nulo explicitamente por último
+  (mesmo padrão do backend) e a barra não é mais renderizada quando o valor
+  é nulo (em vez de aparecer com largura mínima falsa). Hoje é um cenário
+  teórico (todas as linhas do piloto SP têm valor preenchido pela migration
+  0021), mas o componente já está correto para quando setores reais/parciais
+  da ANEEL existirem. VALIDADO nesta sessão: `npx tsc -b` do frontend e
+  `npx tsc --noEmit` do backend limpos (nenhum arquivo de backend alterado,
+  rodado só como checagem de linha de base). Teste manual no navegador
+  ainda NÃO feito nesta sessão.
 
 **NAO implementado ainda** (apesar de descrito em secoes deste documento como padrao):
 - Backend Node/Express: endpoints de LEITURA (`GET /api/vazios-de-acesso`,
@@ -717,7 +963,8 @@ porta 5173, com o backend rodando na 3000). Makefile de desenvolvimento existe d
 │       │   │   ├── unidades_espaciais.ts
 │       │   │   ├── mmgd_indicadores.ts   (+ potenciaResidencialKw/numeroUcsResidencial, migration 0020;
 │       │   │   │   + numeroEmpreendimentos, migration 0025 — ver "Correção de rótulo" acima)
-│       │   │   ├── indicadores_sociais.ts (+ percentualPobrezaCadunico, drift da migration 0013 corrigido 07/07/2026)
+│       │   │   ├── indicadores_sociais.ts (+ percentualPobrezaCadunico, drift da migration 0013 corrigido 07/07/2026;
+│       │   │   │   + numeroContratosReformaCasaBrasilSolar/valorLiberadoReformaCasaBrasilSolar, migration 0027)
 │       │   │   ├── irradiacao_solar.ts
 │       │   │   ├── indicadores_climaticos.ts
 │       │   │   ├── usuarios.ts     (NOVO 08/07/2026 - fundacao de auth/RBAC,
@@ -732,7 +979,7 @@ porta 5173, com o backend rodando na 3000). Makefile de desenvolvimento existe d
 │       │   │   ├── aprovacoes_indicadores.ts  (NOVO 08/07/2026 - RF-074, migration 0024)
 │       │   │   ├── versoes_publicadas.ts      (NOVO 08/07/2026 - RF-075, migration 0024)
 │       │   │   └── index.ts
-│       │   └── migrations/        (SQL incremental - IMPLEMENTADO, 0000 a 0025)
+│       │   └── migrations/        (SQL incremental - IMPLEMENTADO, 0000 a 0028)
 │       │       ├── 0000_criacao_tabelas.sql
 │       │       ├── 0001_extensoes_e_indices_espaciais.sql
 │       │       ├── ... (0002 a 0010: infraestrutura, renda, capital humano,
@@ -755,9 +1002,17 @@ porta 5173, com o backend rodando na 3000). Makefile de desenvolvimento existe d
 │       │       ├── 0023_colaborador_escrita.sql    (NOVO 08/07/2026 - RF-059 a RF-067)
 │       │       ├── 0024_admin_escrita.sql          (NOVO 08/07/2026 - RF-070 a RF-077
 │       │       │     + usuarios.ativo)
-│       │       └── 0025_mmgd_indicadores_numero_empreendimentos.sql (NOVO
-│       │             10/07/2026 - contagem real de instalações MMGD, ver
-│       │             "Correção de rótulo" em Estado Real do Projeto)
+│       │       ├── 0025_mmgd_indicadores_numero_empreendimentos.sql (NOVO
+│       │       │     10/07/2026 - contagem real de instalações MMGD, ver
+│       │       │     "Correção de rótulo" em Estado Real do Projeto)
+│       │       ├── 0026_desempenho_conexao_distribuidoras.sql (ranking
+│       │       │     público de distribuidoras, ver ARQUITETURA.md)
+│       │       ├── 0027_indicadores_sociais_reforma_casa_brasil_solar.sql
+│       │       │     (NOVO 17/07/2026 - ver "Indicador Reforma Casa Brasil
+│       │       │     Solar" em Estado Real do Projeto)
+│       │       └── 0028_view_ivsh_consolidado.sql (NOVO 18/07/2026 - view
+│       │             `vw_ivsh_consolidado`, ver "Auditoria analítica moradia
+│       │             ×solar e IVSH" em Estado Real do Projeto)
 │       ├── types/
 │       │   └── express.d.ts        (NOVO 08/07/2026 - augmentation de `Request.usuario`)
 │       ├── middlewares/            (IMPLEMENTADO 07/07/2026)
@@ -867,7 +1122,10 @@ porta 5173, com o backend rodando na 3000). Makefile de desenvolvimento existe d
 │               ├── extrair_irradiacao_solar_inpe.py
 │               ├── extrair_tarifa_distribuidoras.py
 │               ├── validar_aneel_real.py
-│               └── extrair_precipitacao_mensal_merge.py
+│               ├── extrair_precipitacao_mensal_merge.py
+│               └── extrair_reforma_casa_brasil_solar.py (NOVO 17/07/2026 -
+│                     unica fonte NAO publica/automatizavel, ver Estado Real
+│                     do Projeto)
 ├── frontend/                       (INICIADO 09/07/2026 - fundação + mapa interativo)
 │   ├── package.json                (React 19, react-router-dom 7, maplibre-gl 5,
 │   │                                Tailwind v4. Scripts: dev/build/typecheck/preview)

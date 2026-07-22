@@ -90,6 +90,24 @@ export const INDICADORES_MAPA: IndicadorMapa[] = [
     metadados: { natureza: 'Estimado', confianca: 'Média', fonte: 'IPEA — Índice de Vulnerabilidade Social' },
   },
   {
+    id: 'ivsh',
+    rotulo: 'Índice de Vulnerabilidade Socio-Habitacional-Energética (IVSH)',
+    unidade: null,
+    formato: 'numero',
+    sentido: 'negativo',
+    // O IVS geral (acima) EXCLUI moradia de propósito (evita endogeneidade ao
+    // testar MMGD x moradia — ver docs/RELATORIO_AUDITORIA_MORADIA_SOLAR.md).
+    // O IVSH é a versão para PRIORIZAÇÃO: média de IVS + precariedade
+    // habitacional + insegurança da posse (migration 0028) — não substitui o
+    // IVS nas demais leituras, é um índice adicional.
+    descricao:
+      'Média de IVS, precariedade habitacional e insegurança da posse — índice de ' +
+      'priorização que inclui moradia (o IVS acima a exclui de propósito). ' +
+      'Fonte: cálculo próprio sobre IPEA/Censo, ver vw_ivsh_consolidado.',
+    cores: RAMPA_VERMELHA,
+    metadados: { natureza: 'Estimado', confianca: 'Média', fonte: 'Cálculo próprio — IVS + precariedade habitacional + insegurança da posse' },
+  },
+  {
     id: 'rendaMediaDomiciliar',
     rotulo: 'Renda média domiciliar',
     unidade: null,

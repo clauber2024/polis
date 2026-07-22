@@ -47,6 +47,14 @@ export function PaginaMapa() {
 
   const [destaqueLigado, setDestaqueLigado] = useState(false);
   const [heatmapLigado, setHeatmapLigado] = useState(false);
+  // Destaque de Descompasso Morfológico (21/07/2026) — mesmo padrão de
+  // carregamento lazy do destaque de Vazios de Acesso, mas escopado ao MESMO
+  // conjunto já carregado (quadrante vazio_de_acesso, ~8 requisições) em vez
+  // de buscar a classificação nacional completa (~28 requisições, só usada
+  // hoje pelo scatter do Painel Analítico): o alerta de descompasso dentro
+  // de um Vazio de Acesso já é o caso de maior interesse (potencial alto E
+  // MMGD baixo E barreira morfológica), então não justifica o fetch maior.
+  const [descompassoLigado, setDescompassoLigado] = useState(false);
   const [vazios, setVazios] = useState<VaziosDeAcessoCompleto | null>(null);
   const [carregandoVazios, setCarregandoVazios] = useState(false);
   const [erroVazios, setErroVazios] = useState<string | null>(null);
@@ -147,6 +155,20 @@ export function PaginaMapa() {
     if (ligado) garantirVaziosCarregados();
   }
 
+  function aoAlternarDescompasso(ligado: boolean) {
+    setDescompassoLigado(ligado);
+    if (ligado) garantirVaziosCarregados();
+  }
+
+  // O CartaoDescompassoMorfologico (painel de detalhe) precisa da mediana
+  // nacional de irradiação para comparar o município selecionado contra o
+  // país — mesma classificação lazy já usada pelo destaque/heatmap/ranking,
+  // só mais um gatilho para o mesmo carregamento (garantirVaziosCarregados
+  // já é idempotente).
+  useEffect(() => {
+    if (municipioSelecionado) garantirVaziosCarregados();
+  }, [municipioSelecionado]);
+
   const quebras = useMemo(() => {
     if (!dados) return [];
     const valores = dados.features
@@ -158,6 +180,17 @@ export function PaginaMapa() {
   const codigosDestaque = useMemo(
     () => (destaqueLigado && vazios ? vazios.municipios.map((m) => m.codigoIbge) : null),
     [destaqueLigado, vazios],
+  );
+
+  // Descompasso Morfológico (21/07/2026) — classificação 100% do backend
+  // (`descompassoMorfologico` já vem calculado em cada município de `vazios`,
+  // ver vaziosDeAcesso.service.ts); aqui só filtra o array já carregado.
+  const codigosDescompasso = useMemo(
+    () =>
+      descompassoLigado && vazios
+        ? vazios.municipios.filter((m) => m.descompassoMorfologico).map((m) => m.codigoIbge)
+        : null,
+    [descompassoLigado, vazios],
   );
 
   // Badges do ranking (RF-032) — mesma classificação do backend, como Set.
@@ -368,6 +401,20 @@ export function PaginaMapa() {
               Destacar Vazios de Acesso
               {carregandoVazios && <span className="text-slate-400">carregando…</span>}
             </label>
+            <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+              <input
+                type="checkbox"
+                checked={descompassoLigado}
+                onChange={(evento) => aoAlternarDescompasso(evento.target.checked)}
+                className="h-4 w-4"
+              />
+              Descompasso Morfológico
+              {vazios && (
+                <span className="text-slate-400">
+                  ({vazios.municipios.filter((m) => m.descompassoMorfologico).length})
+                </span>
+              )}
+            </label>
             <button
               type="button"
               onClick={() => aoAlternarHeatmap(!heatmapLigado)}
@@ -389,7 +436,9 @@ export function PaginaMapa() {
           </p>
         )}
         {erroVazios && <p className="mt-2 text-xs text-red-600">{erroVazios}</p>}
-        {(destaqueLigado || heatmapLigado) && vazios && vazios.avisos.totalPrecisaReextrairMmgd > 0 && (
+        {(destaqueLigado || heatmapLigado || descompassoLigado) &&
+          vazios &&
+          vazios.avisos.totalPrecisaReextrairMmgd > 0 && (
           <p className="mt-2 text-xs text-amber-600">
             {vazios.avisos.totalPrecisaReextrairMmgd.toLocaleString('pt-BR')} municípios fora da
             classificação (MMGD residencial pendente de re-extração — ver CLAUDE.md).
@@ -471,6 +520,7 @@ export function PaginaMapa() {
             indicador={indicador}
             quebras={quebras}
             codigosDestaque={codigosDestaque}
+            codigosDescompasso={codigosDescompasso}
             pontosHeatmap={pontosHeatmap}
             foco={foco}
             estados={estados}
@@ -526,6 +576,8 @@ export function PaginaMapa() {
           <PainelMunicipio
             municipio={municipioSelecionado}
             aoFechar={() => setMunicipioSelecionado(null)}
+            medianaIrradiacao={vazios?.medianaNacional.potencialSolarKwhM2Dia ?? null}
+            limiarPrecariedadeHabitacionalAlta={vazios?.limiarPrecariedadeHabitacionalAlta ?? null}
           />
         )}
       </div>

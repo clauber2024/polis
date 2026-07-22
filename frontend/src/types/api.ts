@@ -26,6 +26,13 @@ export interface MunicipioComIndicadores {
   /** ESTIMADA (densidade × área) — o Atlas não guarda população absoluta. */
   populacaoEstimada: number | null;
   ivs: number | null;
+  /**
+   * IVSH — Índice de Vulnerabilidade Socio-Habitacional-Energética
+   * (vw_ivsh_consolidado, migration 0028) = média de IVS + precariedade
+   * habitacional + insegurança da posse. Diferente de `ivs`: inclui moradia
+   * de propósito. Uso de priorização/mapa, não substitui `ivs`.
+   */
+  ivsh: number | null;
   rendaMediaDomiciliar: number | null;
   /** Cobertura: pessoas cadastradas no CadÚnico ÷ população (Censo 2022) × 100. */
   percentualCadunico: number | null;
@@ -53,6 +60,14 @@ export interface MunicipioComIndicadores {
   valorLiberadoReformaCasaBrasilSolar: number | null;
   /** Derivado: contratos por 10.000 habitantes (população estimada). */
   contratosReformaCasaBrasilSolarPer10000Hab: number | null;
+  /**
+   * Índice de precariedade habitacional (vw_indices_compostos_moradia_
+   * infraestrutura, migration 0014) — normalização min-max nacional de
+   * cortiço/parede inadequada/população em favela (0 = melhor, 1 = pior).
+   */
+  indicePrecariedadeMoradia: number | null;
+  /** % de domicílios do tipo "Apartamento" (Censo 2022, SIDRA 9928) — proxy de tipologia habitacional densa. */
+  percentualApartamento: number | null;
   periodoReferenciaMmgd: string | null;
   periodoReferenciaIrradiacao: string | null;
 }
@@ -121,7 +136,15 @@ export interface ListarMunicipiosResultado {
 export interface FeatureMunicipio {
   type: 'Feature';
   geometry: GeoJSON.Geometry | null;
-  properties: MunicipioComIndicadores;
+  properties: MunicipioComIndicadores & {
+    /**
+     * Ponto GARANTIDAMENTE dentro do polígono (ST_PointOnSurface, backend) —
+     * usar para o rótulo do município, nunca `centroDaGeometria` (centro do
+     * bbox pode cair fora de polígono côncavo — bug real, 21/07/2026, ver
+     * docs/DECISOES.md).
+     */
+    pontoRotulo: [number, number] | null;
+  };
 }
 
 export interface FeatureCollectionMunicipios {
@@ -158,6 +181,14 @@ export type Quadrante =
   | 'adocao_acima_do_potencial'
   | 'baixo_potencial_baixa_adocao';
 
+/**
+ * Quintil de IVSH DENTRO do quadrante vazio_de_acesso (não nacional) —
+ * "muito_alto" = 20% mais vulneráveis. Só preenchido por
+ * GET /api/vazios-de-acesso (listagem paginada), `null` nos demais usos de
+ * MunicipioClassificado. Ver vaziosDeAcesso.service.ts, `calcularClassificacaoIvsh`.
+ */
+export type ClassificacaoIvsh = 'muito_alto' | 'alto' | 'medio' | 'baixo' | 'muito_baixo';
+
 /** Espelho de MunicipioClassificado (GET /api/vazios-de-acesso). */
 export interface MunicipioClassificado {
   codigoIbge: string;
@@ -177,6 +208,14 @@ export interface MunicipioClassificado {
   ivsh: number | null;
   rendaMediaDomiciliar: number | null;
   percentualPobrezaCadunico: number | null;
+  /**
+   * Alta irradiação desperdiçada por alta precariedade habitacional OU alta
+   * verticalização (mesma condição de CartaoDescompassoMorfologico.tsx,
+   * agora calculada no backend para virar camada nacional do mapa,
+   * 21/07/2026).
+   */
+  descompassoMorfologico: boolean;
+  classificacaoIvsh: ClassificacaoIvsh | null;
 }
 
 /**
@@ -340,7 +379,7 @@ export interface UsuarioAdmin {
 
 /** Espelho de IndicadorIndisponivel (estatisticasNacionais.service.ts). */
 export interface IndicadorIndisponivel {
-  id: 'participacaoMatrizNacional' | 'projecaoFuturaPotencia';
+  id: 'projecaoFuturaPotencia';
   rotulo: string;
   motivo: string;
 }
@@ -358,11 +397,24 @@ export interface PessoasBeneficiadasEstimativa {
 }
 
 /**
+ * Espelho de ParticipacaoMatrizNacional (RF-005 item 5) — calculada como
+ * geracaoMmgdGwh / geracaoEletricaNacionalGwh, mesmo ano (EPE/BEN +
+ * EPE/PDGD, ver docs/DECISOES.md). `null` se os extractors de
+ * indicadores_energia_nacional nunca rodaram neste ambiente.
+ */
+export interface ParticipacaoMatrizNacional {
+  periodoReferencia: string;
+  geracaoMmgdGwh: number;
+  geracaoEletricaNacionalGwh: number;
+  participacaoPercentual: number;
+  fonteGeracaoNacional: string | null;
+  fonteMmgd: string | null;
+}
+
+/**
  * Espelho de EstatisticasNacionais (GET /api/estatisticas-nacionais, RF-005).
- * Só os 3 primeiros campos são calculados de fato — os outros 3 números
- * pedidos pelo RF-005 (pessoas beneficiadas, participação na matriz nacional,
- * projeção futura) não são calculáveis com o schema atual e aparecem em
- * `indicadoresIndisponiveis`, cada um com o motivo — nunca fabricados.
+ * O número que falta calcular de fato (projeção futura) aparece em
+ * `indicadoresIndisponiveis`, com o motivo — nunca fabricado.
  */
 export interface EstatisticasNacionais {
   /** UCs beneficiadas por crédito de energia — não é contagem de instalações. Ver backend. */
@@ -373,6 +425,7 @@ export interface EstatisticasNacionais {
   totalMunicipiosComMmgd: number;
   periodoReferencia: string | null;
   pessoasBeneficiadas: PessoasBeneficiadasEstimativa;
+  participacaoMatrizNacional: ParticipacaoMatrizNacional | null;
   indicadoresIndisponiveis: IndicadorIndisponivel[];
 }
 
@@ -387,6 +440,8 @@ export interface ListarVaziosDeAcessoResultado {
       potencialSolarKwhM2Dia: number;
       mmgdResidencialPer1000Hab: number;
     };
+    /** Percentil 90 nacional de indicePrecariedadeMoradia — limiar de "alta precariedade" do CartaoDescompassoMorfologico. */
+    limiarPrecariedadeHabitacionalAlta: number;
   };
   notaMetodologica: string;
   avisos: {
@@ -396,10 +451,14 @@ export interface ListarVaziosDeAcessoResultado {
     totalPrecisaReextrairMmgd: number;
   };
   resumoPorQuadrante: Record<Quadrante, number>;
+  /** Contagem de municípios com descompassoMorfologico=true no recorte já filtrado por geografia. */
+  resumoDescompasso: number;
   filtrosAplicados: {
     uf: string | null;
     regiao: string | null;
     quadrante: string | null;
+    classificacaoIvsh: ClassificacaoIvsh | null;
+    descompassoMorfologico: boolean | null;
   };
   paginacao: Paginacao;
   resultados: MunicipioClassificado[];
@@ -462,6 +521,8 @@ export interface EstadoFeature {
     uf: string;
     nomeEstado: string;
     regiao: string;
+    /** Ponto GARANTIDAMENTE dentro do polígono (ST_PointOnSurface) — usar para o rótulo da UF, nunca `centroDaGeometria` (ver docs/DECISOES.md, 21/07/2026). */
+    pontoRotulo: [number, number] | null;
   };
 }
 
@@ -497,4 +558,41 @@ export interface StatusBasesDeDadosResultado {
   atualizadoEm: string;
   totalMunicipios: number;
   fontes: StatusFonteDados[];
+}
+
+// ---------------------------------------------------------------------------
+// Análises estatísticas materializadas (correlação parcial de Spearman,
+// eixo moradia x MMGD residencial) — ver
+// backend/src/services/analisesEstatisticas.service.ts. Resultado gravado
+// pelo ETL (migration 0029), não calculado em tempo real.
+// ---------------------------------------------------------------------------
+
+/** Espelho de ResultadoAnaliseEstatistica (GET /api/analises-estatisticas). */
+export interface ResultadoAnaliseEstatistica {
+  variavelX: string;
+  rotuloVariavelX: string;
+  sentidoEsperado: string;
+  variavelY: string;
+  variaveisControle: string[];
+  metodo: string;
+  n: number;
+  rhoBruto: number | null;
+  pValorBruto: number | null;
+  rhoParcial: number | null;
+  pValorParcial: number | null;
+  nRegioesTestadas: number | null;
+  nRegioesMesmoSinal: number | null;
+  veredito: string | null;
+  calculadoEm: string;
+}
+
+/** Espelho de AnalisesEstatisticasResultado (GET /api/analises-estatisticas). */
+export interface AnalisesEstatisticasResultado {
+  metodologia: {
+    descricaoMetodo: string;
+    amostraMinima: number;
+  };
+  notaMetodologica: string;
+  totalResultados: number;
+  resultados: ResultadoAnaliseEstatistica[];
 }
