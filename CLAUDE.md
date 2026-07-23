@@ -49,7 +49,7 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
 
 ---
 
-## Estado Real do Projeto (atualizado em 09/07/2026)
+## Estado Real do Projeto (atualizado em 23/07/2026 — log cronologico abaixo cobre ate 22/07/2026, commit `e5b2d14`)
 
 **Implementado e validado com dados reais:**
 - **Backend Node/Express — primeiro endpoint real (07/07/2026):**
@@ -135,7 +135,7 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   `qualidade_conjunto_municipio` criadas FORA do Drizzle, via
   `backend/src/etl/schema_qualidade.sql` (ver nota de inconsistencia arquitetural na
   Secao 2)
-- Migrations incrementais 0000 a 0029 - ver `backend/src/db/migrations/`. Numeracao
+- Migrations incrementais 0000 a 0030 - ver `backend/src/db/migrations/`. Numeracao
   formal NAO cobre o schema de qualidade (criado fora do sistema de migrations ate a
   migration 0011, que so adiciona as views DEC/FEC "real" em cima do schema ja existente).
   0014-0017: indices compostos + views consolidadas (`vw_indicadores_sociais_consolidado`,
@@ -173,16 +173,23 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   0029: tabela `analises_estatisticas` (infraestrutura estatística integrada,
   resultados de correlação parcial de Spearman materializados via ETL) - ver
   bloco "Infraestrutura estatística integrada" acima - aplicada e validada em
-  18/07/2026.
-- 21 extractors Python funcionais em `backend/src/etl/loaders/` (territorio, MMGD/ANEEL,
+  18/07/2026. 0030: tabela `indicadores_energia_nacional`, granularidade
+  NACIONAL por ano (único caso do schema que não referencia
+  `unidades_espaciais`) - `geracao_eletrica_nacional_gwh` (BEN Anexo X) e
+  `geracao_mmgd_gwh`/`percentual_consumo_cativo_atendido_mmgd` (PDGD/EPE) -
+  ver bloco "Participação da MMGD na matriz elétrica nacional" abaixo -
+  aplicada e validada em 21-22/07/2026, commit `e5b2d14`.
+- 23 extractors Python funcionais em `backend/src/etl/loaders/` (territorio, MMGD/ANEEL,
   Infraestrutura Urbana/Censo, Renda e Trabalho/RAIS via BigQuery, Alfabetizacao/Censo,
   Mortalidade Infantil/SIM+SINASC via BigQuery, Moradia/Censo, Tipo de Domicilio/Censo,
   RDPC/Censo, Inadequacao Habitacional, MCMV/FGTS, MCMV/OGU, Favelas/FCU (seed + extract),
-  ZEIS/AEIS por capital - SP, Recife, Rio Branco, Rio de Janeiro -, Irradiacao Solar/INPE,
+  ZEIS/AEIS - 8 municipios, cada um com seed proprio: Sao Paulo, Recife, Rio Branco, Rio
+  de Janeiro (AEIS), Belo Horizonte, Contagem, Fortaleza, Salvador -, Irradiacao Solar/INPE,
   Tarifa Residencial/ANEEL, Precipitacao Mensal/MERGE-CPTEC-INPE, Reforma Casa Brasil
   Solar/Caixa - unica fonte NAO publica/automatizavel, extrato pontual fornecido pelo
-  usuario, ver bloco "Indicador Reforma Casa Brasil Solar" acima) + 2 scripts fora do
-  padrao `loaders/`: `backend/src/etl/etl_indqual.py` e
+  usuario, ver bloco "Indicador Reforma Casa Brasil Solar" acima -, Geracao Eletrica
+  Nacional/EPE-BEN e Geracao MMGD/EPE-PDGD (migration 0030, ambas sem API - snapshot
+  manual repetivel) + 2 scripts fora do padrao `loaders/`: `backend/src/etl/etl_indqual.py` e
   `backend/src/etl/schema_qualidade.sql` (Qualidade de Fornecimento/ANEEL - ver nota na
   Secao 2). Dentro de `loaders/`, mas fora do padrao "extractor de fonte externa" -
   `calcular_analise_estatistica_moradia_mmgd.py` (18/07/2026): nao baixa/le nenhuma
@@ -391,11 +398,19 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   mesma CTE `mmgd_latest` já validada em municipios.service.ts); os outros 3
   ("pessoas beneficiadas por créditos de energia", "participação da solar
   distribuída na matriz elétrica nacional", "projeção futura de potência")
-  exigem dado que o Atlas não tem (recorte de beneficiários de geração
-  compartilhada da ANEEL; total de geração nacional do Brasil como
+  exigem dado que o Atlas não tem nesta sessão (recorte de beneficiários de
+  geração compartilhada da ANEEL; total de geração nacional do Brasil como
   denominador; modelo de projeção) — expostos em
   `indicadoresIndisponiveis`, cada um com o motivo, NUNCA fabricados (mesmo
-  princípio já usado no RF-034/TSEE). Também no backend: filtro de faixa de
+  princípio já usado no RF-034/TSEE). **Atualização (ver blocos mais abaixo
+  nesta mesma seção, por ordem cronológica): "pessoas beneficiadas" foi
+  resolvido como estimativa ainda em 10/07/2026 (bloco "Correção de rótulo em
+  RF-005 + migration 0025"); "participação na matriz elétrica nacional" foi
+  resolvido de fato em 21/07/2026, migration 0030/commit `e5b2d14` (bloco
+  "Participação da MMGD na matriz elétrica nacional (EPE/PDGD)" abaixo) — só
+  "projeção futura de potência" continua indisponível até hoje, por falta de
+  série temporal real de MMGD (só 1 `periodo_referencia` carregado).** Também
+  no backend: filtro de faixa de
   potência instalada (`potenciaMin`/`potenciaMax`, RF-046) adicionado a
   `listarMunicipiosQuerySchema` — propaga automaticamente para
   `GET /api/municipios` e `GET /api/municipios/exportar` (RF-047) por
@@ -846,6 +861,45 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   `npx tsc --noEmit` do backend limpos (nenhum arquivo de backend alterado,
   rodado só como checagem de linha de base). Teste manual no navegador
   ainda NÃO feito nesta sessão.
+- **Participação da MMGD na matriz elétrica nacional (EPE/PDGD) e deploy
+  público temporário (21-22/07/2026, commit `e5b2d14`):** RF-005 item 5
+  ("participação da solar distribuída na matriz elétrica nacional") saiu de
+  `indicadoresIndisponiveis` — até aqui só era citado como texto estático na
+  landing (bloco "Landing Page + Dashboard Público" acima). Nova tabela
+  `indicadores_energia_nacional` (migration 0030, granularidade NACIONAL por
+  ano, não referencia `unidades_espaciais` — único caso do schema) + dois
+  extractors manuais (sem API em nenhuma das duas fontes):
+  `extrair_geracao_eletrica_nacional_epe.py` (denominador, BEN Anexo X) e
+  `extrair_geracao_mmgd_epe_pdgd.py` (numerador, PDGD "Estimativa da Geração
+  no Ano"). Backend expõe `participacaoMatrizNacional` em
+  `estatisticasNacionais.service.ts` — percentual calculado para 2025
+  (~7,02%) bate com o número já citado da EPE (7,0%). **Guarda duas métricas
+  distintas lado a lado, sempre rotuladas** (decisão explícita do usuário,
+  mesmo princípio já usado no `numero_ucs_com_mmgd`/RF-005 item 1): a coluna
+  `percentual_consumo_cativo_atendido_mmgd` (métrica diferente, denominador é
+  consumo cativo, não geração) **continua vazia** — exige um segundo botão de
+  download dentro da mesma aba do PDGD, ainda não obtido do usuário. Ver
+  ARQUITETURA.md, seção "RF-005", e `docs/DECISOES.md`, ADR "Integração da
+  participação da MMGD na matriz elétrica nacional (EPE/PDGD)", para o
+  raciocínio completo. Também nesta sessão: endpoint público de notas
+  metodológicas dedicado (`nota-metodologica.*`), cartão "Descompasso
+  Morfológico" e matriz IVSH x MMGD no mapa/painel analítico, alternador de
+  critério de priorização (IVS/IVSH) em Vazios de Acesso, e novos componentes
+  da landing page (diagrama de conexão de dados, tour de achados). Validado
+  manualmente pelo usuário antes do commit.
+
+  **Deploy público temporário (mesma janela, 22/07/2026)**: backend + Postgres
+  publicados na Railway (imagem `postgis/postgis:16-3.4`, igual à local — dump
+  do banco local restaurado, não replay de migrations+ETL na nuvem) e
+  frontend estático na Vercel (`https://polis-teal.vercel.app`), com CORS
+  adicionado (`backend/package.json` — dependência `cors`;
+  `backend/src/app.ts`/`config/env.ts` — variável `FRONTEND_URL`). **Não é a
+  arquitetura de produção definitiva da Seção 8** (Nginx/certbot/
+  `docker-compose.prod.yml` seguem só especificação) — é uma ponte barata e
+  fácil de transferir de posse para o Instituto Pólis quando isso acontecer.
+  Passo a passo completo em `docs/DEPLOY_TEMPORARIO.md`; raciocínio e
+  alternativas descartadas em `docs/DECISOES.md`, seção "Hospedagem pública
+  temporária (pré-handoff Instituto Pólis) — 2026-07-22".
 
 **NAO implementado ainda** (apesar de descrito em secoes deste documento como padrao):
 - Backend Node/Express: endpoints de LEITURA (`GET /api/vazios-de-acesso`,
@@ -873,8 +927,12 @@ como diretriz. O que muda é exclusivamente o que depende de Laravel/PHP/MySQL.
   `make deploy-first`, `make shell`, `make lint` continuam **especificacao**, nao
   implementados (ver Secao 7). Os comandos de desenvolvimento (`make up`, `make
   migrate`, `make etl`, etc.) foram implementados em 09/07/2026 - ver bloco acima.
-- Deploy/producao (Nginx, certbot, scheduler, `docker-compose.prod.yml`) - arquitetura
-  especificada mas nunca implementada nem testada
+- Deploy/producao definitivo (Nginx, certbot, scheduler, `docker-compose.prod.yml`) -
+  arquitetura especificada mas nunca implementada nem testada. **Existe, porem, um deploy
+  publico TEMPORARIO desde 22/07/2026** (Railway + Vercel, ver bloco "Participacao da MMGD
+  na matriz eletrica nacional (EPE/PDGD) e deploy publico temporario" acima e
+  `docs/DEPLOY_TEMPORARIO.md`) - ponte ate o handoff ao Instituto Polis, nao substitui esta
+  arquitetura definitiva
 - Upload de arquivo real (multer/storage) para o Painel Admin - decisao explicita do
   usuario foi NAO implementar isso agora (ver bloco acima); carga de dado continua via
   ETL Python

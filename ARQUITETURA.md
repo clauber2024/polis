@@ -2,27 +2,37 @@
 > Complemento ao [`CLAUDE.md`](./CLAUDE.md) (padroes tecnicos) e ao [`README.md`](./README.md).
 > Este documento cobre o que muda com frequencia: estado dos dados, decisoes de fontes
 > e fila de trabalho. Padroes de codigo, banco e Git estao no CLAUDE.md - nao duplicar aqui.
-> Ultima atualizacao: 10/07/2026.
+> Ultima atualizacao: 23/07/2026 (sincronizacao de documentacao com o estado real do
+> codigo/banco - sem sessao de carga de dados nova; ver commit `e5b2d14`, 22/07/2026,
+> para o ultimo trabalho de dados de fato).
 
-## Estado dos dados (pos-sessao DEC/FEC real, jul/2026)
+## Estado dos dados (pos-sessao EPE/PDGD + deploy temporario, jul/2026)
 
 Tabela `unidades_espaciais`:
 - 5.573 municipios (`municipio:<codigo_ibge>`)
 - 12.348 FCUs - Favelas e Comunidades Urbanas como unidades espaciais proprias
   (tipo `favela_comunidade_urbana`; coluna `tipo` expandida para VARCHAR(40))
-- 3.696 ZEIS/AEIS em 4 capitais: RJ 1.044, SP 2.574, Recife 76, Rio Branco 2
+- 4.778 ZEIS/AEIS em 8 municipios (corrigido em 18/07/2026, auditoria
+  moradia×solar - a contagem de "4 capitais" abaixo estava desatualizada desde o
+  commit `9c29c8e`, 10/07/2026, que ja tinha somado Contagem, Salvador,
+  Fortaleza e Belo Horizonte): RJ 1.044, SP 2.574, Recife 76, Rio Branco 2,
+  Contagem, Salvador, Fortaleza, Belo Horizonte (ver `CLAUDE.md`, "Auditoria
+  analitica moradia×solar e IVSH", para a contagem por municipio mais recente)
 
 | Dimensao | Status | Notas |
 |---|---|---|
 | Territorio | ok | IBGE Malha 2025, 5.573 municipios |
-| MMGD | ok | ANEEL jun/2026: 5.567 mun., 50.086 MW, 8M UCs |
+| MMGD | ok, mas 1 unico periodo | ANEEL jun/2026: 5.567 mun., 50.086 MW, 8M UCs. `numero_empreendimentos` (migration 0025) criada mas NULL ate reexecutar o extractor. Schema suporta serie temporal (chave unica `unidade_espacial_id`+`periodo_referencia`), mas so ha 1 snapshot carregado ate hoje - bloqueia projecao futura (RF-005 item 6), filtro de periodo (RF-046) e ranking por variacao (RF-034) |
 | Infraestrutura Urbana | ok | Censo 2022/SIDRA, 5.570 mun., 5 indicadores |
 | Renda e Trabalho | ok Ampliada 06/07/2026 | RAIS 2024 via BigQuery, 5.571 mun. + RDPC (Censo 2022/SIDRA 10295+10296, `renda_per_capita_rdpc` e `percentual_baixa_renda_rdpc`, migration 0017, 5.570 mun.) |
-| Moradia | ok Finalizada jul/2026 | Regime de ocupacao (Censo) + FCU + ZEIS/AEIS + inadequacao (% parede) + MCMV/FGTS (5.111 mun., 36,6M UH) + MCMV/OGU (4.883 mun., 1,7M UH) + percentual_apartamento (Censo 2022/SIDRA 9928, migration 0016, 5.570 mun. - ver secao de analise de correlacao abaixo) |
-| Qualidade de Fornecimento | ok Finalizada jul/2026 | INDQUAL/ANEEL: DEC/FEC + 21 variantes por origem de interrupcao, ~4,9M registros. Conjunto eletrico -> municipio e N:N (42.661 pares); view resolve por pior-caso e media. **DEC/FEC "real" (sem expurgo de Dia Critico) fechado em 04/07/2026**: views `vw_qualidade_conjunto_real` e `vw_qualidade_municipio_real` (migration 0011), formula confirmada contra o dicionario oficial da ANEEL (`dominio-indicadores.csv`) - soma `DEC + DECINC + DECIPC + DECXNC + DECXPC` (e equivalente FEC); variantes IND/INE/INO/IP/XN/XP sao decomposicao do valor ja incluso no oficial e NAO entram na soma. Cobertura validada identica a view oficial (423.147 linhas municipio/ano/periodo em ambas) |
+| Moradia | ok Finalizada jul/2026 | Regime de ocupacao (Censo) + FCU + ZEIS/AEIS (4.778, 8 municipios - ver acima) + inadequacao (% parede) + MCMV/FGTS (5.111 mun., 36,6M UH) + MCMV/OGU (4.883 mun., 1,7M UH) + percentual_apartamento (Censo 2022/SIDRA 9928, migration 0016, 5.570 mun.) + **Reforma Casa Brasil Solar** (migration 0027, 17/07/2026 - 1.093 mun., 3.253 contratos, R$ 61.377.571,09, fonte Caixa/SIC nao publica, PDF fornecido pelo usuario) - ver secao de analise de correlacao abaixo. 2 dos 5 eixos do plano original (`docs/PLANO_MORADIA_TERRITORIO_POPULAR.md`) seguem sem fonte nacional: ZEIS fora dos 8 municipios ja cobertos, e MCMV/HIS alem do ja carregado |
+| Qualidade de Fornecimento | ok Finalizada jul/2026 | INDQUAL/ANEEL: DEC/FEC + 21 variantes por origem de interrupcao, ~4,9M registros. Conjunto eletrico -> municipio e N:N (42.661 pares); view resolve por pior-caso e media. **DEC/FEC "real" (sem expurgo de Dia Critico) fechado em 04/07/2026**: views `vw_qualidade_conjunto_real` e `vw_qualidade_municipio_real` (migration 0011), formula confirmada contra o dicionario oficial da ANEEL (`dominio-indicadores.csv`) - soma `DEC + DECINC + DECIPC + DECXNC + DECXPC` (e equivalente FEC); variantes IND/INE/INO/IP/XN/XP sao decomposicao do valor ja incluso no oficial e NAO entram na soma. Cobertura validada identica a view oficial (423.147 linhas municipio/ano/periodo em ambas). **Ranking publico de distribuidoras** (migration 0026, `desempenho_conexao_distribuidoras`, 52 distribuidoras) adicionado sobre o dataset de Atendimento a Pedidos de Conexao MMGD |
 | Capital Humano | ok Finalizada jul/2026 | Alfabetizacao (Censo 2022) + taxa de mortalidade infantil (SIM+SINASC/DATASUS via Base dos Dados/BigQuery, media poolada 2022-2024, 5.570 mun.) |
 | Irradiacao Solar | ok Finalizada jul/2026 | Atlas Brasileiro de Energia Solar (LABREN/CCST/INPE, 2a ed. 2017), GHI anual, 5.569 mun. Media climatologica 1999-2015, nao ano especifico |
 | IVS Consolidado | ok Completa 06/07/2026 | Media de 3 blocos oficiais do IVS/IPEA (Infraestrutura Urbana, Renda e Trabalho, Capital Humano) sobre vw_indicadores_sociais_consolidado, normalizacao min-max. Moradia fica fora de proposito (ver indice separado). Migration 0015 |
+| IVSH - Indice de Vulnerabilidade Socio-Habitacional-Energetica (NOVO) | ok Completa 18/07/2026 | `vw_ivsh_consolidado` = media de IVS + Precariedade Habitacional + Inseguranca da Posse (migration 0028), 5.573 mun. Disponivel via `GET /api/vazios-de-acesso?ordenarPor=ivsh`. Sem seletor de criterio no frontend ainda (so backend) |
+| Infraestrutura estatistica integrada (NOVO) | ok Completa 18/07/2026 | Tabela `analises_estatisticas` (migration 0029) - correlacao parcial de Spearman materializada via ETL (`calcular_analise_estatistica_moradia_mmgd.py`). 2 pares testados: Precariedade Habitacional (rho parcial -0,1524, robusto em 4/5 regioes) e Seguranca da Posse (rho parcial -0,2976, sinal invertido, nao investigado a fundo) vs. MMGD residencial per capita. `GET /api/analises-estatisticas` |
+| Participacao da MMGD na matriz eletrica nacional (NOVO) | ok Parcial, RESOLVIDO em 21/07/2026 | Tabela `indicadores_energia_nacional` (migration 0030): `geracao_eletrica_nacional_gwh` (BEN Anexo X) completo para 2021-2025; percentual calculado 2025 ~7,02%, bate com o numero da EPE (7,0%). Exposto em `participacaoMatrizNacional`, RF-005 item 5 saiu de `indicadoresIndisponiveis`. **`percentual_consumo_cativo_atendido_mmgd` (metrica DISTINTA, denominador = consumo cativo, nao geracao) segue vazia** - extractor do numerador PDGD pendente de um segundo download manual (ver "Bloqueado" abaixo) |
 
 ## Decisoes de fontes (confirmadas por pesquisa, jul/2026)
 
@@ -210,16 +220,40 @@ Tabela `unidades_espaciais`:
   comparavel entre municipios de tamanhos diferentes - mesmo padrao ja usado
   para MMGD (`mmgdPer1000Hab`).
 
-## Estado das migrations (corrigido 06/07/2026)
+## Estado das migrations (corrigido 23/07/2026)
 
-Numeracao real em `backend/src/db/migrations/`: 0000 a 0017. O schema do INDQUAL
-(`qualidade_conjuntos`, `qualidade_indicadores`, `qualidade_conjunto_municipio`) foi
+Numeracao real em `backend/src/db/migrations/`: 0000 a 0030, sem buracos. O schema do
+INDQUAL (`qualidade_conjuntos`, `qualidade_indicadores`, `qualidade_conjunto_municipio`) foi
 criado fora desse sistema formal, via script Python direto - por isso nao aparece na
-pasta de migrations. Migrations mais recentes: `0014_indices_compostos_moradia_infraestrutura.sql`
-(indices compostos + `vw_indicadores_sociais_consolidado`), `0015_view_ivs_consolidado.sql`
-(IVS), `0016_indicadores_sociais_tipo_domicilio.sql` (`percentual_apartamento`, ver secao de
-analise de correlacao abaixo), `0017_indicadores_sociais_rdpc.sql` (`renda_per_capita_rdpc`,
-`percentual_baixa_renda_rdpc`, ver "Decisoes de fontes"). Proxima migration: 0018.
+pasta de migrations (inconsistencia arquitetural conhecida, ver CLAUDE.md Secao 2). Nao
+existe tabela de tracking de migration aplicada (`schema_migrations`/similar) - a
+estrategia real e reaplicar todo o diretorio via `make migrate`, idempotente por
+`IF NOT EXISTS`/`ON CONFLICT`.
+
+Migrations 0018 em diante (as anteriores ja detalhadas na tabela "Estado dos dados" acima
+ou em secoes proprias):
+- `0018_indicadores_sociais_tarifa_residencial.sql` - Tarifa de Energia Residencial (TUSD+TE)
+- `0019_criacao_indicadores_climaticos.sql` - precipitacao maxima mensal (MERGE/CPTEC-INPE)
+- `0020_mmgd_indicadores_residencial.sql` - persiste quebra MMGD Residencial (usada por
+  Vazios de Acesso)
+- `0021_seed_piloto_setores_censitarios_sp.sql` - piloto SINTETICO de setor censitario,
+  so Sao Paulo (81 setores), `e_dado_ilustrativo = 'true'`
+- `0022_criacao_usuarios_auth.sql` - tabela `usuarios`, fundacao de autenticacao/RBAC
+  (3 papeis), 2 contas-demo semeadas
+- `0023_colaborador_escrita.sql` - escrita do Colaborador (RF-059 a RF-067)
+- `0024_admin_escrita.sql` - Painel Admin (RF-070 a RF-077 + `usuarios.ativo`)
+- `0025_mmgd_indicadores_numero_empreendimentos.sql` - correcao de rotulo do RF-005
+  (`numero_empreendimentos`, NULL ate reexecutar o extractor)
+- `0026_desempenho_conexao_distribuidoras.sql` - ranking publico de distribuidoras
+  (52 distribuidoras, dataset de Atendimento a Pedidos de Conexao MMGD)
+- `0027_indicadores_sociais_reforma_casa_brasil_solar.sql` - Reforma Casa Brasil Solar
+  (17/07/2026, unica fonte nao publica/automatizavel do Atlas ate agora - PDF da Caixa/SIC)
+- `0028_view_ivsh_consolidado.sql` - IVSH (18/07/2026)
+- `0029_analises_estatisticas.sql` - infraestrutura estatistica integrada (18/07/2026)
+- `0030_indicadores_energia_nacional.sql` - participacao da MMGD na matriz eletrica
+  nacional, EPE/BEN+PDGD (21-22/07/2026, commit `e5b2d14`)
+
+Proxima migration: 0031.
 
 ## Fila de trabalho
 
@@ -667,14 +701,17 @@ analise de correlacao abaixo), `0017_indicadores_sociais_rdpc.sql` (`renda_per_c
   formal com a ANEEL (contato do dataset: dadosabertos@aneel.gov.br) em vez de
   so tentar de novo silenciosamente.
 
-## RF-005 (Landing Page) - 3 indicadores nacionais ainda nao calculados
+## RF-005 (Landing Page) - status dos 6 indicadores nacionais (atualizado 23/07/2026)
 
-Contexto: `GET /api/estatisticas-nacionais` (`backend/src/services/estatisticasNacionais.service.ts`,
-sessao 10/07/2026) calcula 3 dos 6 numeros pedidos pelo RF-005 com dado real
-(sistemas MMGD, potencia total, municipios com MMGD) e expoe os outros 3 como
-`indicadoresIndisponiveis`, sem numero fabricado. Usuario pediu (10/07/2026)
-para registrar que acha os 3 viaveis "em breve" - status real de cada um,
-verificado nesta sessao:
+Contexto: `GET /api/estatisticas-nacionais` (`backend/src/services/estatisticasNacionais.service.ts`)
+calcula 3 dos 6 numeros pedidos pelo RF-005 desde 10/07/2026 (sistemas MMGD,
+potencia total, municipios com MMGD). Dos outros 3, que comecaram todos em
+`indicadoresIndisponiveis`: **2 ja foram resolvidos** (pessoas beneficiadas,
+10/07/2026; participacao na matriz eletrica nacional, 21/07/2026 - migration
+0030, ver bullet proprio abaixo) e **1 continua indisponivel** (projecao
+futura de potencia, sem dado suficiente ate hoje - ver "Projecao futura de
+potencia instalada" abaixo). Status real de cada um, historico de investigacao
+preservado:
 
 - **Pessoas beneficiadas por creditos de energia** - QUASE RESOLVIDO, achado
   confirmado em 10/07/2026 (inspecao real do Parquet, nao mais hipotese).
@@ -740,16 +777,43 @@ acima).
   **DECISAO DO USUARIO (10/07/2026)**: opcao (a) da lista de alternativas
   abaixo - citar o numero exatamente como o BEN 2026 o publica (rotulado
   "MMGD", nao "solar distribuida"), com fonte e ano, mesmo tratamento ja dado
-  ao OBEPE (referencia de contexto, nao KPI calculado pelo Atlas). Implementado:
-  `PaginaLanding.tsx`, secao "Referencias metodologicas" (paragrafo logo apos o
-  OBEPE) + `motivo` do item `participacaoMatrizNacional` em
-  `indicadoresIndisponiveis` (`estatisticasNacionais.service.ts`) atualizado
-  para apontar para essa citacao. O item **continua** em
-  `indicadoresIndisponiveis` - o Atlas nao passou a calcular esse numero, so
-  passou a citar a fonte externa ao lado do card "Em breve". Sem mudanca de
-  contrato da API (nenhum campo novo em `EstatisticasNacionais`). **Pendente**:
-  validar `make front-typecheck` no ambiente do usuario (nao rodado nesta
-  sessao via bash sandbox, ver excecao confirmada).
+  ao OBEPE (referencia de contexto, nao KPI calculado pelo Atlas). Implementado
+  nesta sessao apenas como citacao estatica: `PaginaLanding.tsx`, secao
+  "Referencias metodologicas" (paragrafo logo apos o OBEPE) + `motivo` do item
+  `participacaoMatrizNacional` em `indicadoresIndisponiveis`
+  (`estatisticasNacionais.service.ts`) atualizado para apontar para essa
+  citacao. Naquele momento o item continuava em `indicadoresIndisponiveis` -
+  o Atlas ainda nao calculava o numero, so citava a fonte externa ao lado do
+  card "Em breve".
+
+  **RESOLVIDO em 21/07/2026 (migration 0030, commit `e5b2d14`)**: o Atlas
+  passou a integrar a fonte de verdade em vez de so citar o numero estatico.
+  Nova tabela `indicadores_energia_nacional` (granularidade NACIONAL por ano,
+  nao municipal - unico caso do schema que nao referencia `unidades_espaciais`,
+  decisao deliberada para nao forcar um valor escalar unico do pais no padrao
+  espacial do resto do banco) + dois extractors manuais:
+  `extrair_geracao_eletrica_nacional_epe.py` (denominador, BEN Anexo X, grupo
+  "Total Transformacao"/"Eletricidade - GWh") e
+  `extrair_geracao_mmgd_epe_pdgd.py` (numerador, PDGD aba "Geracao de
+  Eletricidade"). Nenhuma das duas fontes tem API - BEN e dashboard interativo,
+  PDGD e app Shiny sem URL de download estavel - entao a captacao e um
+  snapshot manual repetivel, nao automatico (mesmo padrao ja aceito para
+  Irradiacao Solar/INPE e Reforma Casa Brasil Solar). Validacao: percentual
+  calculado para 2025 (~7,02%) bate com o numero da EPE ja citado nas
+  Referencias Metodologicas da landing (7,0%). Exposto agora em
+  `participacaoMatrizNacional` - **saiu de `indicadoresIndisponiveis`**. Ver
+  `docs/DECISOES.md`, ADR "Integracao da participacao da MMGD na matriz
+  eletrica nacional (EPE/PDGD)", para o raciocinio completo.
+
+  **RESSALVA - metrica irma ainda pendente**: a mesma migration criou a coluna
+  `percentual_consumo_cativo_atendido_mmgd`, que **NAO e a mesma metrica**
+  (denominador = consumo cativo medido/SAMP-ANEEL + autoconsumo MMGD, ou seja
+  demanda, nao oferta) - essa coluna segue **vazia**, porque exige um segundo
+  botao de download dentro da mesma aba do PDGD que ainda nao foi obtido do
+  usuario (ver `extrair_geracao_mmgd_epe_pdgd.py`, comentario de topo, e
+  migration `0030`, linha do `COMMENT ON COLUMN`). Nao confundir os dois
+  numeros ao consumir a API.
+
   Registro historico da decisao original, mantido para rastreabilidade:
   ~~RESSALVA: e um numero em PDF (relatorio anual), nao um dataset
   baixavel/atualizavel via ETL automatico - diferente dos outros indicadores

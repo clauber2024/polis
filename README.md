@@ -20,28 +20,44 @@ urbana, CEP ou bairro) conforme novas fontes de dados se tornem disponíveis —
 
 ---
 
-## Estado atual dos dados (atualizado em 08/07/2026)
+## Estado atual dos dados (atualizado em 23/07/2026)
 
 | Dimensão | Cobertura | Fonte | Status |
 |---|---|---|---|
 | Território (municípios) | 5.573 municípios, geometria real | IBGE, Malha Municipal 2025 | ✅ Completo |
-| MMGD instalada | 5.567 municípios, 50.086 MW, 8M UCs (quebra Residencial persistida em `mmgd_indicadores` desde a migration 0020, 07/07/2026 — Rural/Outras seguem disponíveis só via Parquet bruto) | ANEEL, snapshot jun/2026 | ✅ Completo |
+| MMGD instalada | 5.567 municípios, 50.086 MW, 8M UCs (quebra Residencial persistida em `mmgd_indicadores` desde a migration 0020 — Rural/Outras seguem disponíveis só via Parquet bruto); `numero_empreendimentos` (migration 0025) criado mas ainda `NULL` até o extractor rodar de novo | ANEEL, snapshot único jun/2026 | ✅ Completo para o snapshot atual — ⚠️ só 1 `periodo_referencia` carregado (schema já suporta série temporal, mas nunca foi reexecutado com um mês diferente; bloqueia filtro de período e ranking por variação) |
 | Infraestrutura Urbana | 5.570 municípios, 5 indicadores + índice composto (Índice de Precariedade de Infraestrutura) | Censo 2022/SIDRA | ✅ Completo |
 | Renda e Trabalho | 5.571 municípios (RAIS) + RDPC — Rendimento Domiciliar Per Capita, 5.570 municípios (renda de todas as fontes, não só trabalho formal) | RAIS ano-base 2024 (BigQuery) + Censo 2022/SIDRA 10295-10296 | ✅ Completo |
 | Capital Humano | 5.570 municípios (alfabetização + mortalidade infantil) + CadÚnico (cobertura e % pobreza, 5.570 municípios, dez/2025) | Censo 2022/SIDRA + SIM/SINASC-DATASUS (BigQuery, média 2022-2024) + MDS/SAGI (Solr "MI Social") | ✅ Completo |
-| Moradia | Regime de ocupação (5.570) + FCU (12.348) + ZEIS/AEIS (3.696, 4 capitais) + inadequação + MCMV/FGTS (5.111) + MCMV/OGU (4.883) + % tipo apartamento (5.570) + índices compostos (Precariedade Habitacional, Segurança da Posse, Cobertura de Investimento Habitacional) | Censo 2022/SIDRA + Ministério das Cidades + portais municipais | ✅ Completo |
-| Qualidade de fornecimento | 5.570 municípios, DEC/FEC oficial + DEC/FEC "real" (sem expurgo de Dia Crítico) | ANEEL, Indicadores Coletivos de Continuidade (INDQUAL) | ✅ Completo |
+| Moradia | Regime de ocupação (5.570) + FCU (12.348) + ZEIS/AEIS (**4.778 em 8 municípios**: RJ, SP, Recife, Rio Branco, Contagem, Salvador, Fortaleza, Belo Horizonte) + inadequação + MCMV/FGTS (5.111) + MCMV/OGU (4.883) + % tipo apartamento (5.570) + Reforma Casa Brasil Solar (1.093 municípios, 3.253 contratos, R$ 61.377.571,09 liberados, migration 0027) + índices compostos (Precariedade Habitacional, Segurança da Posse, Cobertura de Investimento Habitacional, e o novo **IVSH** — ver abaixo) | Censo 2022/SIDRA + Ministério das Cidades + portais municipais + Caixa/SIC (extrato pontual, não pública) | ✅ Completo — 2 dos 5 eixos do plano original seguem sem fonte nacional (ZEIS fora das 8 capitais/municípios já cobertos; MCMV/HIS além do já carregado) e inadequação habitacional completa só existe para o Censo 2010, não recalculada para 2022 (ver `docs/PLANO_MORADIA_TERRITORIO_POPULAR.md`) |
+| Qualidade de fornecimento | 5.570 municípios, DEC/FEC oficial + DEC/FEC "real" (sem expurgo de Dia Crítico) + ranking público de 52 distribuidoras por desempenho de conexão MMGD (`desempenho_conexao_distribuidoras`, migration 0026) | ANEEL, Indicadores Coletivos de Continuidade (INDQUAL) + Atendimento a pedidos de conexão MMGD | ✅ Completo |
 | Irradiação solar | 5.569 municípios, GHI médio anual (média climatológica 1999-2015) | Atlas Brasileiro de Energia Solar (LABREN/CCST/INPE, 2ª ed. 2017) | ✅ Completo |
 | Tarifa de Energia Residencial | 4.724/5.540 municípios (TUSD+TE), 116 distribuidoras | ANEEL, Tarifas de Aplicação das Distribuidoras | ✅ Completo — variável de interesse regional (Centro-Oeste), não indicador nacional robusto (ver ARQUITETURA.md) |
 | IVS Consolidado (índice próprio) | ~5.571 municípios, média de 3 blocos (Infraestrutura, Renda e Trabalho, Capital Humano) | `vw_ivs_consolidado`, normalização min-max sobre dados já carregados | ✅ Completo |
+| IVSH — Índice de Vulnerabilidade Sócio-Habitacional-Energética (índice próprio, novo) | 5.573 municípios, média de IVS + Precariedade Habitacional + Insegurança da Posse | `vw_ivsh_consolidado`, migration 0028 (18/07/2026) | ✅ Completo na API (`GET /api/vazios-de-acesso?ordenarPor=ivsh`) — ⚠️ sem seletor de critério na interface ainda (só backend) |
+| Infraestrutura estatística integrada (análises formais, novo) | 2 pares variável-x/variável-y testados: Precariedade Habitacional (rho parcial −0,1524, robusto em 4/5 regiões) e Segurança da Posse (rho parcial −0,2976, sinal invertido, não investigado a fundo) vs. MMGD residencial per capita | `analises_estatisticas`, migration 0029 (18/07/2026), correlação parcial de Spearman materializada via ETL | ✅ Completo — `GET /api/analises-estatisticas` |
+| Participação da MMGD na matriz elétrica nacional (novo) | 5 anos (2021-2025), `geracao_eletrica_nacional_gwh` completo; percentual calculado para 2025 (~7,02%) bate com o número já citado pela EPE (7,0%) | EPE — BEN Anexo X (denominador) + PDGD (numerador), migration 0030 (21-22/07/2026) | ✅ Completo para "participação na geração nacional" — ⚠️ `percentual_consumo_cativo_atendido_mmgd` (métrica distinta, ver ARQUITETURA.md) ainda vazio: extractor do numerador PDGD pendente de um segundo arquivo a baixar manualmente |
 | Precipitação máxima mensal (`indicadores_climaticos`) | 5.573 municípios x 24 meses (jan/2024–dez/2025), máximo zonal (não comparável ao pico de 1 estação) | MERGE/CPTEC-INPE (GPM-IMERG V07B), migration 0019 | ✅ Completo — 9ª dimensão, fora das 8 originais do DRF, nascida da investigação "Queima de equipamentos" (ver ARQUITETURA.md) |
-| TSEE / baixa renda (`percentual_tsee`) | — | ANEEL, Beneficiários da CDE | 🔒 Bloqueado — aguardando dado de jan/2026+ (nova subclasse "Desconto Social") e resolução de bug de infraestrutura no portal ANEEL |
+| TSEE / baixa renda (`percentual_tsee`) | — | ANEEL, Beneficiários da CDE | 🔒 Bloqueado — aguardando dado de jan/2026+ (nova subclasse "Desconto Social") e resolução de bug de infraestrutura no portal ANEEL (redirecionamento HTTP 302 infinito no único recurso disponível) |
 
-Os índices de Infraestrutura Urbana, Renda e Trabalho, Capital Humano, Moradia e o IVS
-Consolidado são **construções próprias do Atlas, inspiradas no IVS/IPEA**, não o IVS
-oficial — que só tem cobertura municipal completa até o Censo 2010. Ver nota metodológica
-em cada extractor (`backend/src/etl/loaders/`) e em `ARQUITETURA.md`, seção "Índices
-compostos e metodologia de cruzamentos".
+Os índices de Infraestrutura Urbana, Renda e Trabalho, Capital Humano, Moradia, o IVS
+Consolidado e o IVSH são **construções próprias do Atlas, inspiradas no IVS/IPEA**, não o
+IVS oficial — que só tem cobertura municipal completa até o Censo 2010. Ver nota
+metodológica em cada extractor (`backend/src/etl/loaders/`) e em `ARQUITETURA.md`, seção
+"Índices compostos e metodologia de cruzamentos".
+
+O piloto de setor censitário de São Paulo (migration 0021, 81 setores) é **dado
+ilustrativo/sintético** — distribui o total municipal real proporcionalmente por área numa
+grade artificial, não é leitura fina real do Censo. Corretamente isolado
+(`e_dado_ilustrativo = 'true'`, filtro `tipo = 'municipio'` em todos os agregados
+nacionais), mas é a única cobertura de "setor censitário" hoje no país inteiro.
+
+### Deploy público temporário
+
+Backend + Postgres na Railway e frontend na Vercel — ponte temporária (não a arquitetura
+de produção definitiva descrita no CLAUDE.md), pensada para transferência de posse ao
+Instituto Pólis. Ver [`docs/DEPLOY_TEMPORARIO.md`](./docs/DEPLOY_TEMPORARIO.md) para o
+passo a passo e `docs/DECISOES.md` para o raciocínio.
 
 ### Análise exploratória: cruzamento MMGD x indicadores sociais
 
@@ -75,6 +91,10 @@ explicado por tarifa histórica mais baixa da distribuidora local).
 | IBGE Censo 2022/SIDRA (tabela 9928) | % Tipo de domicílio Apartamento (Moradia) | API SIDRA |
 | ANEEL — Tarifas de Aplicação das Distribuidoras | Tarifa de Energia Residencial (TUSD+TE) | CSV, atualizado semanalmente (dadosabertos.aneel.gov.br) |
 | ANEEL — Beneficiários da CDE | TSEE / baixa renda (`percentual_tsee`) — bloqueado | ZIP mensal (dadosabertos.aneel.gov.br) |
+| ANEEL — Atendimento a pedidos de conexão MMGD (pós Lei 14.300) | Ranking público de distribuidoras por desempenho de conexão | CSV (dadosabertos.aneel.gov.br) |
+| Caixa Econômica Federal / SIC | Reforma Casa Brasil Solar (Moradia) — extrato pontual, não pública | PDF fornecido pelo usuário (não automatizável) |
+| EPE — Balanço Energético Nacional (BEN), Anexo X | Geração elétrica nacional bruta (denominador da participação da MMGD na matriz) | Dashboard interativo, sem API — download manual |
+| EPE — Painel de Dados de MMGD (PDGD) | Geração da MMGD e % do consumo cativo atendido (numerador) | App Shiny, sem API/URL estável — download manual |
 
 > O **OBEPE** (Observatório Brasileiro de Erradicação da Pobreza Energética — EPE/MME/BID) é
 > referência metodológica para o Índice de Pobreza Energética Regional do Atlas, mas não é
@@ -97,11 +117,19 @@ explicado por tarifa histórica mais baixa da distribuidora local).
 
 ## Stack técnica
 
-- **Backend:** Node.js 20+, TypeScript, Express, Drizzle ORM (1 endpoint real desde 07/07/2026 — `GET /api/vazios-de-acesso`; demais rotas do DRF ainda não implementadas)
+- **Backend:** Node.js 20+, TypeScript, Express, Drizzle ORM — leitura (municípios, bases de
+  dados, estatísticas nacionais, estados, ranking de distribuidoras, análises estatísticas,
+  vazios de acesso), autenticação/RBAC (3 papéis) e escrita do Colaborador/Admin (RF-059 a
+  RF-077) implementadas; upload de arquivo real (RF-070) não implementado por decisão do
+  projeto (carga de dado continua só via ETL Python)
 - **Banco de dados:** PostgreSQL 16 + PostGIS 3.4 (SIRGAS 2000 / EPSG:4674)
 - **ETL:** Python 3.12+ (venv isolado), pandas, geopandas, SQLAlchemy, google-cloud-bigquery
-- **Frontend:** React 19, TypeScript, Vite, Tailwind CSS, MapLibre GL JS (ainda não iniciado)
-- **Infraestrutura:** Docker, Docker Compose (PostGIS local), Google Cloud/BigQuery (RAIS)
+- **Frontend:** React 19, TypeScript, Vite, Tailwind CSS, MapLibre GL JS — landing page,
+  mapa interativo (choropleth + heatmap), painéis Colaborador/Admin, painel analítico e
+  ranking de distribuidoras implementados (iniciado 09/07/2026)
+- **Infraestrutura:** Docker, Docker Compose (PostGIS local), Google Cloud/BigQuery (RAIS);
+  deploy público temporário em Railway (backend+Postgres) + Vercel (frontend) — ver
+  [`docs/DEPLOY_TEMPORARIO.md`](./docs/DEPLOY_TEMPORARIO.md)
 
 Detalhamento completo de padrões de código, banco de dados, deploy e Git em
 [`CLAUDE.md`](./CLAUDE.md).
@@ -208,6 +236,24 @@ docker compose exec -T postgres psql -U atlas -d atlas_solar_justo < backend/src
 # escrita do Colaborador e Painel Admin":
 docker compose exec -T postgres psql -U atlas -d atlas_solar_justo < backend/src/db/migrations/0023_colaborador_escrita.sql
 docker compose exec -T postgres psql -U atlas -d atlas_solar_justo < backend/src/db/migrations/0024_admin_escrita.sql
+
+# migration 0025 (numero_empreendimentos em mmgd_indicadores) + reexecutar o
+# extractor de MMGD, 0026 (ranking publico de distribuidoras) + extractor
+# proprio, 0027 (Reforma Casa Brasil Solar - requer PDF fornecido pelo
+# usuario, nao publico), 0028 (view IVSH), 0029 (analises_estatisticas) e
+# 0030 (indicadores_energia_nacional - EPE/BEN+PDGD, requer download manual):
+docker compose exec -T postgres psql -U atlas -d atlas_solar_justo < backend/src/db/migrations/0025_mmgd_indicadores_numero_empreendimentos.sql
+python3 backend/src/etl/loaders/extrair_mmgd_aneel.py
+docker compose exec -T postgres psql -U atlas -d atlas_solar_justo < backend/src/db/migrations/0026_desempenho_conexao_distribuidoras.sql
+python3 backend/src/etl/loaders/extrair_desempenho_conexao_mmgd.py
+docker compose exec -T postgres psql -U atlas -d atlas_solar_justo < backend/src/db/migrations/0027_indicadores_sociais_reforma_casa_brasil_solar.sql
+python3 backend/src/etl/loaders/extrair_reforma_casa_brasil_solar.py   # requer PDF em BASE_DOWNLOADS
+docker compose exec -T postgres psql -U atlas -d atlas_solar_justo < backend/src/db/migrations/0028_view_ivsh_consolidado.sql
+docker compose exec -T postgres psql -U atlas -d atlas_solar_justo < backend/src/db/migrations/0029_analises_estatisticas.sql
+python3 backend/src/etl/loaders/calcular_analise_estatistica_moradia_mmgd.py
+docker compose exec -T postgres psql -U atlas -d atlas_solar_justo < backend/src/db/migrations/0030_indicadores_energia_nacional.sql
+python3 backend/src/etl/loaders/extrair_geracao_eletrica_nacional_epe.py   # requer download manual do BEN
+python3 backend/src/etl/loaders/extrair_geracao_mmgd_epe_pdgd.py           # requer download manual do PDGD
 ```
 
 ### Backend (Node/Express)
