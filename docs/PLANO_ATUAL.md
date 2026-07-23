@@ -4,12 +4,17 @@ Documento de trabalho para tarefas com várias etapas. Ver `CLAUDE.md`, seção 
 de Trabalho do Assistente de IA" → "Início de sessão", para quando e como manter isto
 atualizado. Ao concluir a tarefa, este arquivo pode ser limpo/reiniciado para a próxima.
 
-> Tarefa anterior ("3 componentes premium" — matriz IVSH×MMGD, cartão de descompasso
-> morfológico, alternador IVS/IVSH): implementação e typecheck concluídos em
-> 2026-07-21, teste manual no navegador ainda pendente do usuário (ver seções abaixo,
-> mantidas como histórico). Este arquivo passa a acompanhar a tarefa nova abaixo.
+> **Concluído em 2026-07-22**: tanto a tarefa "3 componentes premium" (matriz IVSH×MMGD,
+> cartão de descompasso morfológico, alternador IVS/IVSH) quanto a tarefa abaixo (EPE/PDGD
+> + nota metodológica pública) foram validadas manualmente pelo usuário, commitadas
+> (`e5b2d14`) e enviadas ao GitHub. Ver `docs/DEPLOY_TEMPORARIO.md` para o novo tópico:
+> nesta mesma sessão, o Atlas foi publicado temporariamente em Railway (backend +
+> Postgres/PostGIS) + Vercel (frontend) — `https://polis-teal.vercel.app` — com dados
+> migrados do banco local via dump/restore, CORS configurado e testado ponta a ponta.
+> Este arquivo pode ser reiniciado na próxima tarefa nova; conteúdo abaixo mantido como
+> histórico.
 
-## Objetivo (tarefa atual, 2026-07-21)
+## Objetivo (tarefa anterior, 2026-07-21 — concluída e commitada em 2026-07-22)
 
 Integrar ao Atlas a participação da MMGD na matriz elétrica nacional (EPE/PDGD), hoje
 só citada como texto estático na Landing Page, com snapshots periódicos reais no banco.
