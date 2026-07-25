@@ -575,17 +575,30 @@ export function PaginaLanding() {
           Carrossel simples (React/CSS, sem lib nova — decisão do usuário
           entre as duas opções apresentadas). Números ao vivo da API, ver
           TourAchados.tsx. */}
-      <section className="px-6 py-16">
-        <div className="mx-auto max-w-3xl">
-          <span className="mb-1 block text-center text-[9px] font-mono font-bold uppercase tracking-wider text-violet-700">
-            Tour Virtual
+      <section className="relative overflow-hidden px-6 py-16">
+        <motion.div
+          aria-hidden
+          animate={{ scale: [1, 1.05, 1], opacity: [0.4, 0.6, 0.4] }}
+          transition={{ duration: 11, repeat: Infinity, ease: 'easeInOut' }}
+          className="pointer-events-none absolute top-0 right-1/3 -z-10 h-[500px] w-[500px] rounded-full bg-red-100/50 mix-blend-multiply blur-[120px] opacity-60"
+        />
+        <motion.div
+          aria-hidden
+          animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
+          transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut', delay: 1.5 }}
+          className="pointer-events-none absolute bottom-0 left-1/3 -z-10 h-[500px] w-[500px] rounded-full bg-orange-100/40 mix-blend-multiply blur-[100px] opacity-50"
+        />
+
+        <div className="relative z-10 mx-auto max-w-4xl">
+          <span className="mb-1 block text-center text-xs font-bold uppercase tracking-widest text-stone-500">
+            Tour Virtual do Observatório
           </span>
-          <h2 className="text-center text-2xl font-bold tracking-tight text-slate-900">
+          <h2 className="text-center text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
             Principais achados da análise
           </h2>
-          <p className="mt-2 text-center text-sm text-slate-500">
-            Um resumo guiado do que o Atlas encontrou ao cruzar potencial solar, vulnerabilidade
-            social e acesso efetivo à energia limpa.
+          <p className="mx-auto mt-3 max-w-2xl text-center text-sm text-stone-600">
+            Uma síntese estratégica cruzando potencial solar, vulnerabilidade habitacional e o
+            impacto real das políticas de crédito.
           </p>
           <div className="mt-8">
             <TourAchados
