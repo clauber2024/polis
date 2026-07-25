@@ -27,6 +27,10 @@ interface FonteDados {
    * sobre o território analisado em vez de despejar 11 siglas soltas; não
    * muda nome/descrição reais, só organiza a mesma lista por categoria. */
   categoria: string;
+  /** Prefixo literal de `descricao` (hierarquia tipográfica, pedido do
+   * usuário) — precisa bater com o início exato do texto, nunca um resumo
+   * novo: renderizado em negrito, o resto de `descricao` continua leve. */
+  destaque: string;
 }
 
 const ORDEM_CATEGORIAS = [
@@ -251,60 +255,71 @@ const FONTES_DE_DADOS: FonteDados[] = [
     descricao:
       'Micro e minigeração distribuída (potência instalada, UCs conectadas), tarifa residencial (TUSD+TE) e qualidade de fornecimento (DEC/FEC).',
     categoria: 'Energia e Infraestrutura Elétrica',
+    destaque: 'Micro e minigeração distribuída',
   },
   {
     nome: 'IBGE — Censo 2022',
     descricao:
       'Infraestrutura urbana, moradia, tipo de domicílio, alfabetização, densidade populacional e Cadastro Nacional de Favelas e Comunidades Urbanas.',
     categoria: 'Moradia e Crédito Habitacional',
+    destaque: 'Infraestrutura urbana, moradia',
   },
   {
     nome: 'CadÚnico',
     descricao: 'Cobertura e pobreza entre famílias cadastradas no Cadastro Único.',
     categoria: 'Vulnerabilidade Social e Renda',
+    destaque: 'Cobertura e pobreza',
   },
   {
     nome: 'TSEE',
     descricao: 'Tarifa Social de Energia Elétrica — beneficiários por subclasse residencial.',
     categoria: 'Vulnerabilidade Social e Renda',
+    destaque: 'Tarifa Social de Energia Elétrica',
   },
   {
     nome: 'IVS/IPEA',
     descricao: 'Índice de Vulnerabilidade Social, consolidado por município.',
     categoria: 'Vulnerabilidade Social e Renda',
+    destaque: 'Índice de Vulnerabilidade Social',
   },
   {
     nome: 'INPE',
     descricao:
       'Irradiação solar (Atlas Solar 2017, LABREN/CCST — média climatológica 1999–2015) e precipitação mensal (MERGE/CPTEC).',
     categoria: 'Território e Clima',
+    destaque: 'Irradiação solar',
   },
   {
     nome: 'RAIS — Ministério do Trabalho',
     descricao: 'Renda média domiciliar e indicadores de trabalho, via BigQuery.',
     categoria: 'Vulnerabilidade Social e Renda',
+    destaque: 'Renda média domiciliar',
   },
   {
     nome: 'DATASUS',
     descricao: 'Mortalidade infantil (SIM + SINASC).',
     categoria: 'Vulnerabilidade Social e Renda',
+    destaque: 'Mortalidade infantil',
   },
   {
     nome: 'Caixa/FGTS e Ministério das Cidades',
     descricao: 'Programa Minha Casa Minha Vida — unidades habitacionais entregues (faixas FGTS e OGU).',
     categoria: 'Moradia e Crédito Habitacional',
+    destaque: 'Programa Minha Casa Minha Vida',
   },
   {
     nome: 'Prefeituras municipais',
     descricao:
       'Zonas Especiais de Interesse Social (ZEIS/AEIS) — hoje 8 municípios: São Paulo, Recife, Rio Branco, Belo Horizonte, Contagem, Fortaleza, Salvador e Rio de Janeiro.',
     categoria: 'Moradia e Crédito Habitacional',
+    destaque: 'Zonas Especiais de Interesse Social',
   },
   {
     nome: 'Caixa Econômica Federal',
     descricao:
       'Programa Reforma Casa Brasil Solar — fonte pontual (extrato via Lei de Acesso à Informação, nov/2025–abr/2026), não uma base pública/automatizável como as demais.',
     categoria: 'Moradia e Crédito Habitacional',
+    destaque: 'Programa Reforma Casa Brasil Solar',
   },
 ];
 
@@ -754,10 +769,15 @@ export function PaginaLanding() {
                   {fontes.map((fonte) => (
                     <div
                       key={fonte.nome}
-                      className="rounded-2xl border border-white/70 bg-white/50 p-4 shadow-sm backdrop-blur-md"
+                      className="flex flex-col rounded-2xl border border-white/80 bg-white/50 p-6 shadow-sm backdrop-blur-xl transition-all hover:bg-white/70"
                     >
-                      <span className="mb-1 block font-mono text-[10px] font-bold text-stone-700">{fonte.nome}</span>
-                      <p className="text-sm text-stone-600">{fonte.descricao}</p>
+                      <div className="mb-3 flex items-center gap-2 border-b border-stone-200/80 pb-3">
+                        <span className="text-sm font-black tracking-widest text-red-700 uppercase">{fonte.nome}</span>
+                      </div>
+                      <p className="text-sm leading-relaxed font-medium text-stone-500">
+                        <strong className="font-bold text-stone-900">{fonte.destaque}</strong>
+                        {fonte.descricao.slice(fonte.destaque.length)}
+                      </p>
                     </div>
                   ))}
                 </div>
