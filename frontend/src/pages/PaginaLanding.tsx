@@ -63,6 +63,23 @@ function IconeMapa(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+function IconeRaio(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z" />
+    </svg>
+  );
+}
+
+const formatoCompacto = new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 });
+
+/** Abreviação (ex.: "4,5 mi") só para os KPIs de destaque desta página — não
+ * mexe em formatarValor/formatadores.ts, que outras telas usam por extenso. */
+function formatarCompacto(valor: number | null | undefined): string {
+  if (valor === null || valor === undefined || Number.isNaN(valor)) return 'sem dado';
+  return formatoCompacto.format(valor);
+}
+
 /**
  * Paleta institucional do Pólis (25/07/2026, 2ª rodada de auditoria de
  * UX/UI): terracota/carmim/chumbo substituem o âmbar/laranja/verde da
@@ -375,112 +392,142 @@ export function PaginaLanding() {
         </div>
       </section>
 
-      {/* RF-005: indicadores nacionais em destaque. */}
-      <section className="px-6 py-16">
-        <div className="mx-auto max-w-5xl">
-          <span className="mb-1 block text-center text-[9px] font-mono font-bold uppercase tracking-wider text-violet-700">
-            Matriz de Monitoramento
-          </span>
-          <h2 className="text-center text-2xl font-bold tracking-tight text-slate-900">
-            O Brasil em números
-          </h2>
-          {estatisticas?.periodoReferencia && (
-            <p className="mt-1 text-center text-xs font-mono text-slate-400">
-              Snapshot mais recente disponível: {estatisticas.periodoReferencia}
-            </p>
-          )}
+      {/* RF-005: indicadores nacionais em destaque, sintetizados em 3 KPIs
+          estratégicos (5ª rodada de auditoria de UX/UI, 25/07/2026) — os 6
+          números brutos viraram 3 cards de vidro (Capacidade Instalada,
+          Acesso e Renda, Presença Territorial), sem sigla técnica na visão
+          principal e com os grandes números abreviados via formatarCompacto
+          (evita a quebra de linha no meio do dígito). Os valores e o
+          disclaimer de estimativa continuam vindo 100% de `estatisticas`
+          (buscarEstatisticasNacionais) — nenhuma chamada nova, só reagrupada
+          a apresentação. */}
+      <section className="relative overflow-hidden bg-stone-50 px-6 py-16">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute top-0 right-1/4 -z-10 h-[400px] w-[400px] rounded-full bg-orange-100/40 blur-[80px]"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute bottom-0 left-1/4 -z-10 h-[400px] w-[400px] rounded-full bg-red-100/30 blur-[100px]"
+        />
+
+        <div className="relative z-10 mx-auto max-w-5xl">
+          <div className="text-center">
+            <span className="text-xs font-bold uppercase tracking-widest text-stone-500">
+              Panorama Nacional
+              {estatisticas?.periodoReferencia && ` · Ref: ${estatisticas.periodoReferencia}`}
+            </span>
+            <h2 className="mt-3 text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
+              A infraestrutura cresce. <span className="text-red-700">O acesso acompanha?</span>
+            </h2>
+          </div>
 
           {erroEstatisticas && !estatisticas && (
             <p className="mt-6 text-center text-sm text-red-600">{erroEstatisticas}</p>
           )}
 
-          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <div className="rounded border border-slate-200 bg-white p-6 text-center shadow-2xs">
-              <p className="font-mono text-2xl font-bold text-violet-700 break-words">
-                {estatisticas?.totalInstalacoesMmgd !== null &&
-                estatisticas?.totalInstalacoesMmgd !== undefined
-                  ? formatarValor(estatisticas.totalInstalacoesMmgd, 'inteiro')
-                  : '—'}
-              </p>
-              <p className="mt-1 text-sm text-slate-600">Sistemas MMGD conectados</p>
-            </div>
-            <div className="rounded border border-slate-200 bg-white p-6 text-center shadow-2xs">
-              <p className="font-mono text-2xl font-bold text-violet-700 break-words">
-                {estatisticas ? formatarValor(estatisticas.totalUcsBeneficiadas, 'inteiro') : '—'}
-              </p>
-              <p className="mt-1 text-sm text-slate-600">UCs beneficiadas por crédito de energia</p>
-            </div>
-            {/* RF-005 item 4: ESTIMATIVA, nunca contagem exata — UCs
-                residenciais beneficiadas × média nacional de moradores por
-                domicílio (IBGE, Censo 2022). Rótulo "(estimativa)" fica
-                sempre visível, sem tooltip escondendo isso. */}
-            <div
-              className="rounded border border-slate-200 bg-white p-6 text-center shadow-2xs"
-              title={
-                estatisticas
-                  ? `${formatarValor(estatisticas.pessoasBeneficiadas.totalUcsResidenciaisBeneficiadas, 'inteiro')} UCs residenciais beneficiadas × ${estatisticas.pessoasBeneficiadas.mediaPessoasPorDomicilio} pessoas/domicílio. Fonte: ${estatisticas.pessoasBeneficiadas.fonteMediaPessoasPorDomicilio}`
-                  : undefined
-              }
-            >
-              <p className="font-mono text-2xl font-bold text-violet-700 break-words">
-                {estatisticas
-                  ? formatarValor(estatisticas.pessoasBeneficiadas.pessoasBeneficiadasEstimativa, 'inteiro')
-                  : '—'}
-              </p>
-              <p className="mt-1 text-sm text-slate-600">
-                Pessoas beneficiadas <span className="text-slate-400">(estimativa)</span>
-              </p>
-            </div>
-            <div className="rounded border border-slate-200 bg-white p-6 text-center shadow-2xs">
-              <p className="font-mono text-2xl font-bold text-violet-700 break-words">
-                {estatisticas
-                  ? `${formatarValor(estatisticas.potenciaTotalInstaladaKw / 1000, 'numero')} MW`
-                  : '—'}
-              </p>
-              <p className="mt-1 text-sm text-slate-600">Potência total instalada</p>
-            </div>
-            <div className="rounded border border-slate-200 bg-white p-6 text-center shadow-2xs">
-              <p className="font-mono text-2xl font-bold text-violet-700 break-words">
-                {estatisticas
-                  ? formatarValor(estatisticas.totalMunicipiosComMmgd, 'inteiro')
-                  : '—'}
-              </p>
-              <p className="mt-1 text-sm text-slate-600">Municípios com presença de MMGD</p>
-            </div>
-            {/* RF-005 item 5 — RESOLVIDO em 21/07/2026 (ver
-                estatisticasNacionais.service.ts): geração MMGD (EPE/PDGD) /
-                geração elétrica total do Brasil (EPE/BEN), mesmo ano. Fica
-                "—" se os extractors de indicadores_energia_nacional nunca
-                rodaram neste ambiente — nunca fabricado. */}
-            <div
-              className="rounded border border-slate-200 bg-white p-6 text-center shadow-2xs"
-              title={
-                estatisticas?.participacaoMatrizNacional
-                  ? `${formatarValor(estatisticas.participacaoMatrizNacional.geracaoMmgdGwh, 'numero')} GWh (MMGD) / ${formatarValor(estatisticas.participacaoMatrizNacional.geracaoEletricaNacionalGwh, 'numero')} GWh (Brasil), ${estatisticas.participacaoMatrizNacional.periodoReferencia.slice(0, 4)}. Fontes: ${estatisticas.participacaoMatrizNacional.fonteMmgd}; ${estatisticas.participacaoMatrizNacional.fonteGeracaoNacional}`
-                  : undefined
-              }
-            >
-              <p className="font-mono text-2xl font-bold text-violet-700 break-words">
-                {estatisticas?.participacaoMatrizNacional
-                  ? formatarValor(estatisticas.participacaoMatrizNacional.participacaoPercentual, 'percentual')
-                  : '—'}
-              </p>
-              <p className="mt-1 text-sm text-slate-600">
-                Participação na geração elétrica nacional
+          <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-3">
+            {/* KPI 1 — Capacidade Instalada (chumbo): potência em GW, nunca
+                "50.086,23 MW" quebrando linha no meio do número. */}
+            <div className="relative flex flex-col rounded-3xl border border-white/60 bg-white/40 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.03)] backdrop-blur-xl transition-all hover:bg-white/60 hover:shadow-[0_12px_40px_rgb(28,25,23,0.06)]">
+              <div className="mb-6 flex items-center justify-between">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-stone-200/60 text-stone-700 shadow-inner ring-1 ring-stone-300/50">
+                  <IconeRaio className="h-6 w-6" strokeWidth={2} />
+                </span>
                 {estatisticas?.participacaoMatrizNacional && (
-                  <span className="text-slate-400">
-                    {' '}
-                    ({estatisticas.participacaoMatrizNacional.periodoReferencia.slice(0, 4)})
+                  <span
+                    className="rounded-lg bg-stone-100 px-3 py-1.5 text-xs font-bold text-stone-700 ring-1 ring-stone-200"
+                    title={`${formatarValor(estatisticas.participacaoMatrizNacional.geracaoMmgdGwh, 'numero')} GWh (energia solar) / ${formatarValor(estatisticas.participacaoMatrizNacional.geracaoEletricaNacionalGwh, 'numero')} GWh (Brasil), ${estatisticas.participacaoMatrizNacional.periodoReferencia.slice(0, 4)}. Fontes: ${estatisticas.participacaoMatrizNacional.fonteMmgd}; ${estatisticas.participacaoMatrizNacional.fonteGeracaoNacional}`}
+                  >
+                    {formatarValor(estatisticas.participacaoMatrizNacional.participacaoPercentual, 'percentual')} da matriz
                   </span>
+                )}
+              </div>
+              <p className="text-sm font-semibold uppercase tracking-wide text-stone-500">Capacidade instalada</p>
+              <div className="mt-2 flex items-baseline gap-2 whitespace-nowrap">
+                <span className="text-5xl font-extrabold tracking-tight text-stone-900">
+                  {estatisticas ? formatarValor(estatisticas.potenciaTotalInstaladaKw / 1_000_000, 'inteiro') : '—'}
+                </span>
+                <span className="text-xl font-bold text-stone-600">GW</span>
+              </div>
+              <p className="mt-4 text-sm leading-relaxed text-stone-600">
+                Distribuídos em{' '}
+                <strong className="text-stone-800">
+                  {estatisticas ? formatarCompacto(estatisticas.totalInstalacoesMmgd) : '—'}
+                </strong>{' '}
+                sistemas de energia solar conectados à rede nacional.
+              </p>
+            </div>
+
+            {/* KPI 2 — Acesso e Renda (terracota): "UCs" vira "imóveis com
+                acesso"; a nota de estimativa continua visível no texto, só
+                o detalhe do cálculo foi para o title (mesma regra de antes:
+                nunca esconder que é estimativa). */}
+            <div className="relative flex flex-col rounded-3xl border border-white/60 bg-orange-50/30 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.03)] backdrop-blur-xl transition-all hover:bg-orange-50/50 hover:shadow-[0_12px_40px_rgb(234,88,12,0.06)]">
+              <div className="mb-6 flex items-center">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-100/60 text-orange-700 shadow-inner ring-1 ring-orange-200/50">
+                  <IconeCasa className="h-6 w-6" strokeWidth={2} />
+                </span>
+              </div>
+              <p className="text-sm font-semibold uppercase tracking-wide text-orange-800/70">Imóveis com acesso</p>
+              <div className="mt-2 flex items-baseline gap-2 whitespace-nowrap">
+                <span className="text-5xl font-extrabold tracking-tight text-stone-900">
+                  {estatisticas ? formatarCompacto(estatisticas.totalUcsBeneficiadas) : '—'}
+                </span>
+              </div>
+              <p
+                className="mt-4 text-sm leading-relaxed text-stone-600"
+                title={
+                  estatisticas
+                    ? `${formatarValor(estatisticas.pessoasBeneficiadas.totalUcsResidenciaisBeneficiadas, 'inteiro')} UCs residenciais beneficiadas × ${estatisticas.pessoasBeneficiadas.mediaPessoasPorDomicilio} pessoas/domicílio. Fonte: ${estatisticas.pessoasBeneficiadas.fonteMediaPessoasPorDomicilio}`
+                    : undefined
+                }
+              >
+                Impacto estimado em{' '}
+                <strong className="text-orange-700">
+                  {estatisticas ? formatarCompacto(estatisticas.pessoasBeneficiadas.pessoasBeneficiadasEstimativa) : '—'}
+                </strong>{' '}
+                pessoas beneficiadas por crédito de energia <span className="text-stone-400">(estimativa)</span>.
+              </p>
+            </div>
+
+            {/* KPI 3 — Presença Territorial (carmim): município é contagem
+                exata, não abrevia; usa os mesmos totalVazios/percentualVazios
+                já calculados acima para o Tour Virtual, sem nova chamada. */}
+            <div className="relative flex flex-col rounded-3xl border border-white/60 bg-red-50/30 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.03)] backdrop-blur-xl transition-all hover:bg-red-50/50 hover:shadow-[0_12px_40px_rgb(185,28,28,0.06)]">
+              <div className="mb-6 flex items-center">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-100/60 text-red-700 shadow-inner ring-1 ring-red-200/50">
+                  <IconeMapa className="h-6 w-6" strokeWidth={2} />
+                </span>
+              </div>
+              <p className="text-sm font-semibold uppercase tracking-wide text-red-800/70">Presença territorial</p>
+              <div className="mt-2 flex items-baseline gap-2 whitespace-nowrap">
+                <span className="text-5xl font-extrabold tracking-tight text-stone-900">
+                  {estatisticas ? formatarValor(estatisticas.totalMunicipiosComMmgd, 'inteiro') : '—'}
+                </span>
+                <span className="text-xl font-bold text-stone-600">municípios</span>
+              </div>
+              <p className="mt-4 text-sm leading-relaxed text-stone-600">
+                {percentualVazios !== null ? (
+                  <>
+                    A adoção já chega a quase todo o território, mas{' '}
+                    <strong className="text-red-700">
+                      {formatarValor(percentualVazios, 'numero')}% ainda são Vazios de Acesso
+                    </strong>{' '}
+                    — sol sobrando, energia limpa não chegando.
+                  </>
+                ) : (
+                  'A adoção chegou a quase todas as cidades, mas o acesso intraurbano segue desigual.'
                 )}
               </p>
             </div>
           </div>
 
           {estatisticas && (
-            <p className="mt-3 text-center text-xs text-slate-400">
-              "Pessoas beneficiadas" é estimativa ({estatisticas.pessoasBeneficiadas.mediaPessoasPorDomicilio}{' '}
-              pessoas/domicílio, {estatisticas.pessoasBeneficiadas.fonteMediaPessoasPorDomicilio}), não contagem exata.
+            <p className="mt-4 text-center text-xs text-stone-400">
+              "Imóveis com acesso" e "pessoas beneficiadas" são estimativas (
+              {estatisticas.pessoasBeneficiadas.mediaPessoasPorDomicilio} pessoas/domicílio,{' '}
+              {estatisticas.pessoasBeneficiadas.fonteMediaPessoasPorDomicilio}), não contagens exatas.
             </p>
           )}
 
@@ -488,19 +535,17 @@ export function PaginaLanding() {
               schema atual (ver estatisticasNacionais.service.ts, backend).
               Exibida como "em breve" com o motivo real, nunca com número
               inventado — mesmo princípio das notas de ausência documentada
-              do painel de município (utils/notasAusencia.ts). "Participação
-              na matriz nacional" (item 5) SAIU desta lista em 21/07/2026 —
-              virou KPI real no grid acima. */}
+              do painel de município (utils/notasAusencia.ts). */}
           {estatisticas && estatisticas.indicadoresIndisponiveis.length > 0 && (
-            <div className="mt-6 grid grid-cols-1 gap-3 mx-auto max-w-sm">
+            <div className="mx-auto mt-6 grid max-w-sm grid-cols-1 gap-3">
               {estatisticas.indicadoresIndisponiveis.map((indicador) => (
                 <div
                   key={indicador.id}
-                  className="rounded border border-dashed border-slate-300 bg-white p-4 text-left"
+                  className="rounded-2xl border border-dashed border-stone-300 bg-white/40 p-4 text-left backdrop-blur-md"
                 >
-                  <p className="font-mono text-sm font-semibold text-slate-400">Em breve</p>
-                  <p className="mt-1 text-xs font-semibold text-slate-600">{indicador.rotulo}</p>
-                  <p className="mt-1.5 text-xs leading-relaxed text-slate-500">{indicador.motivo}</p>
+                  <p className="font-mono text-sm font-semibold text-stone-400">Em breve</p>
+                  <p className="mt-1 text-xs font-semibold text-stone-600">{indicador.rotulo}</p>
+                  <p className="mt-1.5 text-xs leading-relaxed text-stone-500">{indicador.motivo}</p>
                 </div>
               ))}
             </div>
