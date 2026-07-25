@@ -71,15 +71,6 @@ function IconeRaio(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-function IconeCadeado(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <rect x="4" y="11" width="16" height="10" rx="2" />
-      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-    </svg>
-  );
-}
-
 const formatoCompacto = new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 });
 
 /** Abreviação (ex.: "4,5 mi") só para os KPIs de destaque desta página — não
@@ -87,6 +78,24 @@ const formatoCompacto = new Intl.NumberFormat('pt-BR', { notation: 'compact', ma
 function formatarCompacto(valor: number | null | undefined): string {
   if (valor === null || valor === undefined || Number.isNaN(valor)) return 'sem dado';
   return formatoCompacto.format(valor);
+}
+
+const NOMES_MESES = [
+  'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+  'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro',
+];
+
+/**
+ * "2026-06-01" -> "Junho de 2026". Faz parsing direto dos componentes
+ * ano/mês da string (sem passar por `Date`/timezone) — periodoReferencia é
+ * uma data calendário (mês de referência), não um instante; construir um
+ * `Date` a partir dela e formatar em America/Sao_Paulo arriscaria cair no
+ * mês anterior (mesma armadilha de fuso já documentada em formatadores.ts).
+ */
+function formatarMesAno(isoString: string): string {
+  const [ano, mes] = isoString.split('-');
+  const nomeMes = NOMES_MESES[Number(mes) - 1] ?? mes;
+  return `${nomeMes.charAt(0).toUpperCase()}${nomeMes.slice(1)} de ${ano}`;
 }
 
 /**
@@ -415,22 +424,25 @@ export function PaginaLanding() {
           aria-hidden
           animate={{ scale: [1, 1.05, 1], opacity: [0.4, 0.6, 0.4] }}
           transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
-          className="pointer-events-none absolute top-0 right-1/4 -z-10 h-[500px] w-[500px] rounded-full bg-orange-100/60 blur-[100px]"
+          className="pointer-events-none absolute top-0 right-1/4 -z-10 h-[500px] w-[500px] rounded-full bg-orange-100/60 mix-blend-multiply blur-[100px]"
         />
         <motion.div
           aria-hidden
           animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
           transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
-          className="pointer-events-none absolute bottom-0 left-1/4 -z-10 h-[600px] w-[600px] rounded-full bg-red-100/50 blur-[120px]"
+          className="pointer-events-none absolute bottom-0 left-1/4 -z-10 h-[600px] w-[600px] rounded-full bg-red-100/50 mix-blend-multiply blur-[120px]"
         />
 
         <div className="relative z-10 mx-auto max-w-5xl">
           <div className="text-center">
-            <span className="text-xs font-bold uppercase tracking-widest text-stone-500">
-              Panorama Nacional
-              {estatisticas?.periodoReferencia && ` · Ref: ${estatisticas.periodoReferencia}`}
-            </span>
-            <h2 className="mt-3 text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-stone-200/50 bg-white/60 px-3 py-1 shadow-sm backdrop-blur-md">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+              <span className="text-[11px] font-bold uppercase tracking-widest text-stone-600">
+                Panorama Nacional
+                {estatisticas?.periodoReferencia && ` · Atualizado em: ${formatarMesAno(estatisticas.periodoReferencia)}`}
+              </span>
+            </div>
+            <h2 className="mt-4 text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
               A infraestrutura cresce. <span className="text-red-700">O acesso acompanha?</span>
             </h2>
           </div>
@@ -536,45 +548,26 @@ export function PaginaLanding() {
             </div>
           </div>
 
+          {/* Disclaimer ancorado numa caixa própria (6ª rodada de auditoria
+              de UX/UI, 25/07/2026) — antes flutuava solto e lia como erro de
+              formatação; agora tem uma âncora visual e contraste OK. */}
           {estatisticas && (
-            <p className="mt-4 text-center text-xs font-medium text-stone-500">
-              "Imóveis com acesso" e "pessoas beneficiadas" são estimativas (
-              {estatisticas.pessoasBeneficiadas.mediaPessoasPorDomicilio} pessoas/domicílio,{' '}
-              {estatisticas.pessoasBeneficiadas.fonteMediaPessoasPorDomicilio}), não contagens exatas.
-            </p>
-          )}
-
-          {/* RF-005 pede também "projeção futura" — não calculável com o
-              schema atual (ver estatisticasNacionais.service.ts, backend).
-              Apresentado como teaser de módulo bloqueado (cadeado + pílula
-              "Em breve"), não como aviso de manutenção pontilhado — mas o
-              rótulo e o motivo continuam vindo de indicadoresIndisponiveis,
-              nunca hardcoded, mesmo princípio das notas de ausência
-              documentada do painel de município (utils/notasAusencia.ts). */}
-          {estatisticas && estatisticas.indicadoresIndisponiveis.length > 0 && (
-            <div className="mx-auto mt-8 flex max-w-2xl flex-col gap-3">
-              {estatisticas.indicadoresIndisponiveis.map((indicador) => (
-                <motion.div
-                  key={indicador.id}
-                  initial={{ opacity: 0 }}
-                  whileInView={{ opacity: 1 }}
-                  viewport={{ once: true }}
-                  className="flex items-center gap-4 rounded-2xl border border-stone-200/60 bg-white/30 px-6 py-4 shadow-sm backdrop-blur-md"
-                >
-                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-stone-200/50 text-stone-500">
-                    <IconeCadeado className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-stone-800">{indicador.rotulo}</h4>
-                    <p className="text-xs font-medium text-stone-600">{indicador.motivo}</p>
-                  </div>
-                  <span className="ml-auto whitespace-nowrap rounded-full bg-stone-200/50 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-stone-600">
-                    Em breve
-                  </span>
-                </motion.div>
-              ))}
+            <div className="mx-auto mt-10 max-w-3xl rounded-xl border border-stone-200/40 bg-stone-100/30 p-4 backdrop-blur-sm">
+              <p className="text-center text-[11px] font-medium leading-relaxed text-stone-500">
+                * "Imóveis com acesso" e "pessoas beneficiadas" são estimativas metodológicas (base:{' '}
+                {estatisticas.pessoasBeneficiadas.mediaPessoasPorDomicilio} pessoas/domicílio,{' '}
+                {estatisticas.pessoasBeneficiadas.fonteMediaPessoasPorDomicilio}), não contagens unitárias
+                exatas das concessionárias.
+              </p>
             </div>
           )}
+
+          {/* O bloco "Em breve" (projeção futura, indicadoresIndisponiveis)
+              foi removido daqui por decisão do Diretor de UX/UI (25/07/2026,
+              7ª rodada): um centro de inteligência permanente não deve
+              ocupar espaço cognitivo do painel principal com módulo
+              inacabado — o dado real de indicadoresIndisponiveis continua
+              vindo da API, só não é mais renderizado nesta seção. */}
         </div>
       </section>
 
