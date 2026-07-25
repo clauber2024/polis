@@ -73,17 +73,17 @@ type CorDestaqueCard = 'terracota' | 'carmim' | 'chumbo';
 
 const ESTILOS_DESTAQUE_CARD: Record<CorDestaqueCard, { icone: string; link: string; sombraHover: string }> = {
   terracota: {
-    icone: 'bg-orange-50 text-orange-600 shadow-inner ring-1 ring-orange-100/50',
+    icone: 'bg-orange-50/80 text-orange-600 shadow-inner ring-1 ring-orange-200/50',
     link: 'text-orange-600 group-hover:text-orange-700',
     sombraHover: 'hover:shadow-[0_12px_40px_rgb(234,88,12,0.08)]',
   },
   carmim: {
-    icone: 'bg-red-50 text-red-600 shadow-inner ring-1 ring-red-100/50',
+    icone: 'bg-red-50/80 text-red-600 shadow-inner ring-1 ring-red-200/50',
     link: 'text-red-600 group-hover:text-red-700',
     sombraHover: 'hover:shadow-[0_12px_40px_rgb(185,28,28,0.08)]',
   },
   chumbo: {
-    icone: 'bg-stone-100 text-stone-700 shadow-inner ring-1 ring-stone-200/50',
+    icone: 'bg-stone-100/80 text-stone-700 shadow-inner ring-1 ring-stone-200/50',
     link: 'text-stone-700 group-hover:text-stone-900',
     sombraHover: 'hover:shadow-[0_12px_40px_rgb(28,25,23,0.08)]',
   },
@@ -113,7 +113,7 @@ function CardExplicativo({ corDestaque, icone, pergunta, resposta, linkPara, lin
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-40px' }}
       transition={{ duration: 0.4 }}
-      className={`group relative flex flex-col justify-between rounded-3xl border border-white/80 bg-white/50 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-white/70 ${estilo.sombraHover}`}
+      className={`group relative flex flex-col justify-between rounded-3xl border border-white/60 bg-white/30 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-white/50 ${estilo.sombraHover}`}
     >
       <div>
         <div className={`mb-6 flex h-12 w-12 items-center justify-center rounded-2xl ${estilo.icone}`}>
@@ -283,13 +283,20 @@ export function PaginaLanding() {
           mais". */}
       <section className="relative overflow-hidden px-6 py-20">
         <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-stone-50" />
-        <div
+        {/* Orbes "respirando" (5ª rodada de auditoria de UX/UI, 25/07/2026):
+            animação sutil de escala/opacidade para o vazamento de cor atrás
+            do glass ficar perceptível mesmo em captura estática. */}
+        <motion.div
           aria-hidden
-          className="pointer-events-none absolute -top-40 -left-40 -z-10 h-[600px] w-[600px] rounded-full bg-orange-100/50 mix-blend-multiply blur-[120px]"
+          animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
+          transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
+          className="pointer-events-none absolute -top-40 -left-40 -z-10 h-[600px] w-[600px] rounded-full bg-orange-200/40 mix-blend-multiply blur-[120px]"
         />
-        <div
+        <motion.div
           aria-hidden
-          className="pointer-events-none absolute top-20 -right-20 -z-10 h-[500px] w-[500px] rounded-full bg-red-100/40 mix-blend-multiply blur-[100px]"
+          animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.4, 0.2] }}
+          transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
+          className="pointer-events-none absolute top-20 -right-20 -z-10 h-[500px] w-[500px] rounded-full bg-red-200/30 mix-blend-multiply blur-[100px]"
         />
 
         <motion.div
@@ -321,14 +328,14 @@ export function PaginaLanding() {
           <div className="mt-8 flex justify-center gap-3">
             <Link
               to="/mapa"
-              className="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-b from-red-600 to-red-700 px-6 py-3 text-xs font-mono font-bold uppercase tracking-wider text-white shadow-[0_8px_20px_rgba(185,28,28,0.25)] ring-1 ring-inset ring-white/20 transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_25px_rgba(185,28,28,0.35)] active:scale-95"
+              className="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-br from-red-600 to-red-800 px-6 py-3 text-xs font-mono font-bold uppercase tracking-wider text-white shadow-[0_8px_25px_rgba(185,28,28,0.25)] ring-1 ring-inset ring-white/20 transition-all hover:-translate-y-1 hover:shadow-[0_12px_30px_rgba(185,28,28,0.4)] active:scale-95"
             >
               Explorar o Atlas
               <IconeSeta className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Link>
             <a
               href="#sobre"
-              className="rounded-xl border border-stone-200 bg-white/50 px-6 py-3 text-xs font-bold uppercase tracking-wider text-stone-700 backdrop-blur-lg transition-all hover:bg-white/90 hover:border-stone-300"
+              className="rounded-xl border border-stone-200 bg-white/40 px-6 py-3 text-xs font-bold uppercase tracking-wider text-stone-700 shadow-sm backdrop-blur-lg transition-all hover:bg-white/70 hover:text-stone-900"
             >
               Saiba mais
             </a>
