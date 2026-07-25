@@ -96,6 +96,43 @@ function IconeRede(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+function IconeCheck(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8.5 12.5l2.2 2.2 4.8-5" />
+    </svg>
+  );
+}
+
+function IconeArquivo(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6" />
+    </svg>
+  );
+}
+
+function IconeDownload(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M12 3v12" />
+      <path d="M7 10l5 5 5-5" />
+      <path d="M5 21h14" />
+    </svg>
+  );
+}
+
+function IconeEscudo(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" />
+      <path d="M9 12l2 2 4-4" />
+    </svg>
+  );
+}
+
 function IconeRaio(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -754,81 +791,169 @@ export function PaginaLanding() {
           OBEPE) — esta explica COMO a plataforma classifica os territórios.
           O PDF reaproveita o mesmo texto oficial de NOTA_METODOLOGICA
           (backend, vaziosDeAcesso.service.ts), não uma versão reescrita. */}
-      <section className="mx-auto max-w-4xl rounded border border-slate-200 bg-white px-6 py-10 shadow-2xs sm:px-10 my-16">
-        <h2 className="text-lg font-bold uppercase tracking-tight text-slate-900">
-          Como classificamos os territórios
-        </h2>
-        <p className="mt-4 leading-relaxed text-slate-600">
-          A classificação de <strong>Vazio de Acesso</strong> é um corte simples: cada
-          município é comparado à mediana nacional de irradiação solar e à mediana nacional
-          de adoção residencial de MMGD per capita. Alta irradiação combinada a baixa adoção
-          é o sinal de território prioritário — sol sobrando, energia limpa não chegando. É
-          um recorte que <strong>não controla renda</strong>: parte da concentração observada
-          em regiões de menor renda reflete o próprio gargalo econômico, não só potencial
-          solar desperdiçado. Já o <strong>IVSH</strong> (Índice de Vulnerabilidade
-          Sócio-Habitacional-Energética) combina vulnerabilidade social geral, precariedade da
-          moradia e insegurança da posse da terra num critério de priorização alternativo, para
-          quem quer considerar a condição da moradia na decisão.
-        </p>
-        <div className="mt-6 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-4">
-          <button
-            type="button"
-            onClick={aoBaixarNotaMetodologica}
-            disabled={baixandoNota}
-            className="rounded border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-          >
-            {baixandoNota ? 'Gerando…' : 'Baixar Nota Metodológica (PDF)'}
-          </button>
-          <span className="text-xs text-slate-400">
-            Documento completo: critérios de classificação, IVS/IVSH e todas as fontes de dados.
-          </span>
+      <section className="relative my-16 overflow-hidden px-6 py-4">
+        <motion.div
+          aria-hidden
+          animate={{ scale: [1, 1.05, 1], opacity: [0.3, 0.5, 0.3] }}
+          transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
+          className="pointer-events-none absolute top-10 left-1/4 -z-10 h-[400px] w-[400px] rounded-full bg-stone-200/50 mix-blend-multiply opacity-60 blur-[100px]"
+        />
+
+        <div className="relative z-10 mx-auto max-w-4xl rounded-3xl border border-white/60 bg-white/40 px-6 py-10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl sm:px-10">
+          <h2 className="flex items-center gap-2 text-lg font-bold uppercase tracking-tight text-stone-900">
+            <IconeEscudo className="h-5 w-5 text-red-700" />
+            Critérios de enquadramento territorial
+          </h2>
+
+          <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
+            <div className="rounded-2xl border border-white/70 bg-orange-50/40 p-6 shadow-sm backdrop-blur-md">
+              <span className="inline-flex items-center rounded-lg border border-orange-200/60 bg-orange-100/70 px-3 py-1 text-xs font-bold text-orange-800">
+                Corte primário
+              </span>
+              <h3 className="mt-3 text-lg font-bold text-stone-900">Vazio de Acesso</h3>
+              <p className="mt-1 text-sm leading-relaxed text-stone-600">
+                Identifica território onde o potencial natural é desperdiçado.
+              </p>
+              <ul className="mt-4 space-y-2 text-sm font-medium text-stone-700">
+                <li className="flex items-start gap-2">
+                  <IconeCheck className="mt-0.5 h-4 w-4 shrink-0 text-orange-600" />
+                  Irradiação solar acima da mediana nacional.
+                </li>
+                <li className="flex items-start gap-2">
+                  <IconeCheck className="mt-0.5 h-4 w-4 shrink-0 text-orange-600" />
+                  Adoção residencial de energia solar per capita abaixo da mediana nacional.
+                </li>
+              </ul>
+              <p className="mt-4 text-xs leading-relaxed text-stone-500">
+                Não controla renda: parte da concentração em regiões de menor renda reflete o
+                próprio gargalo econômico, não só potencial desperdiçado.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/70 bg-red-50/40 p-6 shadow-sm backdrop-blur-md">
+              <span className="inline-flex items-center rounded-lg border border-red-200/60 bg-red-100/70 px-3 py-1 text-xs font-bold text-red-800">
+                Corte estrutural
+              </span>
+              <h3 className="mt-3 text-lg font-bold text-stone-900">IVSH</h3>
+              <p className="mt-1 text-sm leading-relaxed text-stone-600">
+                Critério de priorização alternativo focado na barreira física da moradia.
+              </p>
+              <ul className="mt-4 space-y-2 text-sm font-medium text-stone-700">
+                <li className="flex items-start gap-2">
+                  <IconeCheck className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+                  Pondera a vulnerabilidade social geral (renda, infraestrutura, capital humano).
+                </li>
+                <li className="flex items-start gap-2">
+                  <IconeCheck className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+                  Soma precariedade construtiva e insegurança da posse da terra.
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Download da Nota Metodológica — mesma lógica de antes
+              (aoBaixarNotaMetodologica/baixandoNota/erroNota), só com mais
+              peso visual (pedido do usuário, 25/07/2026: era pequeno demais
+              pra ser a principal conversão secundária da página). */}
+          <div className="mt-8 flex flex-col items-start gap-4 rounded-2xl border border-white/70 bg-white/50 p-6 shadow-sm backdrop-blur-md sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-600">
+                <IconeArquivo className="h-6 w-6" />
+              </div>
+              <div>
+                <h4 className="font-bold text-stone-900">Nota Metodológica completa</h4>
+                <p className="text-xs text-stone-500">
+                  Documento em PDF: critérios de classificação, IVS/IVSH e todas as fontes de dados.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={aoBaixarNotaMetodologica}
+              disabled={baixandoNota}
+              className="flex shrink-0 items-center gap-2 rounded-lg bg-stone-800 px-6 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:bg-stone-700 disabled:opacity-60"
+            >
+              <IconeDownload className="h-4 w-4" />
+              {baixandoNota ? 'Gerando…' : 'Baixar PDF'}
+            </button>
+          </div>
+          {erroNota && <p className="mt-2 text-xs text-red-600">{erroNota}</p>}
         </div>
-        {erroNota && <p className="mt-2 text-xs text-red-600">{erroNota}</p>}
       </section>
 
       {/* RF-007/RT-005/RF-078: Referências Metodológicas — seção DISTINTA das
           fontes de dados. O OBEPE inspira a metodologia do Índice de Pobreza
           Energética Regional (ver ARQUITETURA.md), mas nunca é listado como
-          fonte de dado primário. */}
-      <section id="referencias-metodologicas" className="px-6 py-16">
-        <div className="mx-auto max-w-4xl rounded border border-slate-800 bg-slate-900 p-8 text-white shadow-2xs sm:p-10">
-          <span className="mb-2 block text-[10px] font-mono font-semibold uppercase tracking-widest text-violet-400">
-            Definição e Enquadramento Analítico
-          </span>
-          <h2 className="text-xl font-bold tracking-tight text-white">Referências metodológicas</h2>
-          <div className="my-4 h-1 w-16 bg-violet-500" />
-          <p className="leading-relaxed text-slate-300">
-            O Índice de Pobreza Energética Regional do Atlas é elaboração própria, construída a
-            partir das fontes primárias já listadas acima (IBGE, CadÚnico, TSEE, IVS/IPEA), mas
-            inspirada na abordagem metodológica do{' '}
-            <strong>Observatório Brasileiro de Erradicação da Pobreza Energética (OBEPE)</strong>.
-            O OBEPE é uma referência de diálogo metodológico, não uma fonte de dado bruto do
-            Atlas — por isso aparece aqui, separado da seção de Fontes de Dados.
-          </p>
+          fonte de dado primário. Reenquadrada em 25/07/2026 (auditoria de
+          UX/UI) de "justificativa defensiva" para "selo de validação": o
+          fato de o OBEPE não ser fonte de dado bruto continua dito (é
+          metodologicamente importante), só que como reforço de
+          auditabilidade, não como pedido de desculpas. Paleta trocada de
+          roxo para chumbo/carmim (Pólis), mesmo tom escuro de antes. */}
+      <section id="referencias-metodologicas" className="relative overflow-hidden px-6 py-16">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="relative mx-auto max-w-4xl overflow-hidden rounded-3xl bg-stone-900 p-8 shadow-2xl sm:p-10"
+        >
+          <div
+            aria-hidden
+            className="pointer-events-none absolute top-0 right-0 -z-0 h-64 w-64 translate-x-1/3 -translate-y-1/3 rounded-full bg-red-600/10 blur-[60px]"
+          />
 
-          {/* RF-005 item 5 ("participação da solar distribuída na matriz
-              elétrica nacional") — RESOLVIDO em 21/07/2026: virou KPI real
-              na seção "O Brasil em números" (geração MMGD/EPE-PDGD dividida
-              pela geração elétrica total do Brasil/EPE-BEN, ver
-              estatisticasNacionais.service.ts). Esta citação continua aqui
-              como cross-check independente: o número já vinha publicado pela
-              EPE antes do Atlas calcular o seu, e os dois bateram. */}
-          <p className="mt-6 leading-relaxed text-slate-300">
-            Como cross-check independente do KPI calculado acima, a Empresa de Pesquisa
-            Energética (EPE) registra no Balanço Energético Nacional 2026 (ano-base 2025) que a
-            micro e minigeração distribuída (MMGD) representou <strong>7,0%</strong> da geração
-            elétrica total do Brasil em 2025 — muito próximo do{' '}
-            {estatisticas?.participacaoMatrizNacional
-              ? formatarValor(estatisticas.participacaoMatrizNacional.participacaoPercentual, 'percentual')
-              : '~7,0%'}{' '}
-            calculado pelo próprio Atlas a partir das mesmas fontes primárias (EPE/PDGD ÷
-            EPE/BEN).
-          </p>
-          <p className="mt-2 text-xs text-slate-500">
-            Fonte: EPE, Balanço Energético Nacional 2026 — ano-base 2025 (Relatório Síntese,
-            publicado em 03/06/2026).
-          </p>
-        </div>
+          <div className="relative z-10">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-stone-700 bg-stone-800/80 px-4 py-1.5 backdrop-blur-sm">
+              <IconeEscudo className="h-4 w-4 text-red-500" />
+              <span className="text-[11px] font-bold uppercase tracking-widest text-stone-300">
+                Aderência oficial e validação
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-10 md:grid-cols-2">
+              <div>
+                <h3 className="mb-3 flex items-center gap-2 text-lg font-bold text-white">
+                  <span className="h-2 w-2 rounded-full bg-stone-500" />
+                  Alinhamento com o OBEPE
+                </h3>
+                <p className="text-sm leading-relaxed text-stone-400">
+                  O Índice de Pobreza Energética Regional do Atlas segue a mesma lente analítica
+                  do <strong className="text-stone-200">Observatório Brasileiro de Erradicação da
+                  Pobreza Energética (OBEPE)</strong>, estruturado a partir das fontes primárias já
+                  auditáveis na seção Fontes de Dados (IBGE, CadÚnico, TSEE, IVS/IPEA). O OBEPE
+                  entra como referência de diálogo metodológico — a base de dados em si continua
+                  100% rastreável, nunca um dado bruto importado de fora.
+                </p>
+              </div>
+
+              <div>
+                <h3 className="mb-3 flex items-center gap-2 text-lg font-bold text-white">
+                  <span className="h-2 w-2 rounded-full bg-red-500" />
+                  Validação cruzada (EPE)
+                </h3>
+                <p className="text-sm leading-relaxed text-stone-400">
+                  Como atestado de precisão do motor de dados do Atlas, o KPI que calculamos para
+                  a participação da energia solar distribuída na matriz elétrica nacional —{' '}
+                  <strong className="text-stone-200">
+                    {estatisticas?.participacaoMatrizNacional
+                      ? formatarValor(estatisticas.participacaoMatrizNacional.participacaoPercentual, 'percentual')
+                      : '~7,0%'}
+                  </strong>{' '}
+                  — mantém extrema aderência aos <strong className="text-stone-200">7,0%</strong>{' '}
+                  publicados de forma independente pela Empresa de Pesquisa Energética (EPE) no
+                  Balanço Energético Nacional 2026 (ano-base 2025), a partir das mesmas fontes
+                  primárias (EPE/PDGD ÷ EPE/BEN).
+                </p>
+                <div className="mt-4 border-l-2 border-stone-700 pl-3">
+                  <p className="text-[10px] uppercase tracking-wider text-stone-500">
+                    Fonte: EPE, Balanço Energético Nacional 2026 — ano-base 2025 (Relatório
+                    Síntese, publicado em 03/06/2026).
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
       </section>
 
       {/* RF-008: footer institucional. */}
