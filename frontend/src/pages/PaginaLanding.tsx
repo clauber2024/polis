@@ -23,7 +23,18 @@ import { formatarValor } from '../utils/formatadores';
 interface FonteDados {
   nome: string;
   descricao: string;
+  /** Agrupamento semântico (25/07/2026, auditoria de UX/UI) — mostra domínio
+   * sobre o território analisado em vez de despejar 11 siglas soltas; não
+   * muda nome/descrição reais, só organiza a mesma lista por categoria. */
+  categoria: string;
 }
+
+const ORDEM_CATEGORIAS = [
+  'Energia e Infraestrutura Elétrica',
+  'Território e Clima',
+  'Vulnerabilidade Social e Renda',
+  'Moradia e Crédito Habitacional',
+] as const;
 
 function IconeSeta(props: SVGProps<SVGSVGElement>) {
   return (
@@ -180,40 +191,68 @@ const FONTES_DE_DADOS: FonteDados[] = [
     nome: 'ANEEL',
     descricao:
       'Micro e minigeração distribuída (potência instalada, UCs conectadas), tarifa residencial (TUSD+TE) e qualidade de fornecimento (DEC/FEC).',
+    categoria: 'Energia e Infraestrutura Elétrica',
   },
   {
     nome: 'IBGE — Censo 2022',
     descricao:
       'Infraestrutura urbana, moradia, tipo de domicílio, alfabetização, densidade populacional e Cadastro Nacional de Favelas e Comunidades Urbanas.',
+    categoria: 'Moradia e Crédito Habitacional',
   },
-  { nome: 'CadÚnico', descricao: 'Cobertura e pobreza entre famílias cadastradas no Cadastro Único.' },
-  { nome: 'TSEE', descricao: 'Tarifa Social de Energia Elétrica — beneficiários por subclasse residencial.' },
-  { nome: 'IVS/IPEA', descricao: 'Índice de Vulnerabilidade Social, consolidado por município.' },
+  {
+    nome: 'CadÚnico',
+    descricao: 'Cobertura e pobreza entre famílias cadastradas no Cadastro Único.',
+    categoria: 'Vulnerabilidade Social e Renda',
+  },
+  {
+    nome: 'TSEE',
+    descricao: 'Tarifa Social de Energia Elétrica — beneficiários por subclasse residencial.',
+    categoria: 'Vulnerabilidade Social e Renda',
+  },
+  {
+    nome: 'IVS/IPEA',
+    descricao: 'Índice de Vulnerabilidade Social, consolidado por município.',
+    categoria: 'Vulnerabilidade Social e Renda',
+  },
   {
     nome: 'INPE',
     descricao:
       'Irradiação solar (Atlas Solar 2017, LABREN/CCST — média climatológica 1999–2015) e precipitação mensal (MERGE/CPTEC).',
+    categoria: 'Território e Clima',
   },
   {
     nome: 'RAIS — Ministério do Trabalho',
     descricao: 'Renda média domiciliar e indicadores de trabalho, via BigQuery.',
+    categoria: 'Vulnerabilidade Social e Renda',
   },
-  { nome: 'DATASUS', descricao: 'Mortalidade infantil (SIM + SINASC).' },
+  {
+    nome: 'DATASUS',
+    descricao: 'Mortalidade infantil (SIM + SINASC).',
+    categoria: 'Vulnerabilidade Social e Renda',
+  },
   {
     nome: 'Caixa/FGTS e Ministério das Cidades',
     descricao: 'Programa Minha Casa Minha Vida — unidades habitacionais entregues (faixas FGTS e OGU).',
+    categoria: 'Moradia e Crédito Habitacional',
   },
   {
     nome: 'Prefeituras municipais',
     descricao:
       'Zonas Especiais de Interesse Social (ZEIS/AEIS) — hoje 8 municípios: São Paulo, Recife, Rio Branco, Belo Horizonte, Contagem, Fortaleza, Salvador e Rio de Janeiro.',
+    categoria: 'Moradia e Crédito Habitacional',
   },
   {
     nome: 'Caixa Econômica Federal',
     descricao:
       'Programa Reforma Casa Brasil Solar — fonte pontual (extrato via Lei de Acesso à Informação, nov/2025–abr/2026), não uma base pública/automatizável como as demais.',
+    categoria: 'Moradia e Crédito Habitacional',
   },
 ];
+
+const FONTES_POR_CATEGORIA = ORDEM_CATEGORIAS.map((categoria) => ({
+  categoria,
+  fontes: FONTES_DE_DADOS.filter((fonte) => fonte.categoria === categoria),
+}));
 
 export function PaginaLanding() {
   const [estatisticas, setEstatisticas] = useState<EstatisticasNacionais | null>(null);
@@ -612,37 +651,66 @@ export function PaginaLanding() {
         </div>
       </section>
 
-      {/* RF-006: fontes de dados primárias. */}
-      <section className="mx-auto max-w-5xl rounded border border-slate-200 bg-white px-6 py-10 shadow-2xs sm:px-10 my-16">
-        <h2 className="text-lg font-bold uppercase tracking-tight text-slate-900">
-          Fontes de dados
-        </h2>
-        <p className="mt-2 text-sm text-slate-500">
-          Todos os indicadores do Atlas vêm de bases públicas oficiais.
-        </p>
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {FONTES_DE_DADOS.map((fonte) => (
-            <div key={fonte.nome} className="rounded border border-slate-100 bg-slate-50 p-4">
-              <span className="mb-1 block font-mono text-[10px] font-bold text-violet-700">
-                {fonte.nome}
-              </span>
-              <p className="text-sm text-slate-600">{fonte.descricao}</p>
-            </div>
-          ))}
-        </div>
+      {/* RF-006: fontes de dados primárias, agora agrupadas por domínio de
+          conhecimento (25/07/2026, auditoria de UX/UI) — a grade solta de 11
+          siglas virou 4 categorias, e o diagrama de linhas cruzadas
+          (DiagramaConexaoDados) virou cards de composição (ver esse arquivo
+          para a lógica de origens/indicadores, só a apresentação mudou). */}
+      <section className="relative my-16 overflow-hidden px-6 py-4">
+        <motion.div
+          aria-hidden
+          animate={{ scale: [1, 1.05, 1], opacity: [0.3, 0.5, 0.3] }}
+          transition={{ duration: 13, repeat: Infinity, ease: 'easeInOut' }}
+          className="pointer-events-none absolute top-0 right-1/4 -z-10 h-[500px] w-[500px] rounded-full bg-stone-200/50 mix-blend-multiply blur-[100px]"
+        />
+        <motion.div
+          aria-hidden
+          animate={{ scale: [1, 1.1, 1], opacity: [0.25, 0.4, 0.25] }}
+          transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
+          className="pointer-events-none absolute bottom-0 left-1/4 -z-10 h-[600px] w-[600px] rounded-full bg-red-100/40 mix-blend-multiply blur-[120px]"
+        />
 
-        {/* Diagrama "como os dados se conectam" (pedido do usuário,
-            21/07/2026) — dimensões de dados → indicadores compostos. Ver
-            docstring de DiagramaConexaoDados.tsx: linha só existe onde a
-            relação é real e já documentada, nunca inventada. */}
-        <h3 className="mt-10 text-sm font-bold uppercase tracking-tight text-slate-900">
-          Como os dados se conectam
-        </h3>
-        <p className="mt-1 text-xs text-slate-500">
-          Das 9 dimensões de dados do Atlas aos indicadores compostos que elas alimentam.
-        </p>
-        <div className="mt-4">
-          <DiagramaConexaoDados />
+        <div className="relative z-10 mx-auto max-w-5xl rounded-3xl border border-white/60 bg-white/40 px-6 py-10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl sm:px-10">
+          <h2 className="text-lg font-bold uppercase tracking-tight text-stone-900">Fontes de dados</h2>
+          <p className="mt-2 text-sm text-stone-500">
+            Todos os indicadores do Atlas vêm de bases públicas oficiais, organizadas por domínio.
+          </p>
+
+          <div className="mt-8 flex flex-col gap-8">
+            {FONTES_POR_CATEGORIA.map(({ categoria, fontes }) => (
+              <div key={categoria}>
+                <h3 className="text-xs font-bold uppercase tracking-widest text-stone-500">{categoria}</h3>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {fontes.map((fonte) => (
+                    <div
+                      key={fonte.nome}
+                      className="rounded-2xl border border-white/70 bg-white/50 p-4 shadow-sm backdrop-blur-md"
+                    >
+                      <span className="mb-1 block font-mono text-[10px] font-bold text-stone-700">{fonte.nome}</span>
+                      <p className="text-sm text-stone-600">{fonte.descricao}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Cards de composição (pedido do usuário, 21/07/2026; redesenhados
+              25/07/2026 — substitui o diagrama de linhas SVG cruzando caixas,
+              que não era responsivo e lia como "teia de aranha". Cada
+              indicador composto mostra suas dimensões de origem como badges,
+              sem desenhar fio nenhum. Ver DiagramaConexaoDados.tsx para a
+              lista real de dimensões/indicadores/origens — nenhuma relação
+              nova foi inventada aqui, só reapresentada. */}
+          <h3 className="mt-10 text-sm font-bold uppercase tracking-tight text-stone-900">
+            Como os dados se conectam
+          </h3>
+          <p className="mt-1 text-xs text-stone-500">
+            Das 9 dimensões de dados do Atlas aos indicadores compostos que elas alimentam.
+          </p>
+          <div className="mt-4">
+            <DiagramaConexaoDados />
+          </div>
         </div>
       </section>
 

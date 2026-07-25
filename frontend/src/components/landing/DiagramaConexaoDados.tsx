@@ -1,19 +1,21 @@
 /**
- * Diagrama "como os dados se conectam" (RF-006, pedido do usuário 21/07/2026)
- * — substitui a ideia original de "mapa mental" livre por um diagrama em
- * DUAS camadas (dimensões de dados → indicadores compostos), decisão tomada
- * com o usuário: um grafo livre com as ~11 fontes soltas + 9 dimensões +
- * indicadores viraria ilegível (muitos nós cruzando linhas). Aqui só se
- * desenha uma linha onde existe uma relação real e já documentada
- * (CLAUDE.md/ARQUITETURA.md) — dimensão sem indicador composto (ex.: Clima)
- * fica sem linha, nunca inventada. As fontes primárias de cada dimensão
- * aparecem como legenda dentro do próprio card (não como um 3º nível de
- * caixas, que exigiria fiação individual por fonte — RF-006 continua
- * coberto pela lista completa em FONTES_DE_DADOS, seção irmã desta).
+ * "Como os dados se conectam" (RF-006, pedido do usuário 21/07/2026) — duas
+ * camadas (dimensões de dados → indicadores compostos): um grafo livre com
+ * as ~11 fontes soltas + 9 dimensões + indicadores viraria ilegível (muitos
+ * nós cruzando linhas), decisão tomada com o usuário na época. Aqui só se
+ * documenta uma relação onde ela é real e já documentada (CLAUDE.md/
+ * ARQUITETURA.md) — dimensão sem indicador composto (ex.: Clima) fica de
+ * fora dos cards, mas aparece na nota abaixo, nunca inventada. As fontes
+ * primárias de cada dimensão continuam cobertas pela lista completa em
+ * FONTES_DE_DADOS, seção irmã desta (em PaginaLanding.tsx).
  *
- * SVG próprio (sem lib de gráfico), mesmo padrão de GraficoQuadrantes.tsx —
- * coordenadas fixas (não medidas via DOM/ResizeObserver), scroll horizontal
- * em telas estreitas (mesmo padrão de tabelas largas do projeto).
+ * Redesenhado em 25/07/2026 (auditoria de UX/UI): a versão anterior desenhava
+ * as conexões como um SVG com paths curvos ligando duas colunas — não era
+ * responsivo (as linhas quebravam/embaralhavam em telas estreitas) e lia
+ * como uma "teia de aranha" para quem não desenhou o diagrama. Trocado por
+ * Cards de Composição: cada indicador composto mostra, dentro do próprio
+ * card, badges com as dimensões de origem — a mesma relação de antes
+ * (`INDICADORES[].origens`), só sem fio nenhum para desenhar ou quebrar.
  */
 
 interface Dimensao {
@@ -22,9 +24,8 @@ interface Dimensao {
   /** Instituição + sistema/dataset específico — precisa dar para achar a
    * fonte de forma independente (busca), não só o nome genérico. */
   fontes: string;
-  /** Motivo de não ter linha de conexão — só para dimensões sem indicador
-   * composto ainda; desenhado como aviso no próprio card, não só na legenda
-   * do rodapé (rodapé sozinho passava despercebido — feedback do usuário). */
+  /** Motivo de não ter indicador composto ainda — só para dimensões sem
+   * indicador; aparece na nota "ainda não conectadas" abaixo dos cards. */
   semIndicador?: string;
 }
 
@@ -33,6 +34,7 @@ interface IndicadorComposto {
   nome: string;
   descricao: string;
   origens: string[];
+  cor: 'terracota' | 'chumbo' | 'carmim' | 'oportunidade';
 }
 
 const DIMENSOES: Dimensao[] = [
@@ -92,164 +94,107 @@ const INDICADORES: IndicadorComposto[] = [
     nome: 'Vazio de Acesso',
     descricao: 'Alta irradiação + baixa adoção de MMGD residencial',
     origens: ['mmgd', 'irradiacao_solar'],
+    cor: 'terracota',
   },
   {
     id: 'ivs',
     nome: 'IVS Consolidado',
     descricao: 'Vulnerabilidade social (exclui moradia por desenho)',
     origens: ['infraestrutura', 'renda_trabalho', 'capital_humano'],
+    cor: 'chumbo',
   },
   {
     id: 'ivsh',
     nome: 'IVSH',
     descricao: 'IVS + precariedade habitacional + insegurança da posse',
     origens: ['infraestrutura', 'renda_trabalho', 'capital_humano', 'moradia'],
+    cor: 'carmim',
   },
   {
     id: 'correlacao',
     nome: 'Correlação MMGD × Moradia',
     descricao: 'Controlando irradiação e renda (Spearman parcial)',
     origens: ['mmgd', 'moradia', 'irradiacao_solar', 'renda_trabalho'],
+    cor: 'oportunidade',
   },
   {
     id: 'ranking_distribuidoras',
     nome: 'Ranking de Distribuidoras',
     descricao: 'Desempenho de conexão de MMGD por distribuidora',
     origens: ['qualidade_fornecimento', 'mmgd'],
+    cor: 'chumbo',
   },
 ];
 
-const LARGURA = 920;
-const ALTURA = 680;
-const CAIXA_DIM = { x: 16, largura: 344, altura: 66 };
-const CAIXA_IND = { x: 624, largura: 280, altura: 92 };
-const TOPO = 12;
-const ESPACO_DIM = (ALTURA - TOPO * 2) / DIMENSOES.length;
-const ESPACO_IND = (ALTURA - TOPO * 2) / INDICADORES.length;
-
-function centroY(indice: number, espaco: number, alturaCaixa: number): number {
-  return TOPO + indice * espaco + alturaCaixa / 2;
-}
+const CORES_INDICADOR: Record<IndicadorComposto['cor'], { borda: string; fundo: string; titulo: string; badge: string }> = {
+  terracota: {
+    borda: 'border-orange-200/60',
+    fundo: 'bg-orange-50/40',
+    titulo: 'text-orange-800',
+    badge: 'border-orange-200 bg-orange-100/70 text-orange-700',
+  },
+  chumbo: {
+    borda: 'border-stone-300/60',
+    fundo: 'bg-stone-100/40',
+    titulo: 'text-stone-800',
+    badge: 'border-stone-300 bg-stone-200/70 text-stone-700',
+  },
+  carmim: {
+    borda: 'border-red-200/60',
+    fundo: 'bg-red-50/40',
+    titulo: 'text-red-800',
+    badge: 'border-red-200 bg-red-100/70 text-red-700',
+  },
+  oportunidade: {
+    borda: 'border-emerald-200/60',
+    fundo: 'bg-emerald-50/40',
+    titulo: 'text-emerald-800',
+    badge: 'border-emerald-200 bg-emerald-100/70 text-emerald-700',
+  },
+};
 
 export function DiagramaConexaoDados() {
-  const centroDim = new Map(DIMENSOES.map((d, i) => [d.id, centroY(i, ESPACO_DIM, CAIXA_DIM.altura)]));
-  const centroInd = new Map(INDICADORES.map((ind, i) => [ind.id, centroY(i, ESPACO_IND, CAIXA_IND.altura)]));
+  const nomeDimensao = new Map(DIMENSOES.map((d) => [d.id, d.nome]));
+  const dimensoesSemIndicador = DIMENSOES.filter((d) => d.semIndicador);
 
   return (
-    <div className="overflow-x-auto">
-      <svg
-        viewBox={`0 0 ${LARGURA} ${ALTURA}`}
-        role="img"
-        aria-label="Diagrama mostrando como as 9 dimensões de dados do Atlas se combinam nos indicadores compostos (Vazio de Acesso, IVS, IVSH, Correlação MMGD×Moradia, Ranking de Distribuidoras)."
-        className="w-full min-w-[860px]"
-      >
-        {/* Coluna esquerda: dimensões de dados (entrada). */}
-        {DIMENSOES.map((dim, i) => {
-          const y = TOPO + i * ESPACO_DIM;
+    <div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {INDICADORES.map((ind) => {
+          const cor = CORES_INDICADOR[ind.cor];
           return (
-            <g key={dim.id}>
-              <rect
-                x={CAIXA_DIM.x}
-                y={y}
-                width={CAIXA_DIM.largura}
-                height={CAIXA_DIM.altura}
-                rx={6}
-                fill="#ffffff"
-                stroke={dim.semIndicador ? '#fbbf24' : '#e2e8f0'}
-                strokeDasharray={dim.semIndicador ? '4 3' : undefined}
-              />
-              <foreignObject x={CAIXA_DIM.x} y={y} width={CAIXA_DIM.largura} height={CAIXA_DIM.altura}>
-                <div className="flex h-full flex-col justify-center gap-0.5 px-3 py-1.5">
-                  <p className="text-xs font-semibold text-slate-700">{dim.nome}</p>
-                  <p className="text-[10px] leading-tight text-slate-400">{dim.fontes}</p>
-                  {dim.semIndicador && (
-                    <p className="text-[10px] leading-tight font-medium text-amber-600">
-                      Sem linha: {dim.semIndicador}
-                    </p>
-                  )}
-                </div>
-              </foreignObject>
-            </g>
+            <div
+              key={ind.id}
+              className={`rounded-2xl border p-5 shadow-sm backdrop-blur-md transition-colors ${cor.borda} ${cor.fundo}`}
+            >
+              <h4 className={`font-mono text-sm font-bold ${cor.titulo}`}>{ind.nome}</h4>
+              <p className="mt-1 text-xs leading-relaxed text-stone-600">{ind.descricao}</p>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {ind.origens.map((origemId) => (
+                  <span
+                    key={origemId}
+                    className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${cor.badge}`}
+                  >
+                    {nomeDimensao.get(origemId) ?? origemId}
+                  </span>
+                ))}
+              </div>
+            </div>
           );
         })}
-
-        {/* Coluna direita: indicadores compostos (saída). */}
-        {INDICADORES.map((ind, i) => {
-          const y = TOPO + i * ESPACO_IND;
-          return (
-            <g key={ind.id}>
-              <rect
-                x={CAIXA_IND.x}
-                y={y}
-                width={CAIXA_IND.largura}
-                height={CAIXA_IND.altura}
-                rx={6}
-                fill="#f5f3ff"
-                stroke="#c4b5fd"
-              />
-              <foreignObject x={CAIXA_IND.x} y={y} width={CAIXA_IND.largura} height={CAIXA_IND.altura}>
-                <div className="flex h-full flex-col justify-center px-3">
-                  <p className="font-mono text-xs font-bold text-violet-800">{ind.nome}</p>
-                  <p className="mt-0.5 text-[10px] leading-tight text-violet-600">{ind.descricao}</p>
-                </div>
-              </foreignObject>
-            </g>
-          );
-        })}
-
-        {/* Linhas de conexão — desenhadas por CIMA das caixas de propósito
-            (senão o preenchimento opaco das caixas cobre o ponto exato de
-            encontro linha↔borda, deixando a conexão pouco visível — bug
-            real encontrado nesta sessão). Um círculo em cada ponta reforça
-            visualmente onde a linha "encosta" na caixa. */}
-        <g fill="none" stroke="#94a3b8" strokeWidth="2" strokeOpacity={0.7}>
-          {INDICADORES.flatMap((ind) =>
-            ind.origens.map((origemId) => {
-              const y1 = centroDim.get(origemId);
-              const y2 = centroInd.get(ind.id);
-              if (y1 === undefined || y2 === undefined) return null;
-              const x1 = CAIXA_DIM.x + CAIXA_DIM.largura;
-              const x2 = CAIXA_IND.x;
-              const xMeio = (x1 + x2) / 2;
-              return (
-                <path
-                  key={`${origemId}-${ind.id}`}
-                  d={`M ${x1} ${y1} C ${xMeio} ${y1}, ${xMeio} ${y2}, ${x2} ${y2}`}
-                />
-              );
-            }),
-          )}
-        </g>
-        <g stroke="#ffffff" strokeWidth={1.5}>
-          {DIMENSOES.map((dim) => {
-            const y = centroDim.get(dim.id);
-            const conectada = INDICADORES.some((ind) => ind.origens.includes(dim.id));
-            if (y === undefined || !conectada) return null;
-            return (
-              <circle key={dim.id} cx={CAIXA_DIM.x + CAIXA_DIM.largura} cy={y} r={4} fill="#64748b" />
-            );
-          })}
-          {INDICADORES.map((ind) => {
-            const y = centroInd.get(ind.id);
-            if (y === undefined) return null;
-            return <circle key={ind.id} cx={CAIXA_IND.x} cy={y} r={4} fill="#7c3aed" />;
-          })}
-        </g>
-      </svg>
-      <div className="mt-3 flex flex-wrap items-center gap-4 text-[10px] text-slate-400">
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-4 rounded-sm border border-slate-200 bg-white" />
-          Dimensões de dados (entrada)
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-4 rounded-sm border border-violet-300 bg-violet-50" />
-          Indicadores compostos (saída)
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-4 rounded-sm border border-dashed border-amber-400 bg-white" />
-          Sem indicador composto ainda (ver aviso no próprio card)
-        </span>
       </div>
+
+      {dimensoesSemIndicador.length > 0 && (
+        <p className="mt-4 text-[11px] leading-relaxed text-stone-400">
+          Ainda sem indicador composto:{' '}
+          {dimensoesSemIndicador.map((d, i) => (
+            <span key={d.id}>
+              <strong className="font-semibold text-stone-500">{d.nome}</strong> ({d.semIndicador})
+              {i < dimensoesSemIndicador.length - 1 ? '; ' : '.'}
+            </span>
+          ))}
+        </p>
+      )}
     </div>
   );
 }
