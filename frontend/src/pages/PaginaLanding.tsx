@@ -222,7 +222,7 @@ function CardExplicativo({ corDestaque, icone, pergunta, resposta, linkPara, lin
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-40px' }}
       transition={{ duration: 0.4 }}
-      className={`group relative flex flex-col justify-between rounded-3xl border border-white/60 bg-white/30 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-white/50 ${estilo.sombraHover}`}
+      className={`group relative flex flex-col justify-between rounded-3xl border border-white/90 bg-white/40 p-8 shadow-[0_12px_40px_rgb(0,0,0,0.08)] backdrop-blur-2xl transition-all duration-300 hover:-translate-y-1 hover:bg-white/60 ${estilo.sombraHover}`}
     >
       <div>
         <div className={`mb-6 flex h-12 w-12 items-center justify-center rounded-2xl ${estilo.icone}`}>
@@ -405,7 +405,7 @@ export function PaginaLanding() {
     analises?.resultados.find((r) => r.variavelX === 'indice_precariedade_moradia') ?? null;
 
   return (
-    <div className="h-full overflow-y-auto bg-slate-50 text-slate-800 font-sans">
+    <div className="h-full overflow-y-auto bg-stone-100 text-stone-900 font-sans">
       {/* RF-002: header fixo com botão Entrar no canto superior direito. */}
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-6 py-3 backdrop-blur">
         <span className="font-display text-base font-bold tracking-tight text-slate-800">
@@ -430,7 +430,7 @@ export function PaginaLanding() {
           id="sobre" migrou para o grid de cards, alvo real do CTA "Saiba
           mais". */}
       <section className="relative overflow-hidden px-6 py-20">
-        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-stone-50" />
+        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-stone-100" />
         {/* Orbes "respirando" (5ª rodada de auditoria de UX/UI, 25/07/2026):
             animação sutil de escala/opacidade para o vazamento de cor atrás
             do glass ficar perceptível mesmo em captura estática. */}
@@ -438,13 +438,13 @@ export function PaginaLanding() {
           aria-hidden
           animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
           transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
-          className="pointer-events-none absolute -top-40 -left-40 -z-10 h-[600px] w-[600px] rounded-full bg-orange-200/40 mix-blend-multiply blur-[120px]"
+          className="pointer-events-none absolute -top-40 -left-40 -z-10 h-[600px] w-[600px] rounded-full bg-orange-200/50 mix-blend-multiply blur-[120px]"
         />
         <motion.div
           aria-hidden
           animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.4, 0.2] }}
           transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
-          className="pointer-events-none absolute top-20 -right-20 -z-10 h-[500px] w-[500px] rounded-full bg-red-200/30 mix-blend-multiply blur-[100px]"
+          className="pointer-events-none absolute top-20 -right-20 -z-10 h-[500px] w-[500px] rounded-full bg-red-200/40 mix-blend-multiply blur-[100px]"
         />
 
         <motion.div
@@ -532,18 +532,18 @@ export function PaginaLanding() {
           disclaimer de estimativa continuam vindo 100% de `estatisticas`
           (buscarEstatisticasNacionais) — nenhuma chamada nova, só reagrupada
           a apresentação. */}
-      <section className="relative overflow-hidden bg-stone-50 px-6 py-16">
+      <section className="relative overflow-hidden bg-stone-100 px-6 py-16">
         <motion.div
           aria-hidden
           animate={{ scale: [1, 1.05, 1], opacity: [0.4, 0.6, 0.4] }}
           transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
-          className="pointer-events-none absolute top-0 right-1/4 -z-10 h-[500px] w-[500px] rounded-full bg-orange-100/60 mix-blend-multiply blur-[100px]"
+          className="pointer-events-none absolute top-0 right-1/4 -z-10 h-[500px] w-[500px] rounded-full bg-orange-200/60 mix-blend-multiply blur-[100px]"
         />
         <motion.div
           aria-hidden
           animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
           transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
-          className="pointer-events-none absolute bottom-0 left-1/4 -z-10 h-[600px] w-[600px] rounded-full bg-red-100/50 mix-blend-multiply blur-[120px]"
+          className="pointer-events-none absolute bottom-0 left-1/4 -z-10 h-[600px] w-[600px] rounded-full bg-red-200/50 mix-blend-multiply blur-[120px]"
         />
 
         <div className="relative z-10 mx-auto max-w-5xl">
@@ -567,7 +567,7 @@ export function PaginaLanding() {
           <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-3">
             {/* KPI 1 — Capacidade Instalada (chumbo): potência em GW, nunca
                 "50.086,23 MW" quebrando linha no meio do número. */}
-            <div className="relative flex flex-col rounded-3xl border border-white/80 bg-white/40 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl transition-all hover:-translate-y-1 hover:bg-white/60 hover:shadow-[0_12px_40px_rgb(28,25,23,0.06)]">
+            <div className="relative flex flex-col rounded-3xl border border-white/90 bg-white/50 p-8 shadow-[0_12px_40px_rgb(0,0,0,0.08)] backdrop-blur-2xl transition-all hover:-translate-y-1 hover:bg-white/70 hover:shadow-[0_16px_45px_rgb(28,25,23,0.1)]">
               <div className="mb-6 flex items-center justify-between">
                 <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-stone-200/50 text-stone-700 shadow-inner ring-1 ring-stone-200">
                   <IconeRaio className="h-5 w-5" strokeWidth={2.5} />
@@ -601,7 +601,7 @@ export function PaginaLanding() {
                 acesso"; a nota de estimativa continua visível no texto, só
                 o detalhe do cálculo foi para o title (mesma regra de antes:
                 nunca esconder que é estimativa). */}
-            <div className="relative flex flex-col rounded-3xl border border-white/80 bg-orange-50/40 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl transition-all hover:-translate-y-1 hover:bg-orange-50/60 hover:shadow-[0_12px_40px_rgb(234,88,12,0.06)]">
+            <div className="relative flex flex-col rounded-3xl border border-white/90 bg-orange-50/50 p-8 shadow-[0_12px_40px_rgb(0,0,0,0.08)] backdrop-blur-2xl transition-all hover:-translate-y-1 hover:bg-orange-50/70 hover:shadow-[0_16px_45px_rgb(234,88,12,0.1)]">
               <div className="mb-6 flex items-center">
                 <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-200/50 text-orange-700 shadow-inner ring-1 ring-orange-200">
                   <IconeCasa className="h-5 w-5" strokeWidth={2.5} />
@@ -632,7 +632,7 @@ export function PaginaLanding() {
             {/* KPI 3 — Presença Territorial (carmim): município é contagem
                 exata, não abrevia; usa os mesmos totalVazios/percentualVazios
                 já calculados acima para o Tour Virtual, sem nova chamada. */}
-            <div className="relative flex flex-col rounded-3xl border border-white/80 bg-red-50/40 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl transition-all hover:-translate-y-1 hover:bg-red-50/60 hover:shadow-[0_12px_40px_rgb(185,28,28,0.06)]">
+            <div className="relative flex flex-col rounded-3xl border border-white/90 bg-red-50/50 p-8 shadow-[0_12px_40px_rgb(0,0,0,0.08)] backdrop-blur-2xl transition-all hover:-translate-y-1 hover:bg-red-50/70 hover:shadow-[0_16px_45px_rgb(185,28,28,0.1)]">
               <div className="mb-6 flex items-center">
                 <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-200/50 text-red-700 shadow-inner ring-1 ring-red-200">
                   <IconeMapa className="h-5 w-5" strokeWidth={2.5} />
@@ -693,13 +693,13 @@ export function PaginaLanding() {
           aria-hidden
           animate={{ scale: [1, 1.05, 1], opacity: [0.4, 0.6, 0.4] }}
           transition={{ duration: 11, repeat: Infinity, ease: 'easeInOut' }}
-          className="pointer-events-none absolute top-0 right-1/3 -z-10 h-[500px] w-[500px] rounded-full bg-red-100/50 mix-blend-multiply blur-[120px] opacity-60"
+          className="pointer-events-none absolute top-0 right-1/3 -z-10 h-[500px] w-[500px] rounded-full bg-red-200/50 mix-blend-multiply blur-[120px] opacity-60"
         />
         <motion.div
           aria-hidden
           animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
           transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut', delay: 1.5 }}
-          className="pointer-events-none absolute bottom-0 left-1/3 -z-10 h-[500px] w-[500px] rounded-full bg-orange-100/40 mix-blend-multiply blur-[100px] opacity-50"
+          className="pointer-events-none absolute bottom-0 left-1/3 -z-10 h-[500px] w-[500px] rounded-full bg-orange-200/40 mix-blend-multiply blur-[100px] opacity-50"
         />
 
         <div className="relative z-10 mx-auto max-w-4xl">
@@ -735,13 +735,13 @@ export function PaginaLanding() {
           aria-hidden
           animate={{ scale: [1, 1.05, 1], opacity: [0.3, 0.5, 0.3] }}
           transition={{ duration: 13, repeat: Infinity, ease: 'easeInOut' }}
-          className="pointer-events-none absolute top-0 right-1/4 -z-10 h-[500px] w-[500px] rounded-full bg-stone-200/50 mix-blend-multiply blur-[100px]"
+          className="pointer-events-none absolute top-0 right-1/4 -z-10 h-[500px] w-[500px] rounded-full bg-stone-300/50 mix-blend-multiply blur-[100px]"
         />
         <motion.div
           aria-hidden
           animate={{ scale: [1, 1.1, 1], opacity: [0.25, 0.4, 0.25] }}
           transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
-          className="pointer-events-none absolute bottom-0 left-1/4 -z-10 h-[600px] w-[600px] rounded-full bg-red-100/40 mix-blend-multiply blur-[120px]"
+          className="pointer-events-none absolute bottom-0 left-1/4 -z-10 h-[600px] w-[600px] rounded-full bg-red-200/40 mix-blend-multiply blur-[120px]"
         />
         {/* Textura ambiente (linhas horizontais bem sutis) — puramente
             decorativa, não representa nenhum dado ou fluxo real; só reforça
@@ -752,7 +752,7 @@ export function PaginaLanding() {
           className="pointer-events-none absolute inset-0 -z-10 opacity-[0.15] [background-image:linear-gradient(to_bottom,#a8a29e_1px,transparent_1px)] [background-size:100%_4rem]"
         />
 
-        <div className="relative z-10 mx-auto max-w-5xl rounded-3xl border border-white/60 bg-white/40 px-6 py-10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl sm:px-10">
+        <div className="relative z-10 mx-auto max-w-5xl rounded-3xl border border-white/90 bg-white/50 px-6 py-10 shadow-[0_12px_40px_rgb(0,0,0,0.08)] backdrop-blur-2xl sm:px-10">
           <h2 className="flex items-center gap-2 text-lg font-bold uppercase tracking-tight text-stone-900">
             <IconeBanco className="h-5 w-5 text-stone-500" />
             Fontes de dados
@@ -769,7 +769,7 @@ export function PaginaLanding() {
                   {fontes.map((fonte) => (
                     <div
                       key={fonte.nome}
-                      className="flex flex-col rounded-2xl border border-white/80 bg-white/50 p-6 shadow-sm backdrop-blur-xl transition-all hover:bg-white/70"
+                      className="flex flex-col rounded-2xl border border-white/90 bg-white/50 p-6 shadow-sm backdrop-blur-xl transition-all hover:bg-white/70"
                     >
                       <div className="mb-3 flex items-center gap-2 border-b border-stone-200/80 pb-3">
                         <span className="text-sm font-black tracking-widest text-red-700 uppercase">{fonte.nome}</span>
@@ -816,17 +816,17 @@ export function PaginaLanding() {
           aria-hidden
           animate={{ scale: [1, 1.05, 1], opacity: [0.3, 0.5, 0.3] }}
           transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
-          className="pointer-events-none absolute top-10 left-1/3 -z-10 h-[500px] w-[500px] rounded-full bg-stone-200/50 mix-blend-multiply opacity-60 blur-[120px]"
+          className="pointer-events-none absolute top-10 left-1/3 -z-10 h-[500px] w-[500px] rounded-full bg-stone-300/50 mix-blend-multiply opacity-60 blur-[120px]"
         />
 
-        <div className="relative z-10 mx-auto max-w-4xl rounded-3xl border border-white/80 bg-white/50 px-6 py-10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl sm:px-10">
+        <div className="relative z-10 mx-auto max-w-4xl rounded-3xl border border-white/90 bg-white/50 px-6 py-10 shadow-[0_12px_40px_rgb(0,0,0,0.08)] backdrop-blur-2xl sm:px-10">
           <h2 className="flex items-center gap-2 text-lg font-bold uppercase tracking-tight text-stone-900">
             <IconeEscudo className="h-5 w-5 text-red-700" />
             Critérios de enquadramento territorial
           </h2>
 
           <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
-            <div className="rounded-2xl border border-white/70 bg-orange-50/40 p-6 shadow-sm backdrop-blur-md">
+            <div className="rounded-2xl border border-white/90 bg-orange-50/50 p-6 shadow-sm backdrop-blur-md">
               <span className="inline-flex items-center rounded-lg border border-orange-200/60 bg-orange-100/70 px-3 py-1 text-[10px] font-bold tracking-widest text-orange-800 uppercase">
                 Corte primário
               </span>
@@ -850,7 +850,7 @@ export function PaginaLanding() {
               </p>
             </div>
 
-            <div className="rounded-2xl border border-white/70 bg-red-50/40 p-6 shadow-sm backdrop-blur-md">
+            <div className="rounded-2xl border border-white/90 bg-red-50/50 p-6 shadow-sm backdrop-blur-md">
               <span className="inline-flex items-center rounded-lg border border-red-200/60 bg-red-100/70 px-3 py-1 text-[10px] font-bold tracking-widest text-red-800 uppercase">
                 Corte estrutural
               </span>
@@ -875,7 +875,7 @@ export function PaginaLanding() {
               (aoBaixarNotaMetodologica/baixandoNota/erroNota), só com mais
               peso visual (pedido do usuário, 25/07/2026: era pequeno demais
               pra ser a principal conversão secundária da página). */}
-          <div className="mt-8 flex flex-col items-start gap-4 rounded-2xl border border-white/70 bg-white/50 p-6 shadow-sm backdrop-blur-md sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-8 flex flex-col items-start gap-4 rounded-2xl border border-white/90 bg-white/50 p-6 shadow-sm backdrop-blur-md sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-600">
                 <IconeArquivo className="h-6 w-6" />

@@ -128,26 +128,26 @@ const INDICADORES: IndicadorComposto[] = [
 
 const CORES_INDICADOR: Record<IndicadorComposto['cor'], { borda: string; fundo: string; titulo: string; badge: string }> = {
   terracota: {
-    borda: 'border-orange-200/60',
-    fundo: 'bg-orange-50/40',
+    borda: 'border-orange-300/70',
+    fundo: 'bg-orange-50/60',
     titulo: 'text-orange-800',
     badge: 'border-orange-200 bg-orange-100/70 text-orange-700',
   },
   chumbo: {
-    borda: 'border-stone-300/60',
-    fundo: 'bg-stone-100/40',
+    borda: 'border-stone-400/60',
+    fundo: 'bg-stone-100/60',
     titulo: 'text-stone-800',
     badge: 'border-stone-300 bg-stone-200/70 text-stone-700',
   },
   carmim: {
-    borda: 'border-red-200/60',
-    fundo: 'bg-red-50/40',
+    borda: 'border-red-300/70',
+    fundo: 'bg-red-50/60',
     titulo: 'text-red-800',
     badge: 'border-red-200 bg-red-100/70 text-red-700',
   },
   oportunidade: {
-    borda: 'border-emerald-200/60',
-    fundo: 'bg-emerald-50/40',
+    borda: 'border-emerald-300/70',
+    fundo: 'bg-emerald-50/60',
     titulo: 'text-emerald-800',
     badge: 'border-emerald-200 bg-emerald-100/70 text-emerald-700',
   },

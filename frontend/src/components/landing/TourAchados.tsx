@@ -215,7 +215,7 @@ export function TourAchados({
 
   return (
     <div>
-      <div className="relative rounded-3xl border border-white/80 bg-white/50 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.06)] backdrop-blur-2xl sm:p-10">
+      <div className="relative rounded-3xl border border-white/90 bg-white/50 p-8 shadow-[0_12px_40px_rgb(0,0,0,0.1)] backdrop-blur-2xl sm:p-10">
         <div className="mb-8 flex items-center justify-between border-b border-stone-200/60 pb-4">
           <span className={`font-mono text-xs font-bold tracking-wider uppercase ${cor.rotulo}`}>{atual.rotulo}</span>
           <span className="font-mono text-xs font-semibold text-stone-400">
