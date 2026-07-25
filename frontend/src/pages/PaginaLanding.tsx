@@ -73,19 +73,19 @@ type CorDestaqueCard = 'terracota' | 'carmim' | 'chumbo';
 
 const ESTILOS_DESTAQUE_CARD: Record<CorDestaqueCard, { icone: string; link: string; sombraHover: string }> = {
   terracota: {
-    icone: 'bg-orange-100 text-orange-700',
-    link: 'text-orange-700 group-hover:text-orange-800',
-    sombraHover: 'hover:shadow-[0_20px_40px_rgb(234,88,12,0.08)]',
+    icone: 'bg-gradient-to-br from-orange-100 to-orange-50 text-orange-600 border border-orange-200/50',
+    link: 'text-orange-600 group-hover:text-orange-700',
+    sombraHover: 'hover:shadow-[0_12px_40px_rgb(234,88,12,0.06)]',
   },
   carmim: {
-    icone: 'bg-red-100 text-red-700',
-    link: 'text-red-700 group-hover:text-red-800',
-    sombraHover: 'hover:shadow-[0_20px_40px_rgb(185,28,28,0.08)]',
+    icone: 'bg-gradient-to-br from-red-100 to-red-50 text-red-600 border border-red-200/50',
+    link: 'text-red-600 group-hover:text-red-700',
+    sombraHover: 'hover:shadow-[0_12px_40px_rgb(185,28,28,0.06)]',
   },
   chumbo: {
-    icone: 'bg-stone-200 text-stone-700',
-    link: 'text-stone-700 group-hover:text-stone-900',
-    sombraHover: 'hover:shadow-[0_20px_40px_rgb(28,25,23,0.08)]',
+    icone: 'bg-gradient-to-br from-stone-200 to-stone-100 text-stone-700 border border-stone-300/50',
+    link: 'text-stone-700 group-hover:text-stone-800',
+    sombraHover: 'hover:shadow-[0_12px_40px_rgb(28,25,23,0.06)]',
   },
 };
 
@@ -113,16 +113,16 @@ function CardExplicativo({ corDestaque, icone, pergunta, resposta, linkPara, lin
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-40px' }}
       transition={{ duration: 0.4 }}
-      className={`group relative flex flex-col justify-between rounded-3xl border border-white/70 bg-white/30 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-white/50 ${estilo.sombraHover}`}
+      className={`group relative flex flex-col justify-between rounded-3xl border border-white/60 bg-white/40 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.03)] backdrop-blur-xl transition-all duration-300 hover:bg-white/60 ${estilo.sombraHover}`}
     >
       <div>
-        <div className={`mb-5 flex h-11 w-11 items-center justify-center rounded-2xl shadow-inner ${estilo.icone}`}>
+        <div className={`mb-6 flex h-12 w-12 items-center justify-center rounded-xl shadow-sm ${estilo.icone}`}>
           {icone}
         </div>
-        <h3 className="mb-2 text-base font-bold text-stone-900">{pergunta}</h3>
+        <h3 className="mb-3 text-lg font-bold leading-snug text-stone-900">{pergunta}</h3>
         <p className="text-sm leading-relaxed text-stone-600">{resposta}</p>
       </div>
-      <Link to={linkPara} className={`mt-6 inline-flex items-center gap-1.5 text-sm font-bold transition-colors ${estilo.link}`}>
+      <Link to={linkPara} className={`mt-8 inline-flex items-center gap-2 text-sm font-bold transition-colors ${estilo.link}`}>
         {linkTexto}
         <IconeSeta className="h-4 w-4 transition-transform group-hover:translate-x-1" />
       </Link>
@@ -274,13 +274,30 @@ export function PaginaLanding() {
         </Link>
       </header>
 
-      {/* RF-003: hero com headline + 2 CTAs. */}
-      <section className="relative overflow-hidden px-6 py-20 text-center">
+      {/* RF-003/RF-004: hero + cards no mesmo bloco visual, com camadas de
+          desfoque coloridas atrás do glass (3ª rodada de auditoria de
+          UX/UI, 25/07/2026) — o container cinza "O que o Atlas faz" (heading
+          + parágrafo) foi eliminado: as perguntas dos cards já comunicam o
+          que a plataforma faz, sem repetir o que o H1 e o lead já disseram.
+          id="sobre" migrou para o grid de cards, alvo real do CTA "Saiba
+          mais". */}
+      <section className="relative overflow-hidden px-6 py-20">
+        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-stone-50" />
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-orange-50/50 via-stone-50 to-rose-50/30"
+          className="pointer-events-none absolute -top-20 left-1/4 -z-10 h-[500px] w-[500px] rounded-full bg-rose-100/40 blur-[100px]"
         />
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-20 right-1/4 -z-10 h-[600px] w-[600px] rounded-full bg-orange-100/40 blur-[120px]"
+        />
+
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="mx-auto max-w-3xl text-center"
+        >
           <div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-red-200/60 bg-white/70 px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-red-700 backdrop-blur-md">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
@@ -304,7 +321,7 @@ export function PaginaLanding() {
           <div className="mt-8 flex justify-center gap-3">
             <Link
               to="/mapa"
-              className="group inline-flex items-center gap-2 rounded-xl bg-red-700 px-6 py-3 text-xs font-mono font-bold uppercase tracking-wider text-white shadow-[0_0_20px_rgba(185,28,28,0.25)] transition-all hover:bg-red-800 hover:shadow-[0_0_25px_rgba(185,28,28,0.4)] active:scale-95"
+              className="group inline-flex items-center gap-2 rounded-xl bg-red-700 px-6 py-3 text-xs font-mono font-bold uppercase tracking-wider text-white shadow-[0_8px_20px_rgba(185,28,28,0.2)] transition-all hover:-translate-y-0.5 hover:bg-red-800 hover:shadow-[0_12px_25px_rgba(185,28,28,0.3)] active:scale-95"
             >
               Explorar o Atlas
               <IconeSeta className="h-4 w-4 transition-transform group-hover:translate-x-1" />
@@ -317,37 +334,16 @@ export function PaginaLanding() {
             </a>
           </div>
         </motion.div>
-      </section>
-
-      {/* RF-004: seção explicativa do objetivo da plataforma. */}
-      <section
-        id="sobre"
-        className="mx-auto max-w-5xl rounded-3xl border border-white/60 bg-white/30 px-6 py-10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl sm:px-10"
-      >
-        <h2 className="text-lg font-bold uppercase tracking-tight text-stone-900">
-          O que o Atlas faz
-        </h2>
-        {/* Lead diluído (25/07/2026, 2ª rodada de auditoria de UX/UI): o
-            parágrafo antigo tentava explicar tudo em texto antes dos cards;
-            agora é só o gancho, e cada card carrega sua própria pergunta. */}
-        <p className="mt-4 max-w-2xl leading-relaxed text-stone-600">
-          O sol não chega igual a todo mundo. O Atlas cruza potencial solar, vulnerabilidade
-          social e acesso real à energia limpa para mostrar, cidade por cidade, onde investir
-          para que isso mude.
-        </p>
 
         {/* RF-004: convite interativo aos 3 componentes premium (Gráfico de
             Quadrantes, Alternador IVSH, Radar de Descompasso Morfológico) —
             ver docs/PLANO_ATUAL.md e docs/DECISOES.md para a metodologia e os
             limiares reais por trás de cada um (percentil 90 de precariedade
-            habitacional corrigido em 20/07/2026). Cards no formato
-            ícone + pergunta + resposta curta + CTA de seta desde 25/07/2026
-            (2ª rodada da auditoria de UX/UI — trocou o tooltip "Ver exemplo
-            real" da rodada anterior por texto ainda mais enxuto). */}
-        <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-3">
+            habitacional corrigido em 20/07/2026). */}
+        <div id="sobre" className="mx-auto mt-20 grid max-w-5xl scroll-mt-24 grid-cols-1 gap-6 sm:grid-cols-3">
           <CardExplicativo
             corDestaque="terracota"
-            icone={<IconeBarras className="h-5 w-5" />}
+            icone={<IconeBarras className="h-6 w-6" strokeWidth={2.5} />}
             pergunta="Onde o sol sobra e a energia limpa não chega?"
             resposta="O Gráfico de Quadrantes cruza irradiação solar com adoção residencial de energia solar e revela os vazios de acesso."
             linkPara="/painel-analitico"
@@ -355,7 +351,7 @@ export function PaginaLanding() {
           />
           <CardExplicativo
             corDestaque="carmim"
-            icone={<IconeCasa className="h-5 w-5" />}
+            icone={<IconeCasa className="h-6 w-6" strokeWidth={2.5} />}
             pergunta="A infraestrutura da moradia suporta a solução?"
             resposta="O Índice de Vulnerabilidade Sócio-Habitacional-Energética (IVSH) identifica onde a precariedade construtiva ou a insegurança da posse impedem a instalação segura de painéis."
             linkPara="/vazios-de-acesso"
@@ -363,7 +359,7 @@ export function PaginaLanding() {
           />
           <CardExplicativo
             corDestaque="chumbo"
-            icone={<IconeMapa className="h-5 w-5" />}
+            icone={<IconeMapa className="h-6 w-6" strokeWidth={2.5} />}
             pergunta="Quando o crédito individual não é a resposta?"
             resposta="Para territórios com descompasso morfológico, o mapa sinaliza a necessidade de modelos de geração compartilhada."
             linkPara="/mapa"
