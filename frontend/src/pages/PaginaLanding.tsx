@@ -796,10 +796,10 @@ export function PaginaLanding() {
           aria-hidden
           animate={{ scale: [1, 1.05, 1], opacity: [0.3, 0.5, 0.3] }}
           transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
-          className="pointer-events-none absolute top-10 left-1/4 -z-10 h-[400px] w-[400px] rounded-full bg-stone-200/50 mix-blend-multiply opacity-60 blur-[100px]"
+          className="pointer-events-none absolute top-10 left-1/3 -z-10 h-[500px] w-[500px] rounded-full bg-stone-200/50 mix-blend-multiply opacity-60 blur-[120px]"
         />
 
-        <div className="relative z-10 mx-auto max-w-4xl rounded-3xl border border-white/60 bg-white/40 px-6 py-10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl sm:px-10">
+        <div className="relative z-10 mx-auto max-w-4xl rounded-3xl border border-white/80 bg-white/50 px-6 py-10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl sm:px-10">
           <h2 className="flex items-center gap-2 text-lg font-bold uppercase tracking-tight text-stone-900">
             <IconeEscudo className="h-5 w-5 text-red-700" />
             Critérios de enquadramento territorial
@@ -807,7 +807,7 @@ export function PaginaLanding() {
 
           <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
             <div className="rounded-2xl border border-white/70 bg-orange-50/40 p-6 shadow-sm backdrop-blur-md">
-              <span className="inline-flex items-center rounded-lg border border-orange-200/60 bg-orange-100/70 px-3 py-1 text-xs font-bold text-orange-800">
+              <span className="inline-flex items-center rounded-lg border border-orange-200/60 bg-orange-100/70 px-3 py-1 text-[10px] font-bold tracking-widest text-orange-800 uppercase">
                 Corte primário
               </span>
               <h3 className="mt-3 text-lg font-bold text-stone-900">Vazio de Acesso</h3>
@@ -831,7 +831,7 @@ export function PaginaLanding() {
             </div>
 
             <div className="rounded-2xl border border-white/70 bg-red-50/40 p-6 shadow-sm backdrop-blur-md">
-              <span className="inline-flex items-center rounded-lg border border-red-200/60 bg-red-100/70 px-3 py-1 text-xs font-bold text-red-800">
+              <span className="inline-flex items-center rounded-lg border border-red-200/60 bg-red-100/70 px-3 py-1 text-[10px] font-bold tracking-widest text-red-800 uppercase">
                 Corte estrutural
               </span>
               <h3 className="mt-3 text-lg font-bold text-stone-900">IVSH</h3>
@@ -871,7 +871,7 @@ export function PaginaLanding() {
               type="button"
               onClick={aoBaixarNotaMetodologica}
               disabled={baixandoNota}
-              className="flex shrink-0 items-center gap-2 rounded-lg bg-stone-800 px-6 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:bg-stone-700 disabled:opacity-60"
+              className="flex shrink-0 items-center gap-2 rounded-lg bg-stone-900 px-6 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:bg-stone-800 hover:shadow-lg active:scale-95 disabled:opacity-60"
             >
               <IconeDownload className="h-4 w-4" />
               {baixandoNota ? 'Gerando…' : 'Baixar PDF'}
@@ -895,7 +895,7 @@ export function PaginaLanding() {
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="relative mx-auto max-w-4xl overflow-hidden rounded-3xl bg-stone-900 p-8 shadow-2xl sm:p-10"
+          className="relative mx-auto max-w-4xl overflow-hidden rounded-3xl border border-stone-800 bg-gradient-to-b from-stone-900 to-stone-950 p-8 shadow-2xl sm:p-10"
         >
           <div
             aria-hidden
