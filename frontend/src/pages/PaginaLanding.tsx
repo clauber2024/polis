@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode, type SVGProps } from 'react';
 import { Link } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { DiagramaConexaoDados } from '../components/landing/DiagramaConexaoDados';
 import { TourAchados } from '../components/landing/TourAchados';
 import { buscarAnalisesEstatisticas } from '../services/analisesEstatisticas.service';
@@ -25,38 +25,86 @@ interface FonteDados {
   descricao: string;
 }
 
-/**
- * Paleta conceitual do diagnóstico de UX (22/07/2026): âmbar para sinalizar
- * potencial/vulnerabilidade, laranja para o alerta de urgência (moradia
- * barra a solução) e verde para a resposta/oportunidade certa — substitui o
- * roxo genérico que os 3 cards de "O que o Atlas faz" usavam antes.
- */
-type CorDestaqueCard = 'amber' | 'orange' | 'emerald';
+function IconeSeta(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M5 12h14" />
+      <path d="M13 6l6 6-6 6" />
+    </svg>
+  );
+}
 
-const ESTILOS_DESTAQUE_CARD: Record<CorDestaqueCard, { ponto: string; borda: string; gradiente: string }> = {
-  amber: { ponto: 'bg-amber-500', borda: 'border-amber-200/60', gradiente: 'from-amber-50/70' },
-  orange: { ponto: 'bg-orange-600', borda: 'border-orange-200/60', gradiente: 'from-orange-50/80' },
-  emerald: { ponto: 'bg-emerald-500', borda: 'border-emerald-200/60', gradiente: 'from-emerald-50/70' },
+function IconeBarras(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
+    </svg>
+  );
+}
+
+function IconeCasa(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M3 11l9-8 9 8" />
+      <path d="M5 10v10h14V10" />
+    </svg>
+  );
+}
+
+function IconeMapa(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z" />
+      <path d="M9 4v14" />
+      <path d="M15 6v14" />
+    </svg>
+  );
+}
+
+/**
+ * Paleta institucional do Pólis (25/07/2026, 2ª rodada de auditoria de
+ * UX/UI): terracota/carmim/chumbo substituem o âmbar/laranja/verde da
+ * rodada anterior — a leitura "verde e amarelo" remetia a painel de
+ * governo, não a um observatório técnico independente do Instituto.
+ */
+type CorDestaqueCard = 'terracota' | 'carmim' | 'chumbo';
+
+const ESTILOS_DESTAQUE_CARD: Record<CorDestaqueCard, { icone: string; link: string; sombraHover: string }> = {
+  terracota: {
+    icone: 'bg-orange-100 text-orange-700',
+    link: 'text-orange-700 group-hover:text-orange-800',
+    sombraHover: 'hover:shadow-[0_20px_40px_rgb(234,88,12,0.08)]',
+  },
+  carmim: {
+    icone: 'bg-red-100 text-red-700',
+    link: 'text-red-700 group-hover:text-red-800',
+    sombraHover: 'hover:shadow-[0_20px_40px_rgb(185,28,28,0.08)]',
+  },
+  chumbo: {
+    icone: 'bg-stone-200 text-stone-700',
+    link: 'text-stone-700 group-hover:text-stone-900',
+    sombraHover: 'hover:shadow-[0_20px_40px_rgb(28,25,23,0.08)]',
+  },
 };
 
 interface CardExplicativoProps {
   corDestaque: CorDestaqueCard;
-  titulo: string;
+  icone: ReactNode;
   pergunta: string;
   resposta: string;
-  detalhe: string;
   linkPara: string;
   linkTexto: string;
 }
 
 /**
- * Card curto (pergunta + resposta de uma frase) com o detalhe mais longo
- * escondido atrás de um tooltip animado sob demanda — mesmo padrão de
- * AnimatePresence/motion já usado em AlternadorPriorizacaoIvsh.tsx, para não
- * introduzir uma segunda convenção de tooltip no projeto.
+ * Card diluído (ícone + pergunta como título + uma frase de resposta) com
+ * CTA de seta — troca o bloco pastel sólido da rodada anterior por vidro de
+ * verdade (bg-white/30 + backdrop-blur-xl) e adiciona a microinteração de
+ * hover pedida na auditoria (seta desliza no hover do link).
  */
-function CardExplicativo({ corDestaque, titulo, pergunta, resposta, detalhe, linkPara, linkTexto }: CardExplicativoProps) {
-  const [dicaVisivel, setDicaVisivel] = useState(false);
+function CardExplicativo({ corDestaque, icone, pergunta, resposta, linkPara, linkTexto }: CardExplicativoProps) {
   const estilo = ESTILOS_DESTAQUE_CARD[corDestaque];
 
   return (
@@ -65,48 +113,19 @@ function CardExplicativo({ corDestaque, titulo, pergunta, resposta, detalhe, lin
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-40px' }}
       transition={{ duration: 0.4 }}
-      className={`group relative rounded-2xl border ${estilo.borda} bg-gradient-to-b ${estilo.gradiente} to-white/60 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl transition-all hover:-translate-y-1 hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)]`}
+      className={`group relative flex flex-col justify-between rounded-3xl border border-white/70 bg-white/30 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-white/50 ${estilo.sombraHover}`}
     >
-      <div className="mb-3 flex items-center gap-2.5">
-        <span className={`h-2 w-2 rounded-full ${estilo.ponto}`} />
-        <h3 className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-900">{titulo}</h3>
+      <div>
+        <div className={`mb-5 flex h-11 w-11 items-center justify-center rounded-2xl shadow-inner ${estilo.icone}`}>
+          {icone}
+        </div>
+        <h3 className="mb-2 text-base font-bold text-stone-900">{pergunta}</h3>
+        <p className="text-sm leading-relaxed text-stone-600">{resposta}</p>
       </div>
-      <p className="text-sm font-semibold text-slate-800">{pergunta}</p>
-      <p className="mt-2 text-sm leading-relaxed text-slate-600">
-        {resposta}{' '}
-        <Link to={linkPara} className="font-semibold text-emerald-700 underline hover:text-emerald-900">
-          {linkTexto}
-        </Link>
-      </p>
-
-      <div
-        className="relative mt-3 inline-flex items-center"
-        onMouseEnter={() => setDicaVisivel(true)}
-        onMouseLeave={() => setDicaVisivel(false)}
-      >
-        <button
-          type="button"
-          onFocus={() => setDicaVisivel(true)}
-          onBlur={() => setDicaVisivel(false)}
-          className="font-mono text-[10px] font-semibold uppercase tracking-wider text-slate-400 underline decoration-dotted hover:text-slate-600"
-        >
-          Ver exemplo real
-        </button>
-        <AnimatePresence>
-          {dicaVisivel && (
-            <motion.div
-              role="tooltip"
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 4 }}
-              transition={{ duration: 0.15 }}
-              className="absolute top-full left-0 z-10 mt-2 w-72 rounded-lg border border-slate-200 bg-white/95 p-3 text-xs leading-relaxed text-slate-600 shadow-lg backdrop-blur"
-            >
-              {detalhe}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+      <Link to={linkPara} className={`mt-6 inline-flex items-center gap-1.5 text-sm font-bold transition-colors ${estilo.link}`}>
+        {linkTexto}
+        <IconeSeta className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+      </Link>
     </motion.div>
   );
 }
@@ -243,7 +262,7 @@ export function PaginaLanding() {
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-6 py-3 backdrop-blur">
         <span className="font-display text-base font-bold tracking-tight text-slate-800">
           ATLAS SOLAR{' '}
-          <span className="bg-gradient-to-r from-amber-500 to-emerald-600 bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-orange-600 to-red-700 bg-clip-text text-transparent">
             JUSTO
           </span>
         </span>
@@ -259,36 +278,40 @@ export function PaginaLanding() {
       <section className="relative overflow-hidden px-6 py-20 text-center">
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br from-amber-50 via-white to-emerald-50"
+          className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-orange-50/50 via-stone-50 to-rose-50/30"
         />
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-          <div className="mx-auto mb-6 inline-flex items-center space-x-1.5 rounded-full border border-amber-200/60 bg-amber-50/80 px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-amber-700 backdrop-blur-sm">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500" />
+          <div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-red-200/60 bg-white/70 px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-red-700 backdrop-blur-md">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-red-600" />
+            </span>
             <span>Justiça Energética &amp; Território</span>
           </div>
-          <h1 className="mx-auto max-w-3xl text-4xl font-bold tracking-tight text-slate-950 sm:text-5xl">
-            Justiça energética é saber{' '}
-            <span className="bg-gradient-to-r from-amber-500 to-emerald-600 bg-clip-text text-transparent">
-              quem tem acesso
+          <h1 className="mx-auto max-w-3xl text-4xl font-bold tracking-tight text-stone-900 sm:text-5xl">
+            Justiça energética é mapear{' '}
+            <span className="bg-gradient-to-r from-orange-600 to-red-700 bg-clip-text text-transparent">
+              quem tem acesso estrutural
             </span>{' '}
             à energia solar no Brasil
           </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-slate-600">
-            Financiar painel solar para quem mora sob telhado de lona não resolve nada. O Atlas
-            cruza potencial solar, vulnerabilidade social e acesso real à energia limpa para
-            mostrar, com precisão territorial, onde o investimento público e os fundos
-            climáticos realmente mudam o jogo.
+          <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-stone-600">
+            O Atlas cruza potencial de irradiação solar, vulnerabilidade social e acesso real à
+            energia limpa. Um observatório de dados para apoiar formuladores de política pública
+            a otimizar fundos climáticos e adaptar o crédito à realidade morfológica de cada
+            território.
           </p>
           <div className="mt-8 flex justify-center gap-3">
             <Link
               to="/mapa"
-              className="rounded-lg bg-emerald-600 px-6 py-3 text-xs font-mono font-bold uppercase tracking-wider text-white shadow-lg shadow-emerald-500/25 transition-all hover:bg-emerald-700 hover:shadow-emerald-500/40"
+              className="group inline-flex items-center gap-2 rounded-xl bg-red-700 px-6 py-3 text-xs font-mono font-bold uppercase tracking-wider text-white shadow-[0_0_20px_rgba(185,28,28,0.25)] transition-all hover:bg-red-800 hover:shadow-[0_0_25px_rgba(185,28,28,0.4)] active:scale-95"
             >
               Explorar o Atlas
+              <IconeSeta className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Link>
             <a
               href="#sobre"
-              className="rounded-lg border border-slate-200 bg-white/60 px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-700 backdrop-blur-md transition-all hover:bg-white/90 hover:shadow-sm"
+              className="rounded-xl border border-stone-200 bg-white/50 px-6 py-3 text-xs font-bold uppercase tracking-wider text-stone-700 backdrop-blur-lg transition-all hover:bg-white/90 hover:border-stone-300"
             >
               Saiba mais
             </a>
@@ -299,56 +322,52 @@ export function PaginaLanding() {
       {/* RF-004: seção explicativa do objetivo da plataforma. */}
       <section
         id="sobre"
-        className="mx-auto max-w-4xl rounded-2xl border border-white/60 bg-white/50 px-6 py-10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl sm:px-10"
+        className="mx-auto max-w-5xl rounded-3xl border border-white/60 bg-white/30 px-6 py-10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl sm:px-10"
       >
-        <h2 className="text-lg font-bold uppercase tracking-tight text-slate-900">
+        <h2 className="text-lg font-bold uppercase tracking-tight text-stone-900">
           O que o Atlas faz
         </h2>
-        <p className="mt-4 leading-relaxed text-slate-600">
-          A energia solar distribuída cresce rápido no Brasil, mas de forma desigual: há
-          municípios onde o sol é abundante e a energia limpa quase não chega, e territórios
-          onde ela chega, mas só para quem já tem renda e telhado firme para receber painéis.
-          O Atlas cruza três informações — quanto sol o território recebe, quão vulnerável é
-          quem vive nele e quantas famílias já têm energia solar — para tornar esse descompasso
-          visível, cidade por cidade, e apontar onde cada real de investimento público rende
-          mais justiça energética.
+        {/* Lead diluído (25/07/2026, 2ª rodada de auditoria de UX/UI): o
+            parágrafo antigo tentava explicar tudo em texto antes dos cards;
+            agora é só o gancho, e cada card carrega sua própria pergunta. */}
+        <p className="mt-4 max-w-2xl leading-relaxed text-stone-600">
+          O sol não chega igual a todo mundo. O Atlas cruza potencial solar, vulnerabilidade
+          social e acesso real à energia limpa para mostrar, cidade por cidade, onde investir
+          para que isso mude.
         </p>
 
         {/* RF-004: convite interativo aos 3 componentes premium (Gráfico de
             Quadrantes, Alternador IVSH, Radar de Descompasso Morfológico) —
             ver docs/PLANO_ATUAL.md e docs/DECISOES.md para a metodologia e os
             limiares reais por trás de cada um (percentil 90 de precariedade
-            habitacional corrigido em 20/07/2026). Cards reformulados em
-            25/07/2026 (auditoria de UX/UI): formato pergunta→resposta curta,
-            com o parágrafo original preservado por trás do tooltip "Ver
-            exemplo real" (CardExplicativo). */}
-        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            habitacional corrigido em 20/07/2026). Cards no formato
+            ícone + pergunta + resposta curta + CTA de seta desde 25/07/2026
+            (2ª rodada da auditoria de UX/UI — trocou o tooltip "Ver exemplo
+            real" da rodada anterior por texto ainda mais enxuto). */}
+        <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-3">
           <CardExplicativo
-            corDestaque="amber"
-            titulo="Painel Analítico"
+            corDestaque="terracota"
+            icone={<IconeBarras className="h-5 w-5" />}
             pergunta="Onde o sol sobra e a energia limpa não chega?"
             resposta="O Gráfico de Quadrantes cruza irradiação solar com adoção residencial de energia solar e revela os vazios de acesso."
-            detalhe="Cruzamos o potencial de irradiação (eixo X) com a adoção residencial de MMGD (eixo Y). O resultado revela os verdadeiros Vazios de Acesso: onde o sol sobra, mas a energia limpa não chega."
             linkPara="/painel-analitico"
-            linkTexto="Ver o Gráfico de Quadrantes"
+            linkTexto="Explorar Quadrantes"
           />
           <CardExplicativo
-            corDestaque="orange"
-            titulo="Vazios de Acesso"
-            pergunta="A moradia da família permite receber a solução?"
-            resposta="O alternador de IVSH reordena o ranking de prioridade penalizando territórios onde a casa não tem condição segura para painéis."
-            detalhe="IVSH (Índice de Vulnerabilidade Sócio-Habitacional-Energética) combina vulnerabilidade social, precariedade construtiva e insegurança da posse — para priorizar territórios onde a própria moradia impede a instalação de painéis."
+            corDestaque="carmim"
+            icone={<IconeCasa className="h-5 w-5" />}
+            pergunta="A infraestrutura da moradia suporta a solução?"
+            resposta="O Índice de Vulnerabilidade Sócio-Habitacional-Energética (IVSH) identifica onde a precariedade construtiva ou a insegurança da posse impedem a instalação segura de painéis."
             linkPara="/vazios-de-acesso"
             linkTexto="Ligar a lente habitacional"
           />
           <CardExplicativo
-            corDestaque="emerald"
-            titulo="Radar de Descompasso Morfológico"
-            pergunta="Quando o crédito individual não é a resposta certa?"
-            resposta="Em municípios como Uiramutã (RR) e Jaboatão dos Guararapes (PE), o alerta aponta para geração compartilhada em vez de crédito individual."
-            detalhe="Quando a precariedade habitacional do território está entre as 10% piores do país, o telhado geralmente não suporta painéis — o crédito individual seria inócuo. A política certa é geração solar compartilhada."
+            corDestaque="chumbo"
+            icone={<IconeMapa className="h-5 w-5" />}
+            pergunta="Quando o crédito individual não é a resposta?"
+            resposta="Para territórios com descompasso morfológico, o mapa sinaliza a necessidade de modelos de geração compartilhada."
             linkPara="/mapa"
-            linkTexto="Explorar no mapa"
+            linkTexto="Visualizar no mapa"
           />
         </div>
       </section>
