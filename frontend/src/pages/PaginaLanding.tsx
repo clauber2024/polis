@@ -71,6 +71,15 @@ function IconeRaio(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+function IconeCadeado(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="4" y="11" width="16" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </svg>
+  );
+}
+
 const formatoCompacto = new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 });
 
 /** Abreviação (ex.: "4,5 mi") só para os KPIs de destaque desta página — não
@@ -402,13 +411,17 @@ export function PaginaLanding() {
           (buscarEstatisticasNacionais) — nenhuma chamada nova, só reagrupada
           a apresentação. */}
       <section className="relative overflow-hidden bg-stone-50 px-6 py-16">
-        <div
+        <motion.div
           aria-hidden
-          className="pointer-events-none absolute top-0 right-1/4 -z-10 h-[400px] w-[400px] rounded-full bg-orange-100/40 blur-[80px]"
+          animate={{ scale: [1, 1.05, 1], opacity: [0.4, 0.6, 0.4] }}
+          transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
+          className="pointer-events-none absolute top-0 right-1/4 -z-10 h-[500px] w-[500px] rounded-full bg-orange-100/60 blur-[100px]"
         />
-        <div
+        <motion.div
           aria-hidden
-          className="pointer-events-none absolute bottom-0 left-1/4 -z-10 h-[400px] w-[400px] rounded-full bg-red-100/30 blur-[100px]"
+          animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
+          transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
+          className="pointer-events-none absolute bottom-0 left-1/4 -z-10 h-[600px] w-[600px] rounded-full bg-red-100/50 blur-[120px]"
         />
 
         <div className="relative z-10 mx-auto max-w-5xl">
@@ -429,14 +442,14 @@ export function PaginaLanding() {
           <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-3">
             {/* KPI 1 — Capacidade Instalada (chumbo): potência em GW, nunca
                 "50.086,23 MW" quebrando linha no meio do número. */}
-            <div className="relative flex flex-col rounded-3xl border border-white/60 bg-white/40 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.03)] backdrop-blur-xl transition-all hover:bg-white/60 hover:shadow-[0_12px_40px_rgb(28,25,23,0.06)]">
+            <div className="relative flex flex-col rounded-3xl border border-white/80 bg-white/40 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl transition-all hover:-translate-y-1 hover:bg-white/60 hover:shadow-[0_12px_40px_rgb(28,25,23,0.06)]">
               <div className="mb-6 flex items-center justify-between">
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-stone-200/60 text-stone-700 shadow-inner ring-1 ring-stone-300/50">
-                  <IconeRaio className="h-6 w-6" strokeWidth={2} />
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-stone-200/50 text-stone-700 shadow-inner ring-1 ring-stone-200">
+                  <IconeRaio className="h-5 w-5" strokeWidth={2.5} />
                 </span>
                 {estatisticas?.participacaoMatrizNacional && (
                   <span
-                    className="rounded-lg bg-stone-100 px-3 py-1.5 text-xs font-bold text-stone-700 ring-1 ring-stone-200"
+                    className="rounded-md bg-stone-100/80 px-2.5 py-1 text-xs font-bold text-stone-700 ring-1 ring-stone-200/50 backdrop-blur-sm"
                     title={`${formatarValor(estatisticas.participacaoMatrizNacional.geracaoMmgdGwh, 'numero')} GWh (energia solar) / ${formatarValor(estatisticas.participacaoMatrizNacional.geracaoEletricaNacionalGwh, 'numero')} GWh (Brasil), ${estatisticas.participacaoMatrizNacional.periodoReferencia.slice(0, 4)}. Fontes: ${estatisticas.participacaoMatrizNacional.fonteMmgd}; ${estatisticas.participacaoMatrizNacional.fonteGeracaoNacional}`}
                   >
                     {formatarValor(estatisticas.participacaoMatrizNacional.participacaoPercentual, 'percentual')} da matriz
@@ -463,10 +476,10 @@ export function PaginaLanding() {
                 acesso"; a nota de estimativa continua visível no texto, só
                 o detalhe do cálculo foi para o title (mesma regra de antes:
                 nunca esconder que é estimativa). */}
-            <div className="relative flex flex-col rounded-3xl border border-white/60 bg-orange-50/30 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.03)] backdrop-blur-xl transition-all hover:bg-orange-50/50 hover:shadow-[0_12px_40px_rgb(234,88,12,0.06)]">
+            <div className="relative flex flex-col rounded-3xl border border-white/80 bg-orange-50/40 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl transition-all hover:-translate-y-1 hover:bg-orange-50/60 hover:shadow-[0_12px_40px_rgb(234,88,12,0.06)]">
               <div className="mb-6 flex items-center">
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-100/60 text-orange-700 shadow-inner ring-1 ring-orange-200/50">
-                  <IconeCasa className="h-6 w-6" strokeWidth={2} />
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-200/50 text-orange-700 shadow-inner ring-1 ring-orange-200">
+                  <IconeCasa className="h-5 w-5" strokeWidth={2.5} />
                 </span>
               </div>
               <p className="text-sm font-semibold uppercase tracking-wide text-orange-800/70">Imóveis com acesso</p>
@@ -487,17 +500,17 @@ export function PaginaLanding() {
                 <strong className="text-orange-700">
                   {estatisticas ? formatarCompacto(estatisticas.pessoasBeneficiadas.pessoasBeneficiadasEstimativa) : '—'}
                 </strong>{' '}
-                pessoas beneficiadas por crédito de energia <span className="text-stone-400">(estimativa)</span>.
+                pessoas beneficiadas por crédito de energia <span className="text-stone-500">(estimativa)</span>.
               </p>
             </div>
 
             {/* KPI 3 — Presença Territorial (carmim): município é contagem
                 exata, não abrevia; usa os mesmos totalVazios/percentualVazios
                 já calculados acima para o Tour Virtual, sem nova chamada. */}
-            <div className="relative flex flex-col rounded-3xl border border-white/60 bg-red-50/30 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.03)] backdrop-blur-xl transition-all hover:bg-red-50/50 hover:shadow-[0_12px_40px_rgb(185,28,28,0.06)]">
+            <div className="relative flex flex-col rounded-3xl border border-white/80 bg-red-50/40 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl transition-all hover:-translate-y-1 hover:bg-red-50/60 hover:shadow-[0_12px_40px_rgb(185,28,28,0.06)]">
               <div className="mb-6 flex items-center">
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-100/60 text-red-700 shadow-inner ring-1 ring-red-200/50">
-                  <IconeMapa className="h-6 w-6" strokeWidth={2} />
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-200/50 text-red-700 shadow-inner ring-1 ring-red-200">
+                  <IconeMapa className="h-5 w-5" strokeWidth={2.5} />
                 </span>
               </div>
               <p className="text-sm font-semibold uppercase tracking-wide text-red-800/70">Presença territorial</p>
@@ -524,7 +537,7 @@ export function PaginaLanding() {
           </div>
 
           {estatisticas && (
-            <p className="mt-4 text-center text-xs text-stone-400">
+            <p className="mt-4 text-center text-xs font-medium text-stone-500">
               "Imóveis com acesso" e "pessoas beneficiadas" são estimativas (
               {estatisticas.pessoasBeneficiadas.mediaPessoasPorDomicilio} pessoas/domicílio,{' '}
               {estatisticas.pessoasBeneficiadas.fonteMediaPessoasPorDomicilio}), não contagens exatas.
@@ -533,20 +546,32 @@ export function PaginaLanding() {
 
           {/* RF-005 pede também "projeção futura" — não calculável com o
               schema atual (ver estatisticasNacionais.service.ts, backend).
-              Exibida como "em breve" com o motivo real, nunca com número
-              inventado — mesmo princípio das notas de ausência documentada
-              do painel de município (utils/notasAusencia.ts). */}
+              Apresentado como teaser de módulo bloqueado (cadeado + pílula
+              "Em breve"), não como aviso de manutenção pontilhado — mas o
+              rótulo e o motivo continuam vindo de indicadoresIndisponiveis,
+              nunca hardcoded, mesmo princípio das notas de ausência
+              documentada do painel de município (utils/notasAusencia.ts). */}
           {estatisticas && estatisticas.indicadoresIndisponiveis.length > 0 && (
-            <div className="mx-auto mt-6 grid max-w-sm grid-cols-1 gap-3">
+            <div className="mx-auto mt-8 flex max-w-2xl flex-col gap-3">
               {estatisticas.indicadoresIndisponiveis.map((indicador) => (
-                <div
+                <motion.div
                   key={indicador.id}
-                  className="rounded-2xl border border-dashed border-stone-300 bg-white/40 p-4 text-left backdrop-blur-md"
+                  initial={{ opacity: 0 }}
+                  whileInView={{ opacity: 1 }}
+                  viewport={{ once: true }}
+                  className="flex items-center gap-4 rounded-2xl border border-stone-200/60 bg-white/30 px-6 py-4 shadow-sm backdrop-blur-md"
                 >
-                  <p className="font-mono text-sm font-semibold text-stone-400">Em breve</p>
-                  <p className="mt-1 text-xs font-semibold text-stone-600">{indicador.rotulo}</p>
-                  <p className="mt-1.5 text-xs leading-relaxed text-stone-500">{indicador.motivo}</p>
-                </div>
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-stone-200/50 text-stone-500">
+                    <IconeCadeado className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-stone-800">{indicador.rotulo}</h4>
+                    <p className="text-xs font-medium text-stone-600">{indicador.motivo}</p>
+                  </div>
+                  <span className="ml-auto whitespace-nowrap rounded-full bg-stone-200/50 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-stone-600">
+                    Em breve
+                  </span>
+                </motion.div>
               ))}
             </div>
           )}
