@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import { DiagramaConexaoDados } from '../components/landing/DiagramaConexaoDados';
 import { TourAchados } from '../components/landing/TourAchados';
 import { buscarAnalisesEstatisticas } from '../services/analisesEstatisticas.service';
@@ -22,6 +23,92 @@ import { formatarValor } from '../utils/formatadores';
 interface FonteDados {
   nome: string;
   descricao: string;
+}
+
+/**
+ * Paleta conceitual do diagnóstico de UX (22/07/2026): âmbar para sinalizar
+ * potencial/vulnerabilidade, laranja para o alerta de urgência (moradia
+ * barra a solução) e verde para a resposta/oportunidade certa — substitui o
+ * roxo genérico que os 3 cards de "O que o Atlas faz" usavam antes.
+ */
+type CorDestaqueCard = 'amber' | 'orange' | 'emerald';
+
+const ESTILOS_DESTAQUE_CARD: Record<CorDestaqueCard, { ponto: string; borda: string; gradiente: string }> = {
+  amber: { ponto: 'bg-amber-500', borda: 'border-amber-200/60', gradiente: 'from-amber-50/70' },
+  orange: { ponto: 'bg-orange-600', borda: 'border-orange-200/60', gradiente: 'from-orange-50/80' },
+  emerald: { ponto: 'bg-emerald-500', borda: 'border-emerald-200/60', gradiente: 'from-emerald-50/70' },
+};
+
+interface CardExplicativoProps {
+  corDestaque: CorDestaqueCard;
+  titulo: string;
+  pergunta: string;
+  resposta: string;
+  detalhe: string;
+  linkPara: string;
+  linkTexto: string;
+}
+
+/**
+ * Card curto (pergunta + resposta de uma frase) com o detalhe mais longo
+ * escondido atrás de um tooltip animado sob demanda — mesmo padrão de
+ * AnimatePresence/motion já usado em AlternadorPriorizacaoIvsh.tsx, para não
+ * introduzir uma segunda convenção de tooltip no projeto.
+ */
+function CardExplicativo({ corDestaque, titulo, pergunta, resposta, detalhe, linkPara, linkTexto }: CardExplicativoProps) {
+  const [dicaVisivel, setDicaVisivel] = useState(false);
+  const estilo = ESTILOS_DESTAQUE_CARD[corDestaque];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-40px' }}
+      transition={{ duration: 0.4 }}
+      className={`group relative rounded-2xl border ${estilo.borda} bg-gradient-to-b ${estilo.gradiente} to-white/60 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl transition-all hover:-translate-y-1 hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)]`}
+    >
+      <div className="mb-3 flex items-center gap-2.5">
+        <span className={`h-2 w-2 rounded-full ${estilo.ponto}`} />
+        <h3 className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-900">{titulo}</h3>
+      </div>
+      <p className="text-sm font-semibold text-slate-800">{pergunta}</p>
+      <p className="mt-2 text-sm leading-relaxed text-slate-600">
+        {resposta}{' '}
+        <Link to={linkPara} className="font-semibold text-emerald-700 underline hover:text-emerald-900">
+          {linkTexto}
+        </Link>
+      </p>
+
+      <div
+        className="relative mt-3 inline-flex items-center"
+        onMouseEnter={() => setDicaVisivel(true)}
+        onMouseLeave={() => setDicaVisivel(false)}
+      >
+        <button
+          type="button"
+          onFocus={() => setDicaVisivel(true)}
+          onBlur={() => setDicaVisivel(false)}
+          className="font-mono text-[10px] font-semibold uppercase tracking-wider text-slate-400 underline decoration-dotted hover:text-slate-600"
+        >
+          Ver exemplo real
+        </button>
+        <AnimatePresence>
+          {dicaVisivel && (
+            <motion.div
+              role="tooltip"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 4 }}
+              transition={{ duration: 0.15 }}
+              className="absolute top-full left-0 z-10 mt-2 w-72 rounded-lg border border-slate-200 bg-white/95 p-3 text-xs leading-relaxed text-slate-600 shadow-lg backdrop-blur"
+            >
+              {detalhe}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </motion.div>
+  );
 }
 
 /**
@@ -155,7 +242,10 @@ export function PaginaLanding() {
       {/* RF-002: header fixo com botão Entrar no canto superior direito. */}
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-6 py-3 backdrop-blur">
         <span className="font-display text-base font-bold tracking-tight text-slate-800">
-          ATLAS SOLAR <span className="text-violet-600">JUSTO</span>
+          ATLAS SOLAR{' '}
+          <span className="bg-gradient-to-r from-amber-500 to-emerald-600 bg-clip-text text-transparent">
+            JUSTO
+          </span>
         </span>
         <Link
           to="/login"
@@ -166,109 +256,100 @@ export function PaginaLanding() {
       </header>
 
       {/* RF-003: hero com headline + 2 CTAs. */}
-      <section className="px-6 py-20 text-center">
-        <div className="mx-auto mb-6 inline-flex items-center space-x-1.5 rounded bg-violet-50 px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-violet-700">
-          <span className="h-2 w-2 animate-pulse rounded-full bg-violet-600" />
-          <span>Justiça Energética &amp; Território</span>
-        </div>
-        <h1 className="mx-auto max-w-3xl text-4xl font-bold tracking-tight text-slate-950 sm:text-5xl">
-          Justiça energética é saber{' '}
-          <span className="text-violet-600">quem tem acesso</span> à energia solar no Brasil
-        </h1>
-        <p className="mx-auto mt-4 max-w-2xl text-lg text-slate-600">
-          O Atlas Solar Justo cruza potencial solar, vulnerabilidade social e acesso efetivo à
-          geração distribuída para identificar territórios prioritários de política pública.
-        </p>
-        <div className="mt-8 flex justify-center gap-3">
-          <Link
-            to="/mapa"
-            className="rounded bg-slate-950 px-5 py-3 text-xs font-mono font-bold uppercase tracking-wider text-emerald-400 shadow-xs transition-all hover:bg-slate-900 hover:text-emerald-300"
-          >
-            Explorar o Atlas
-          </Link>
-          <a
-            href="#sobre"
-            className="rounded border border-slate-200 bg-white px-5 py-3 text-xs font-bold uppercase tracking-wider text-violet-700 transition-all hover:bg-slate-50"
-          >
-            Saiba mais
-          </a>
-        </div>
+      <section className="relative overflow-hidden px-6 py-20 text-center">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br from-amber-50 via-white to-emerald-50"
+        />
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+          <div className="mx-auto mb-6 inline-flex items-center space-x-1.5 rounded-full border border-amber-200/60 bg-amber-50/80 px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-amber-700 backdrop-blur-sm">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500" />
+            <span>Justiça Energética &amp; Território</span>
+          </div>
+          <h1 className="mx-auto max-w-3xl text-4xl font-bold tracking-tight text-slate-950 sm:text-5xl">
+            Justiça energética é saber{' '}
+            <span className="bg-gradient-to-r from-amber-500 to-emerald-600 bg-clip-text text-transparent">
+              quem tem acesso
+            </span>{' '}
+            à energia solar no Brasil
+          </h1>
+          <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-slate-600">
+            Financiar painel solar para quem mora sob telhado de lona não resolve nada. O Atlas
+            cruza potencial solar, vulnerabilidade social e acesso real à energia limpa para
+            mostrar, com precisão territorial, onde o investimento público e os fundos
+            climáticos realmente mudam o jogo.
+          </p>
+          <div className="mt-8 flex justify-center gap-3">
+            <Link
+              to="/mapa"
+              className="rounded-lg bg-emerald-600 px-6 py-3 text-xs font-mono font-bold uppercase tracking-wider text-white shadow-lg shadow-emerald-500/25 transition-all hover:bg-emerald-700 hover:shadow-emerald-500/40"
+            >
+              Explorar o Atlas
+            </Link>
+            <a
+              href="#sobre"
+              className="rounded-lg border border-slate-200 bg-white/60 px-6 py-3 text-xs font-bold uppercase tracking-wider text-slate-700 backdrop-blur-md transition-all hover:bg-white/90 hover:shadow-sm"
+            >
+              Saiba mais
+            </a>
+          </div>
+        </motion.div>
       </section>
 
       {/* RF-004: seção explicativa do objetivo da plataforma. */}
       <section
         id="sobre"
-        className="mx-auto max-w-4xl rounded border border-slate-200 bg-white px-6 py-10 shadow-2xs sm:px-10"
+        className="mx-auto max-w-4xl rounded-2xl border border-white/60 bg-white/50 px-6 py-10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl sm:px-10"
       >
         <h2 className="text-lg font-bold uppercase tracking-tight text-slate-900">
           O que o Atlas faz
         </h2>
         <p className="mt-4 leading-relaxed text-slate-600">
-          A energia solar distribuída (MMGD) cresce rápido no Brasil, mas seu acesso não é
-          uniforme: municípios com alto potencial de irradiação solar podem, ao mesmo tempo, ter
-          baixa adoção de MMGD e alta vulnerabilidade social — um sinal de que o benefício da
-          transição energética não está chegando a quem mais precisa. O Atlas cruza três eixos —
-          potencial solar (INPE), vulnerabilidade social (IVS/IPEA, CadÚnico, renda) e acesso
-          efetivo à energia limpa (MMGD/ANEEL) — para tornar esse descompasso visível, município
-          a município, e apoiar a priorização de políticas públicas de justiça energética.
+          A energia solar distribuída cresce rápido no Brasil, mas de forma desigual: há
+          municípios onde o sol é abundante e a energia limpa quase não chega, e territórios
+          onde ela chega, mas só para quem já tem renda e telhado firme para receber painéis.
+          O Atlas cruza três informações — quanto sol o território recebe, quão vulnerável é
+          quem vive nele e quantas famílias já têm energia solar — para tornar esse descompasso
+          visível, cidade por cidade, e apontar onde cada real de investimento público rende
+          mais justiça energética.
         </p>
 
         {/* RF-004: convite interativo aos 3 componentes premium (Gráfico de
             Quadrantes, Alternador IVSH, Radar de Descompasso Morfológico) —
             ver docs/PLANO_ATUAL.md e docs/DECISOES.md para a metodologia e os
             limiares reais por trás de cada um (percentil 90 de precariedade
-            habitacional corrigido em 20/07/2026). */}
+            habitacional corrigido em 20/07/2026). Cards reformulados em
+            25/07/2026 (auditoria de UX/UI): formato pergunta→resposta curta,
+            com o parágrafo original preservado por trás do tooltip "Ver
+            exemplo real" (CardExplicativo). */}
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="rounded border border-slate-100 bg-slate-50 p-5">
-            <span className="mb-2 block font-mono text-[10px] font-bold uppercase tracking-wider text-violet-700">
-              Painel Analítico
-            </span>
-            <p className="text-sm leading-relaxed text-slate-600">
-              O Atlas não cruza apenas renda. No{' '}
-              <Link
-                to="/painel-analitico"
-                className="font-semibold text-violet-700 underline hover:text-violet-900"
-              >
-                Gráfico de Quadrantes
-              </Link>{' '}
-              cruzamos o potencial de irradiação (eixo X) com a adoção residencial de MMGD
-              (eixo Y). O resultado revela os verdadeiros Vazios de Acesso: onde o sol sobra,
-              mas a energia limpa não chega.
-            </p>
-          </div>
-          <div className="rounded border border-slate-100 bg-slate-50 p-5">
-            <span className="mb-2 block font-mono text-[10px] font-bold uppercase tracking-wider text-violet-700">
-              Vazios de Acesso
-            </span>
-            <p className="text-sm leading-relaxed text-slate-600">
-              A moradia precária barra a energia solar. Em{' '}
-              <Link
-                to="/vazios-de-acesso"
-                className="font-semibold text-violet-700 underline hover:text-violet-900"
-              >
-                Vazios de Acesso
-              </Link>
-              , ligue o alternador do Índice de Vulnerabilidade Sócio-Habitacional-Energética
-              (IVSH) e veja o ranking de prioridades mudar em tempo real ao penalizar
-              territórios onde a precariedade construtiva e a insegurança da posse impedem a
-              instalação de painéis.
-            </p>
-          </div>
-          <div className="rounded border border-slate-100 bg-slate-50 p-5">
-            <span className="mb-2 block font-mono text-[10px] font-bold uppercase tracking-wider text-violet-700">
-              Radar de Descompasso Morfológico
-            </span>
-            <p className="text-sm leading-relaxed text-slate-600">
-              Nem todo problema se resolve com crédito individual. No{' '}
-              <Link to="/mapa" className="font-semibold text-violet-700 underline hover:text-violet-900">
-                mapa
-              </Link>
-              , clique em municípios extremos, como Uiramutã (RR) ou Jaboatão dos Guararapes
-              (PE): quando a precariedade habitacional do território está entre as 10%
-              piores do país, um alerta crítico indica que a infraestrutura local exige
-              políticas de geração compartilhada, pois os telhados não suportam painéis.
-            </p>
-          </div>
+          <CardExplicativo
+            corDestaque="amber"
+            titulo="Painel Analítico"
+            pergunta="Onde o sol sobra e a energia limpa não chega?"
+            resposta="O Gráfico de Quadrantes cruza irradiação solar com adoção residencial de energia solar e revela os vazios de acesso."
+            detalhe="Cruzamos o potencial de irradiação (eixo X) com a adoção residencial de MMGD (eixo Y). O resultado revela os verdadeiros Vazios de Acesso: onde o sol sobra, mas a energia limpa não chega."
+            linkPara="/painel-analitico"
+            linkTexto="Ver o Gráfico de Quadrantes"
+          />
+          <CardExplicativo
+            corDestaque="orange"
+            titulo="Vazios de Acesso"
+            pergunta="A moradia da família permite receber a solução?"
+            resposta="O alternador de IVSH reordena o ranking de prioridade penalizando territórios onde a casa não tem condição segura para painéis."
+            detalhe="IVSH (Índice de Vulnerabilidade Sócio-Habitacional-Energética) combina vulnerabilidade social, precariedade construtiva e insegurança da posse — para priorizar territórios onde a própria moradia impede a instalação de painéis."
+            linkPara="/vazios-de-acesso"
+            linkTexto="Ligar a lente habitacional"
+          />
+          <CardExplicativo
+            corDestaque="emerald"
+            titulo="Radar de Descompasso Morfológico"
+            pergunta="Quando o crédito individual não é a resposta certa?"
+            resposta="Em municípios como Uiramutã (RR) e Jaboatão dos Guararapes (PE), o alerta aponta para geração compartilhada em vez de crédito individual."
+            detalhe="Quando a precariedade habitacional do território está entre as 10% piores do país, o telhado geralmente não suporta painéis — o crédito individual seria inócuo. A política certa é geração solar compartilhada."
+            linkPara="/mapa"
+            linkTexto="Explorar no mapa"
+          />
         </div>
       </section>
 
