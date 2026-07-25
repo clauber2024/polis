@@ -73,19 +73,19 @@ type CorDestaqueCard = 'terracota' | 'carmim' | 'chumbo';
 
 const ESTILOS_DESTAQUE_CARD: Record<CorDestaqueCard, { icone: string; link: string; sombraHover: string }> = {
   terracota: {
-    icone: 'bg-gradient-to-br from-orange-100 to-orange-50 text-orange-600 border border-orange-200/50',
+    icone: 'bg-orange-50 text-orange-600 shadow-inner ring-1 ring-orange-100/50',
     link: 'text-orange-600 group-hover:text-orange-700',
-    sombraHover: 'hover:shadow-[0_12px_40px_rgb(234,88,12,0.06)]',
+    sombraHover: 'hover:shadow-[0_12px_40px_rgb(234,88,12,0.08)]',
   },
   carmim: {
-    icone: 'bg-gradient-to-br from-red-100 to-red-50 text-red-600 border border-red-200/50',
+    icone: 'bg-red-50 text-red-600 shadow-inner ring-1 ring-red-100/50',
     link: 'text-red-600 group-hover:text-red-700',
-    sombraHover: 'hover:shadow-[0_12px_40px_rgb(185,28,28,0.06)]',
+    sombraHover: 'hover:shadow-[0_12px_40px_rgb(185,28,28,0.08)]',
   },
   chumbo: {
-    icone: 'bg-gradient-to-br from-stone-200 to-stone-100 text-stone-700 border border-stone-300/50',
-    link: 'text-stone-700 group-hover:text-stone-800',
-    sombraHover: 'hover:shadow-[0_12px_40px_rgb(28,25,23,0.06)]',
+    icone: 'bg-stone-100 text-stone-700 shadow-inner ring-1 ring-stone-200/50',
+    link: 'text-stone-700 group-hover:text-stone-900',
+    sombraHover: 'hover:shadow-[0_12px_40px_rgb(28,25,23,0.08)]',
   },
 };
 
@@ -113,10 +113,10 @@ function CardExplicativo({ corDestaque, icone, pergunta, resposta, linkPara, lin
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-40px' }}
       transition={{ duration: 0.4 }}
-      className={`group relative flex flex-col justify-between rounded-3xl border border-white/60 bg-white/40 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.03)] backdrop-blur-xl transition-all duration-300 hover:bg-white/60 ${estilo.sombraHover}`}
+      className={`group relative flex flex-col justify-between rounded-3xl border border-white/80 bg-white/50 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-white/70 ${estilo.sombraHover}`}
     >
       <div>
-        <div className={`mb-6 flex h-12 w-12 items-center justify-center rounded-xl shadow-sm ${estilo.icone}`}>
+        <div className={`mb-6 flex h-12 w-12 items-center justify-center rounded-2xl ${estilo.icone}`}>
           {icone}
         </div>
         <h3 className="mb-3 text-lg font-bold leading-snug text-stone-900">{pergunta}</h3>
@@ -285,11 +285,11 @@ export function PaginaLanding() {
         <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-stone-50" />
         <div
           aria-hidden
-          className="pointer-events-none absolute -top-20 left-1/4 -z-10 h-[500px] w-[500px] rounded-full bg-rose-100/40 blur-[100px]"
+          className="pointer-events-none absolute -top-40 -left-40 -z-10 h-[600px] w-[600px] rounded-full bg-orange-100/50 mix-blend-multiply blur-[120px]"
         />
         <div
           aria-hidden
-          className="pointer-events-none absolute -bottom-20 right-1/4 -z-10 h-[600px] w-[600px] rounded-full bg-orange-100/40 blur-[120px]"
+          className="pointer-events-none absolute top-20 -right-20 -z-10 h-[500px] w-[500px] rounded-full bg-red-100/40 mix-blend-multiply blur-[100px]"
         />
 
         <motion.div
@@ -298,7 +298,7 @@ export function PaginaLanding() {
           transition={{ duration: 0.5 }}
           className="mx-auto max-w-3xl text-center"
         >
-          <div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-red-200/60 bg-white/70 px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-red-700 backdrop-blur-md">
+          <div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-red-200/40 bg-white/50 px-3 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-red-700 shadow-[0_2px_10px_rgba(185,28,28,0.05)] backdrop-blur-md">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-red-600" />
@@ -321,7 +321,7 @@ export function PaginaLanding() {
           <div className="mt-8 flex justify-center gap-3">
             <Link
               to="/mapa"
-              className="group inline-flex items-center gap-2 rounded-xl bg-red-700 px-6 py-3 text-xs font-mono font-bold uppercase tracking-wider text-white shadow-[0_8px_20px_rgba(185,28,28,0.2)] transition-all hover:-translate-y-0.5 hover:bg-red-800 hover:shadow-[0_12px_25px_rgba(185,28,28,0.3)] active:scale-95"
+              className="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-b from-red-600 to-red-700 px-6 py-3 text-xs font-mono font-bold uppercase tracking-wider text-white shadow-[0_8px_20px_rgba(185,28,28,0.25)] ring-1 ring-inset ring-white/20 transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_25px_rgba(185,28,28,0.35)] active:scale-95"
             >
               Explorar o Atlas
               <IconeSeta className="h-4 w-4 transition-transform group-hover:translate-x-1" />
