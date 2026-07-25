@@ -173,7 +173,7 @@ export function DiagramaConexaoDados() {
                 {ind.origens.map((origemId) => (
                   <span
                     key={origemId}
-                    className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${cor.badge}`}
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-bold shadow-sm backdrop-blur-md ${cor.badge}`}
                   >
                     {nomeDimensao.get(origemId) ?? origemId}
                   </span>

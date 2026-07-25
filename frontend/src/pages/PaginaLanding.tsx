@@ -74,6 +74,28 @@ function IconeMapa(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+function IconeBanco(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <ellipse cx="12" cy="5" rx="8" ry="3" />
+      <path d="M4 5v14c0 1.66 3.58 3 8 3s8-1.34 8-3V5" />
+      <path d="M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3" />
+    </svg>
+  );
+}
+
+function IconeRede(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="5" cy="6" r="2.5" />
+      <circle cx="19" cy="6" r="2.5" />
+      <circle cx="12" cy="18" r="2.5" />
+      <path d="M7 7.5 10 16" />
+      <path d="M17 7.5 14 16" />
+    </svg>
+  );
+}
+
 function IconeRaio(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -669,9 +691,20 @@ export function PaginaLanding() {
           transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
           className="pointer-events-none absolute bottom-0 left-1/4 -z-10 h-[600px] w-[600px] rounded-full bg-red-100/40 mix-blend-multiply blur-[120px]"
         />
+        {/* Textura ambiente (linhas horizontais bem sutis) — puramente
+            decorativa, não representa nenhum dado ou fluxo real; só reforça
+            a sensação de "motor rodando" atrás do glass sem inventar uma
+            animação de dados que não existe. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 -z-10 opacity-[0.15] [background-image:linear-gradient(to_bottom,#a8a29e_1px,transparent_1px)] [background-size:100%_4rem]"
+        />
 
         <div className="relative z-10 mx-auto max-w-5xl rounded-3xl border border-white/60 bg-white/40 px-6 py-10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl sm:px-10">
-          <h2 className="text-lg font-bold uppercase tracking-tight text-stone-900">Fontes de dados</h2>
+          <h2 className="flex items-center gap-2 text-lg font-bold uppercase tracking-tight text-stone-900">
+            <IconeBanco className="h-5 w-5 text-stone-500" />
+            Fontes de dados
+          </h2>
           <p className="mt-2 text-sm text-stone-500">
             Todos os indicadores do Atlas vêm de bases públicas oficiais, organizadas por domínio.
           </p>
@@ -702,7 +735,8 @@ export function PaginaLanding() {
               sem desenhar fio nenhum. Ver DiagramaConexaoDados.tsx para a
               lista real de dimensões/indicadores/origens — nenhuma relação
               nova foi inventada aqui, só reapresentada. */}
-          <h3 className="mt-10 text-sm font-bold uppercase tracking-tight text-stone-900">
+          <h3 className="mt-10 flex items-center gap-2 text-sm font-bold uppercase tracking-tight text-stone-900">
+            <IconeRede className="h-4 w-4 text-stone-500" />
             Como os dados se conectam
           </h3>
           <p className="mt-1 text-xs text-stone-500">
