@@ -66,6 +66,8 @@ Chamamos de **descompasso morfológico** a situação em que o potencial solar d
 
 Um segundo padrão, distinto do primeiro, aparece em territórios de alta verticalização (prédios e condomínios) combinada a alta irradiação: aqui a barreira não é a precariedade construtiva, mas a decisão coletiva de instalação em telhado compartilhado — que exige regulação de autoconsumo em condomínio, não reforma habitacional.
 
+**Ressalva (26/07/2026):** diferente do primeiro padrão, este segundo ainda é uma hipótese conceitual, não confirmada estatisticamente. O único teste direto disponível (`percentual_apartamento` sobre adoção de MMGD residencial, controlando renda) apontou coeficiente **positivo**, não negativo — sugerindo que a variável funciona mais como proxy de porte urbano do que como barreira de telhado. Tratamos esse segundo padrão como hipótese a confirmar, não como achado consolidado (ver `docs/ANEXO_TECNICO_ATLAS_SOLAR_JUSTO.md`, Seção 10.3).
+
 ---
 
 ## 4. O Reforma Casa Brasil Solar Reforça, Não Corrige, o Padrão de Acesso Desigual
