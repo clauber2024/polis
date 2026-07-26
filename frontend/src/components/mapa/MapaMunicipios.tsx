@@ -58,11 +58,11 @@ const COR_ATENUADA = '#e7e5e4';
  * para manter a identidade visual do conceito.
  */
 export const RAMPA_HEATMAP: [number, string][] = [
-  [0, 'rgba(234, 88, 12, 0)'],
-  [0.15, '#ffedd5'],
-  [0.4, '#fdba74'],
-  [0.65, '#f97316'],
-  [1, '#9a3412'],
+  [0, 'rgba(252, 211, 77, 0)'],
+  [0.2, 'rgba(253, 186, 116, 0.6)'],
+  [0.5, 'rgba(234, 88, 12, 0.8)'],
+  [0.8, 'rgba(220, 38, 38, 0.9)'],
+  [1, 'rgba(153, 27, 27, 1)'],
 ];
 
 const FONTE = 'municipios';
@@ -522,7 +522,7 @@ export function MapaMunicipios({
 
     if (fonte) {
       fonte.setData(pontosHeatmap as GeoJSON.GeoJSON);
-      mapa.setPaintProperty(CAMADA_HEATMAP, 'heatmap-opacity', 0.8);
+      mapa.setPaintProperty(CAMADA_HEATMAP, 'heatmap-opacity', 0.85);
       return;
     }
 
@@ -554,7 +554,7 @@ export function MapaMunicipios({
     );
     // Dispara o fade-in após o layer ser adicionado ao canvas.
     requestAnimationFrame(() => {
-      mapaRef.current?.setPaintProperty(CAMADA_HEATMAP, 'heatmap-opacity', 0.8);
+      mapaRef.current?.setPaintProperty(CAMADA_HEATMAP, 'heatmap-opacity', 0.85);
     });
   }, [pontosHeatmap, mapaCarregado]);
 
