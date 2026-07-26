@@ -51,6 +51,15 @@ const COR_FUNDO_MODO_HEATMAP = '#eef2f7';
 export const COR_DESTAQUE_VAZIO = '#b91c1c';
 const COR_ATENUADA = '#e7e5e4';
 
+/** Badge de confiança do tooltip de hover — cor reflete o dado real
+ * (`indicador.metadados.confianca`), não fixa: "Baixa" em verde-sucesso
+ * seria enganoso. */
+const CONFIANCA_ESTILO: Record<'Alta' | 'Média' | 'Baixa', string> = {
+  Alta: 'border-emerald-200/60 bg-emerald-50 text-emerald-700',
+  Média: 'border-amber-200/60 bg-amber-50 text-amber-700',
+  Baixa: 'border-red-200/60 bg-red-50 text-red-700',
+};
+
 /**
  * Rampa do heatmap (transparente → terracota escuro) — mesma família de cor
  * que identifica "Vazio de Acesso" no destaque e nos badges (#ea580c,
@@ -780,47 +789,70 @@ export function MapaMunicipios({
 
       {hover && municipioHover && (
         <div
-          className="pointer-events-none absolute z-[100] max-w-[240px] rounded-xl border border-white/80 bg-white/85 p-4 shadow-[0_12px_40px_rgb(0,0,0,0.12)] backdrop-blur-xl"
+          className="pointer-events-none absolute z-[100] w-64 rounded-2xl border border-white/80 bg-white/90 p-4 font-sans shadow-[0_12px_40px_rgb(0,0,0,0.12)] backdrop-blur-xl"
           style={{ left: hover.x, top: hover.y, transform: 'translate(-50%, -110%)' }}
         >
           <div className="mb-3 border-b border-stone-200/80 pb-2">
-            <h4 className="text-sm leading-none font-black uppercase text-stone-900">
+            <h4 className="text-sm leading-tight font-black text-stone-900">
               {municipioHover.nome}
             </h4>
             <span className="text-[10px] font-bold tracking-widest text-stone-500 uppercase">
-              {municipioHover.regiao} ({municipioHover.uf})
+              {municipioHover.regiao} · {municipioHover.uf}
             </span>
           </div>
 
-          <div className="flex flex-col gap-1">
-            <span className="text-[9px] font-extrabold tracking-wider text-stone-400 uppercase">
+          {/* Indicador ativo em caixa própria — antes flutuava solto no
+              corpo do tooltip, mesma correção de "âncora visual" já
+              aplicada no disclaimer da landing page. */}
+          <div className="mb-3 rounded-xl border border-stone-200/50 bg-stone-50/80 p-3">
+            <span className="mb-1 block text-[9px] font-extrabold tracking-widest text-stone-400 uppercase">
+              Indicador ativo
+            </span>
+            <span className="mb-1.5 block text-[11px] leading-tight font-bold text-stone-700">
               {indicador.rotulo}
             </span>
-            <span className="text-lg font-extrabold text-red-700">
-              {municipioHover[indicador.id] !== null
-                ? `${formatarValor(municipioHover[indicador.id] as number, indicador.formato)}${indicador.unidade ? ` ${indicador.unidade}` : ''}`
-                : 'Não disponível'}
-            </span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-black text-red-700">
+                {municipioHover[indicador.id] !== null
+                  ? formatarValor(municipioHover[indicador.id] as number, indicador.formato)
+                  : 'Não disponível'}
+              </span>
+              {municipioHover[indicador.id] !== null && indicador.unidade && (
+                <span className="text-[10px] font-bold text-stone-500">{indicador.unidade}</span>
+              )}
+            </div>
           </div>
 
           {indicador.metadados && (
-            <div className="mt-3 grid grid-cols-2 gap-2 border-t border-stone-200/80 pt-2 text-[9px]">
-              <div>
-                <span className="block font-mono text-[7.5px] tracking-wider text-stone-400 uppercase">
-                  Confiança
-                </span>
-                <span className="font-bold text-stone-700">{indicador.metadados.confianca}</span>
+            <>
+              <div className="mb-3 flex justify-between gap-2">
+                <div className="flex flex-col items-start">
+                  <span className="mb-1 text-[8px] font-extrabold tracking-widest text-stone-400 uppercase">
+                    Confiança
+                  </span>
+                  <span
+                    className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[9px] font-bold tracking-wider uppercase ${CONFIANCA_ESTILO[indicador.metadados.confianca]}`}
+                  >
+                    {indicador.metadados.confianca}
+                  </span>
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="mb-1 text-[8px] font-extrabold tracking-widest text-stone-400 uppercase">
+                    Natureza
+                  </span>
+                  <span className="inline-flex items-center rounded-md border border-amber-200/60 bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-amber-700 uppercase">
+                    {indicador.metadados.natureza}
+                  </span>
+                </div>
               </div>
-              <div>
-                <span className="block font-mono text-[7.5px] tracking-wider text-stone-400 uppercase">
-                  Natureza
-                </span>
-                <span className="font-bold text-stone-700">{indicador.metadados.natureza}</span>
+
+              <div className="border-t border-stone-200/80 pt-2.5">
+                <p className="text-[9px] leading-relaxed font-medium text-stone-500">
+                  <strong className="font-extrabold text-stone-700">Fonte:</strong>{' '}
+                  {indicador.metadados.fonte}
+                </p>
               </div>
-              <div className="col-span-2 font-mono text-[8px] text-stone-500">
-                <span className="text-stone-400">Fonte:</span> {indicador.metadados.fonte}
-              </div>
-            </div>
+            </>
           )}
         </div>
       )}
