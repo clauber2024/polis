@@ -9,6 +9,63 @@ interface CartaoDescompassoMorfologicoProps {
   limiarPrecariedadeHabitacionalAlta: number | null;
 }
 
+/** Ícones inline (sem dependência de lucide-react, ainda não usada no projeto). */
+function IconeAlerta({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  );
+}
+
+function IconeCasa({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+      <path d="M9 22V12h6v10" />
+    </svg>
+  );
+}
+
+function IconeLampada({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M9 18h6" />
+      <path d="M10 22h4" />
+      <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5.6.6 1.13 1.28 1.41 2.5" />
+    </svg>
+  );
+}
+
 /**
  * Alerta de "descompasso morfológico": alta irradiação solar desperdiçada
  * porque a tipologia construtiva do município barra a instalação
@@ -65,34 +122,71 @@ export function CartaoDescompassoMorfologico({
     return null;
   }
 
-  const barreiras: string[] = [];
-  if (precariedadeAlta) {
-    barreiras.push(
-      `precariedade habitacional entre as 10% piores do país (índice ${formatarValor(indicePrecariedadeMoradia, 'numero')} de 1 — cortiços, paredes inadequadas ou favelas)`,
-    );
-  }
-  if (verticalizacaoAlta) {
-    barreiras.push(
-      `${formatarValor(percentualApartamento, 'percentual')} dos domicílios são apartamentos, sem telhado individual disponível`,
-    );
-  }
+  // Diagnóstico em tom de política pública, não de acusação ("desperdício"):
+  // apresenta o fato técnico (a estrutura não comporta o painel) e já entrega
+  // a diretriz — não um relatório do cálculo pro gestor decifrar.
+  const descricaoBarreira =
+    precariedadeAlta && verticalizacaoAlta
+      ? `vulnerabilidade habitacional crítica (índice ${formatarValor(indicePrecariedadeMoradia, 'numero')}, entre as 10% piores do país) e alta verticalização (${formatarValor(percentualApartamento, 'percentual')} dos domicílios em apartamentos, sem telhado individual)`
+      : precariedadeAlta
+        ? `vulnerabilidade habitacional crítica (índice ${formatarValor(indicePrecariedadeMoradia, 'numero')}, entre as 10% piores do país)`
+        : `alta verticalização habitacional (${formatarValor(percentualApartamento, 'percentual')} dos domicílios em apartamentos, sem telhado individual)`;
+
+  const mecanismoBarreira =
+    precariedadeAlta && verticalizacaoAlta
+      ? 'A precariedade das moradias e a predominância de apartamentos sem telhado próprio inviabilizam'
+      : precariedadeAlta
+        ? 'A precariedade das moradias (estruturas e telhados inadequados) inviabiliza'
+        : 'A predominância de apartamentos sem telhado individual inviabiliza';
 
   return (
-    <div className="mx-4 mt-3 rounded-lg border-2 border-red-300/80 bg-red-50/80 p-3">
-      <p className="mb-1 font-mono text-[10px] font-bold tracking-wider text-red-700 uppercase">
-        ⚠ Descompasso morfológico
-      </p>
-      <p className="text-sm leading-snug text-red-900">
-        Alta irradiação solar ({formatarValor(irradiacaoMediaKwhM2Dia, 'numero')} kWh/m²·dia, acima
-        da mediana nacional) está sendo desperdiçada: {barreiras.join(' e ')}. A instalação
-        individual no telhado é, na prática, uma barreira física para boa parte do território —
-        não só uma questão de renda.
-      </p>
-      <p className="mt-2 rounded bg-white/70 p-2 text-xs leading-snug text-red-800">
-        <span className="font-semibold">Recomendado:</span> geração compartilhada/comunitária
-        (usinas remotas com rateio de créditos), em vez de subsídio para instalação individual —
-        orienta melhor fundos climáticos/habitacionais focados neste território.
-      </p>
+    <div className="mx-4 mt-3 rounded-xl border border-amber-200/80 bg-amber-50/50 p-5 shadow-sm">
+      <div className="mb-4 flex items-center gap-2 border-b border-amber-200/60 pb-3">
+        <IconeAlerta className="h-4 w-4 text-amber-600" />
+        <h4 className="text-xs font-black tracking-widest text-amber-800 uppercase">
+          Alerta: descompasso morfológico
+        </h4>
+      </div>
+
+      <div className="flex flex-col gap-4">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 shrink-0 rounded-full bg-amber-100 p-1.5">
+            <IconeCasa className="h-3.5 w-3.5 text-amber-700" />
+          </div>
+          <div>
+            <span className="mb-0.5 block text-[10px] font-bold tracking-wider text-amber-800/70 uppercase">
+              Barreira estrutural
+            </span>
+            <p className="text-[11px] leading-relaxed font-medium text-stone-700">
+              Alto potencial solar (
+              <strong className="font-bold text-stone-900">
+                {formatarValor(irradiacaoMediaKwhM2Dia, 'numero')} kWh/m²·dia
+              </strong>
+              ), mas {descricaoBarreira}. {mecanismoBarreira} a instalação de painéis individuais,
+              independentemente da disponibilidade de crédito ou renda.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-3 rounded-lg border border-amber-200/80 bg-white/70 p-3 shadow-sm">
+          <div className="mt-0.5 shrink-0 rounded-full bg-stone-100 p-1.5">
+            <IconeLampada className="h-3.5 w-3.5 text-amber-600" />
+          </div>
+          <div>
+            <span className="mb-0.5 block text-[10px] font-bold tracking-wider text-amber-800/70 uppercase">
+              Diretriz recomendada
+            </span>
+            <p className="text-[11px] leading-relaxed font-medium text-stone-700">
+              Priorizar modelos de{' '}
+              <strong className="font-bold text-stone-900">
+                Geração Compartilhada ou Comunitária
+              </strong>{' '}
+              (usinas remotas com rateio de créditos). Subsídios para instalação individual no
+              telhado terão baixa eficácia técnica neste território.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
