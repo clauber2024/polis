@@ -73,6 +73,8 @@ interface LinhaIndicador {
   unidade?: string;
   /** Esclarecimento metodológico — mesmo critério de utils/indicadores.ts. */
   descricao?: string;
+  /** Marca o indicador-âncora da seção — ganha cartão próprio de 2 colunas em vez de célula do grid. No máximo um por grupo. */
+  destaque?: boolean;
 }
 
 /**
@@ -149,6 +151,7 @@ export function PainelMunicipio({
           rotulo: 'MMGD residencial per capita',
           formato: 'numero',
           unidade: 'kW/1.000 hab',
+          destaque: true,
         },
         {
           campo: 'potenciaInstaladaKw',
@@ -174,7 +177,7 @@ export function PainelMunicipio({
     {
       titulo: 'Indicadores sociais',
       linhas: [
-        { campo: 'ivs', rotulo: 'IVS', formato: 'numero' },
+        { campo: 'ivs', rotulo: 'IVS', formato: 'numero', destaque: true },
         { campo: 'rendaMediaDomiciliar', rotulo: 'Renda média domiciliar', formato: 'moeda' },
         {
           campo: 'percentualCadunico',
@@ -244,128 +247,184 @@ export function PainelMunicipio({
 
   const notaMunicipio = NOTAS_MUNICIPIO[municipio.codigoIbge];
 
-  return (
-    <aside className="flex h-full w-80 flex-col overflow-y-auto rounded-3xl border border-white/90 bg-white/85 shadow-[0_12px_40px_rgb(0,0,0,0.12)] backdrop-blur-2xl">
-      <div className="flex items-start justify-between gap-2 border-b border-stone-200/70 p-5">
-        <div className="space-y-1">
-          <h2 className="font-display text-lg leading-tight font-bold text-slate-900">
-            {municipio.nome}
-          </h2>
-          <p className="font-mono text-[10px] tracking-wider text-slate-400 uppercase">
-            {municipio.nomeEstado} ({municipio.uf}) · {municipio.regiao} · IBGE{' '}
-            {municipio.codigoIbge}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={aoFechar}
-          aria-label="Fechar painel"
-          className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-        >
-          ✕
-        </button>
-      </div>
+  /**
+   * Notas metodológicas e de ausência da seção, reunidas numa "gaveta" única
+   * no rodapé em vez de intercaladas linha a linha — o KPI não pode competir
+   * visualmente com a nota que o explica.
+   */
+  function notasDaSecao(grupo: { linhas: LinhaIndicador[] }) {
+    return grupo.linhas
+      .map((linha) => {
+        const valor = municipio[linha.campo];
+        const nota = valor === null ? notaAusencia(linha.campo, municipio) : null;
+        return { rotulo: linha.rotulo, texto: nota ?? linha.descricao };
+      })
+      .filter((item): item is { rotulo: string; texto: string } => !!item.texto);
+  }
 
-      {/* RF-058: relatório-resumo exportável em PDF do território selecionado. */}
-      <div className="border-b border-stone-200/70 px-5 py-3">
+  return (
+    <aside className="flex h-full w-80 flex-col overflow-hidden rounded-3xl border border-white/90 bg-white/85 shadow-[0_12px_40px_rgb(0,0,0,0.12)] backdrop-blur-2xl">
+      {/* Cabeçalho fixo: identificação + PDF sempre visíveis, mesmo com a lista rolada. */}
+      <div className="sticky top-0 z-10 border-b border-stone-200/70 bg-white/90 p-5 backdrop-blur-md">
+        <div className="flex items-start justify-between gap-2">
+          <div className="space-y-1">
+            <h2 className="font-display text-lg leading-tight font-bold text-slate-900">
+              {municipio.nome}
+            </h2>
+            <p className="font-mono text-[10px] tracking-wider text-slate-400 uppercase">
+              {municipio.nomeEstado} ({municipio.uf}) · {municipio.regiao} · IBGE{' '}
+              {municipio.codigoIbge}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={aoFechar}
+            aria-label="Fechar painel"
+            className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* RF-058: relatório-resumo exportável em PDF do território selecionado. */}
         <button
           type="button"
           onClick={aoBaixarRelatorio}
           disabled={gerandoRelatorio}
-          className="w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          className="mt-4 w-full rounded-lg border border-stone-300 bg-white py-2 text-xs font-bold text-stone-700 shadow-sm transition-colors hover:bg-stone-50 disabled:opacity-60"
         >
           {gerandoRelatorio ? 'Gerando relatório…' : 'Baixar relatório-resumo (PDF)'}
         </button>
         {erroRelatorio && <p className="mt-1.5 text-xs text-red-600">{erroRelatorio}</p>}
       </div>
 
-      {notaMunicipio && (
-        <p className="border-b border-amber-100 bg-amber-50/60 px-4 py-2.5 text-xs leading-relaxed text-amber-900">
-          {notaMunicipio}
-        </p>
-      )}
+      {/* Área de rolagem: só o corpo de dados rola por baixo do cabeçalho fixo. */}
+      <div className="flex-1 overflow-y-auto">
+        {notaMunicipio && (
+          <p className="border-b border-amber-100 bg-amber-50/60 px-4 py-2.5 text-xs leading-relaxed text-amber-900">
+            {notaMunicipio}
+          </p>
+        )}
 
-      <CartaoDescompassoMorfologico
-        municipio={municipio}
-        medianaIrradiacao={medianaIrradiacao}
-        limiarPrecariedadeHabitacionalAlta={limiarPrecariedadeHabitacionalAlta}
-      />
+        <CartaoDescompassoMorfologico
+          municipio={municipio}
+          medianaIrradiacao={medianaIrradiacao}
+          limiarPrecariedadeHabitacionalAlta={limiarPrecariedadeHabitacionalAlta}
+        />
 
-      {grupos.map((grupo) => (
-        <section key={grupo.titulo} className="border-b border-stone-200/70 p-5">
-          <h3 className="mb-3 border-b border-stone-200/80 pb-2 text-[10px] font-extrabold tracking-widest text-stone-400 uppercase">
-            {grupo.titulo}
-          </h3>
-          <dl className="flex flex-col gap-2">
-            {grupo.linhas.map((linha) => {
-              const valor = municipio[linha.campo];
-              const nota = valor === null ? notaAusencia(linha.campo, municipio) : null;
-              return (
-                <div
-                  key={linha.rotulo}
-                  className={`rounded-lg p-2.5 transition-colors ${
-                    valor === null ? 'bg-amber-50/60' : 'bg-stone-50/60 hover:bg-stone-100/60'
-                  }`}
-                >
-                  <dt className="text-[10px] font-bold tracking-wider text-stone-500 uppercase">
-                    {linha.rotulo}
-                  </dt>
-                  <dd className="mt-1 flex items-baseline gap-1">
-                    <span className="text-base font-black whitespace-nowrap text-stone-900">
-                      {formatarValor(valor, linha.formato)}
-                    </span>
-                    {valor !== null && linha.unidade && (
-                      <span className="text-xs font-bold text-stone-500">{linha.unidade}</span>
-                    )}
-                  </dd>
-                  {linha.descricao && (
-                    <p className="mt-2 border-l-2 border-stone-200 pl-2 text-[9px] leading-relaxed font-medium text-stone-400">
-                      {linha.descricao}
-                    </p>
-                  )}
-                  {nota && (
-                    <p className="mt-2 border-l-2 border-amber-300 pl-2 text-[9px] leading-relaxed font-medium text-amber-800 italic">
-                      {nota}
-                    </p>
-                  )}
+        {grupos.map((grupo) => {
+          const notas = notasDaSecao(grupo);
+          return (
+            <section key={grupo.titulo} className="border-b border-stone-200/70 p-5">
+              <h3 className="mb-4 flex items-center gap-2 text-[10px] font-extrabold tracking-widest text-stone-400 uppercase">
+                {grupo.titulo}
+                <span className="h-px flex-1 bg-stone-200" aria-hidden="true" />
+              </h3>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+                {grupo.linhas.map((linha) => {
+                  const valor = municipio[linha.campo];
+                  const semDado = valor === null;
+
+                  if (linha.destaque) {
+                    return (
+                      <div
+                        key={linha.rotulo}
+                        className="col-span-2 rounded-xl border border-stone-200/60 bg-white p-4 shadow-sm"
+                      >
+                        <span className="text-[10px] font-bold tracking-widest text-stone-500 uppercase">
+                          {linha.rotulo}
+                        </span>
+                        <div className="mt-1 flex items-baseline gap-1.5">
+                          <span
+                            className={`text-3xl font-black ${semDado ? 'text-stone-300' : 'text-red-700'}`}
+                          >
+                            {formatarValor(valor, linha.formato)}
+                          </span>
+                          {!semDado && linha.unidade && (
+                            <span className="text-xs font-bold text-stone-400">{linha.unidade}</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={linha.rotulo} className={`flex flex-col ${semDado ? 'opacity-60' : ''}`}>
+                      <span className="text-[9px] font-bold tracking-widest text-stone-500 uppercase">
+                        {linha.rotulo}
+                      </span>
+                      <div className="mt-0.5 flex items-baseline gap-1">
+                        {semDado ? (
+                          <span className="text-sm font-bold text-stone-400 italic">Não disponível</span>
+                        ) : (
+                          <>
+                            <span className="text-lg font-black whitespace-nowrap text-stone-900">
+                              {formatarValor(valor, linha.formato)}
+                            </span>
+                            {linha.unidade && (
+                              <span className="text-[10px] font-semibold text-stone-500">
+                                {linha.unidade}
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Gaveta metodológica: notas técnicas e justificativas de ausência
+                  reunidas no rodapé da seção, fora do ritmo de leitura dos KPIs. */}
+              {notas.length > 0 && (
+                <div className="mt-4 rounded-lg bg-stone-100/50 p-3 text-[9px] leading-relaxed text-stone-500">
+                  <strong className="mb-1 block font-bold text-stone-700">Notas técnicas</strong>
+                  <ul className="ml-4 list-outside list-disc space-y-1">
+                    {notas.map((nota) => (
+                      <li key={nota.rotulo}>
+                        <strong className="font-semibold text-stone-600">{nota.rotulo}:</strong>{' '}
+                        {nota.texto}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-              );
-            })}
-          </dl>
-        </section>
-      ))}
-
-      {/* RF-043/RF-045: drill-down de setores censitários — só aparece quando
-          o backend confirma granularidade fina disponível para este
-          município (hoje, só São Paulo). */}
-      {setores?.temGranularidadeFina && (
-        <section className="border-b border-stone-200/70 p-5">
-          <button
-            type="button"
-            onClick={() => setDetalhamentoAberto((aberto) => !aberto)}
-            className="flex w-full items-center justify-between rounded-lg border border-red-200 bg-red-50/60 px-3 py-2 text-left text-sm font-semibold text-red-800 hover:bg-red-50"
-          >
-            <span>Ver detalhamento interno ({setores.setores.length} setores censitários)</span>
-            <span aria-hidden="true">{detalhamentoAberto ? '▲' : '▼'}</span>
-          </button>
-
-          {detalhamentoAberto && (
-            <div className="mt-3 space-y-2">
-              {setores.avisoIlustrativo && (
-                <p className="rounded border border-amber-200 bg-amber-50 p-2 text-xs leading-relaxed text-amber-900">
-                  {setores.avisoIlustrativo}
-                </p>
               )}
-              <DetalhamentoSetores setores={setores.setores} />
-            </div>
-          )}
-        </section>
-      )}
+            </section>
+          );
+        })}
 
-      <p className="p-4 font-mono text-[10px] text-slate-400">
-        Referências: MMGD {municipio.periodoReferenciaMmgd ?? '—'} · irradiação{' '}
-        {municipio.periodoReferenciaIrradiacao ?? '—'}
-      </p>
+        {/* RF-043/RF-045: drill-down de setores censitários — só aparece quando
+            o backend confirma granularidade fina disponível para este
+            município (hoje, só São Paulo). */}
+        {setores?.temGranularidadeFina && (
+          <section className="border-b border-stone-200/70 p-5">
+            <button
+              type="button"
+              onClick={() => setDetalhamentoAberto((aberto) => !aberto)}
+              className="flex w-full items-center justify-between rounded-lg border border-red-200 bg-red-50/60 px-3 py-2 text-left text-sm font-semibold text-red-800 hover:bg-red-50"
+            >
+              <span>Ver detalhamento interno ({setores.setores.length} setores censitários)</span>
+              <span aria-hidden="true">{detalhamentoAberto ? '▲' : '▼'}</span>
+            </button>
+
+            {detalhamentoAberto && (
+              <div className="mt-3 space-y-2">
+                {setores.avisoIlustrativo && (
+                  <p className="rounded border border-amber-200 bg-amber-50 p-2 text-xs leading-relaxed text-amber-900">
+                    {setores.avisoIlustrativo}
+                  </p>
+                )}
+                <DetalhamentoSetores setores={setores.setores} />
+              </div>
+            )}
+          </section>
+        )}
+
+        <p className="p-4 font-mono text-[10px] text-slate-400">
+          Referências: MMGD {municipio.periodoReferenciaMmgd ?? '—'} · irradiação{' '}
+          {municipio.periodoReferenciaIrradiacao ?? '—'}
+        </p>
+      </div>
     </aside>
   );
 }
