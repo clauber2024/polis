@@ -113,14 +113,14 @@ export function PainelRanking({
   const corDestaque = indicador.cores[3];
 
   return (
-    <div className="flex h-full flex-col bg-white">
-      <div className="border-b border-slate-100 bg-slate-50 p-3">
+    <div className="flex h-full flex-col">
+      <div className="border-b border-stone-200/70 p-3">
         <div className="mb-2">
-          <span className="block font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
-            Ordenação Prioritária
+          <span className="block font-mono text-[10px] font-bold tracking-wider text-stone-500 uppercase">
+            Ordenação prioritária
           </span>
-          <h2 className="text-sm font-semibold text-slate-900">Ranking estadual</h2>
-          <p className="text-xs text-slate-500">{indicador.rotulo}</p>
+          <h2 className="text-sm font-bold text-stone-900">Ranking estadual</h2>
+          <p className="text-xs text-stone-500">{indicador.rotulo}</p>
         </div>
 
         <select
@@ -130,7 +130,7 @@ export function PainelRanking({
             // '' → "Selecione…" limpa o destaque do estado no mapa.
             aoEscolherUf(evento.target.value);
           }}
-          className="mb-2 w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-800"
+          className="mb-2 w-full rounded-lg border border-stone-200/80 bg-white/70 px-2 py-1.5 text-sm text-stone-800 shadow-sm backdrop-blur-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-400/20"
         >
           <option value="">Selecione um estado…</option>
           {ufs.map(([sigla, nomeEstado]) => (
@@ -148,13 +148,13 @@ export function PainelRanking({
               placeholder="Filtrar por nome…"
               value={filtroNome}
               onChange={(evento) => setFiltroNome(evento.target.value)}
-              className="min-w-0 flex-1 rounded border border-slate-300 bg-white px-2 py-1 text-sm text-slate-800 placeholder:text-slate-400"
+              className="min-w-0 flex-1 rounded-lg border border-stone-200/80 bg-white/70 px-2 py-1 text-sm text-stone-800 shadow-sm backdrop-blur-sm outline-none placeholder:text-stone-400 focus:border-red-400 focus:ring-2 focus:ring-red-400/20"
             />
             <button
               type="button"
               onClick={() => setOrdem((atual) => (atual === 'desc' ? 'asc' : 'desc'))}
               title={ordem === 'desc' ? 'Maior → menor (clique para inverter)' : 'Menor → maior (clique para inverter)'}
-              className="shrink-0 rounded border border-slate-300 px-2 py-1 text-sm text-slate-600 hover:bg-slate-50"
+              className="shrink-0 rounded-lg border border-stone-200/80 bg-white/70 px-2 py-1 text-sm text-stone-600 shadow-sm backdrop-blur-sm hover:bg-white/90"
             >
               {ordem === 'desc' ? '↓' : '↑'}
             </button>
@@ -164,13 +164,13 @@ export function PainelRanking({
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {!uf && (
-          <p className="p-4 text-sm text-slate-500">
+          <p className="p-4 text-sm text-stone-500">
             Selecione um estado para ver o ranking dos municípios pelo indicador ativo do mapa.
           </p>
         )}
 
         {uf && itensVisiveis.length === 0 && (
-          <p className="p-4 text-sm text-slate-500">
+          <p className="p-4 text-sm text-stone-500">
             {itens.length === 0
               ? 'Nenhum município deste estado tem dado para este indicador.'
               : 'Nenhum município encontrado com esse nome.'}
@@ -187,15 +187,15 @@ export function PainelRanking({
                   onClick={() => aoSelecionarMunicipio(item.municipio.codigoIbge)}
                   className={`block w-full rounded-lg border px-2.5 py-2 text-left transition-all ${
                     ehVazio
-                      ? 'border-violet-200 bg-violet-50/60 hover:bg-violet-50'
-                      : 'border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50/60'
+                      ? 'border-red-200/80 bg-red-50/60 hover:bg-red-50/90'
+                      : 'border-stone-100/80 bg-white/40 hover:border-stone-200 hover:bg-white/70'
                   }`}
                 >
                   <div className="flex items-baseline gap-2 text-sm">
-                    <span className="w-8 shrink-0 text-right font-mono font-semibold text-slate-400">
+                    <span className="w-8 shrink-0 text-right font-mono font-semibold text-stone-400">
                       {item.posicao}º
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-slate-800">
+                    <span className="min-w-0 flex-1 truncate text-stone-800">
                       {item.municipio.nome}
                     </span>
                     <span
@@ -205,7 +205,7 @@ export function PainelRanking({
                       {formatarValor(item.valor, indicador.formato)}
                     </span>
                   </div>
-                  <div className="mt-1.5 ml-10 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                  <div className="mt-1.5 ml-10 h-1.5 overflow-hidden rounded-full bg-stone-200/60">
                     <div
                       className="h-full rounded-full transition-all duration-500"
                       style={{
@@ -215,7 +215,7 @@ export function PainelRanking({
                     />
                   </div>
                   {ehVazio && (
-                    <span className="mt-1.5 ml-10 inline-block rounded-sm bg-violet-100 px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-wide text-violet-700 uppercase">
+                    <span className="mt-1.5 ml-10 inline-block rounded-sm bg-red-100/90 px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-wide text-red-800 uppercase">
                       Vazio de Acesso
                     </span>
                   )}
@@ -227,7 +227,7 @@ export function PainelRanking({
       </div>
 
       {uf && (
-        <p className="border-t border-slate-200 p-2 text-center text-xs text-slate-400">
+        <p className="border-t border-stone-200/70 p-2 text-center text-xs text-stone-400">
           {itens.length.toLocaleString('pt-BR')} municípios no ranking
           {totalSemDado > 0 && ` · ${totalSemDado.toLocaleString('pt-BR')} sem dado`}
           {carregandoVazios && ' · carregando badges…'}

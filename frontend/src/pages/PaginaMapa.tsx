@@ -10,6 +10,7 @@ import { PainelFiltrosDashboard } from '../components/mapa/PainelFiltrosDashboar
 import { PainelHeatmapVazios } from '../components/mapa/PainelHeatmapVazios';
 import { PainelMunicipio } from '../components/mapa/PainelMunicipio';
 import { PainelRanking } from '../components/mapa/PainelRanking';
+import { SeletorIndicador } from '../components/mapa/SeletorIndicador';
 import { buscarGeoJsonNacional } from '../services/municipios.service';
 import { buscarEstadosGeoJson } from '../services/estados.service';
 import type { EstadosGeoJson } from '../types/api';
@@ -30,6 +31,54 @@ import { INDICADORES_MAPA, calcularQuebrasQuantis } from '../utils/indicadores';
  * backend.
  */
 const PESO_MINIMO_HEATMAP = 0.2;
+
+/**
+ * Interruptor das "Lentes de Priorização" (25/07/2026, auditoria de UX/UI) —
+ * antes eram checkboxes nativos minúsculos disputando espaço com a busca no
+ * canto superior; viraram os protagonistas do painel flutuante esquerdo.
+ * Só apresentação: quem decide ligado/desligado e dispara o fetch lazy
+ * continua sendo PaginaMapa (aoAlternar já vem pronto com essa lógica).
+ */
+function InterruptorLente({
+  rotulo,
+  ligado,
+  aoAlternar,
+  nota,
+}: {
+  rotulo: string;
+  ligado: boolean;
+  aoAlternar: (ligado: boolean) => void;
+  nota?: string;
+}) {
+  return (
+    <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-red-100/70 bg-white/60 p-2.5 shadow-sm transition-colors hover:bg-white/80">
+      <span className="text-sm font-bold text-stone-800">
+        {rotulo}
+        {nota && <span className="ml-1.5 text-xs font-normal text-stone-400">{nota}</span>}
+      </span>
+      <span
+        role="switch"
+        aria-checked={ligado}
+        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+          ligado ? 'bg-red-700' : 'bg-stone-300'
+        }`}
+      >
+        <input
+          type="checkbox"
+          checked={ligado}
+          onChange={(evento) => aoAlternar(evento.target.checked)}
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          aria-label={rotulo}
+        />
+        <span
+          className={`ml-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${
+            ligado ? 'translate-x-4' : 'translate-x-0'
+          }`}
+        />
+      </span>
+    </label>
+  );
+}
 
 /**
  * Mapa interativo do Atlas (RF-016/017 choropleth; RF-055/056 destaque dos
@@ -351,118 +400,116 @@ export function PaginaMapa() {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Sub-header de indicador e camadas — padrão do protótipo AI Studio:
-          seletor + nota científica do indicador + toggles de Vazios. */}
-      <section className="shrink-0 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <label
-              htmlFor="seletor-indicador"
-              className="mb-1 block font-mono text-[10px] font-semibold tracking-wider text-slate-500 uppercase"
-            >
-              Indicador de Distribuição Espacial
-            </label>
-            <select
-              id="seletor-indicador"
-              value={indicador.id}
-              onChange={(evento) =>
-                setIndicadorId(evento.target.value as (typeof INDICADORES_MAPA)[number]['id'])
-              }
-              className="w-full cursor-pointer rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-800 focus:bg-white focus:ring-1 focus:ring-violet-600 focus:outline-none sm:w-80"
-            >
-              {INDICADORES_MAPA.map((opcao) => (
-                <option key={opcao.id} value={opcao.id}>
-                  {opcao.rotulo}
-                </option>
-              ))}
-            </select>
-          </div>
+    <div className="relative h-full w-full overflow-hidden bg-stone-100">
+      {/* Camada do mapa — tela cheia. Painéis de controle flutuam por cima
+          (25/07/2026, auditoria de UX/UI: layout "encaixotado" antigo com
+          sidebar/header sólidos virou Floating UI em vidro, mesmo padrão da
+          landing page). Nenhuma prop mudou — MapaMunicipios continua
+          isolado da lógica de negócio (CLAUDE.md Seção 4). */}
+      <div className="absolute inset-0">
+        <MapaMunicipios
+          dados={dados}
+          indicador={indicador}
+          quebras={quebras}
+          codigosDestaque={codigosDestaque}
+          codigosDescompasso={codigosDescompasso}
+          pontosHeatmap={pontosHeatmap}
+          foco={foco}
+          estados={estados}
+          ufDestacada={ufDestacada || null}
+          codigoDestacado={municipioSelecionado?.codigoIbge ?? null}
+          codigosVisiveis={codigosVisiveis}
+          aoClicarMunicipio={(codigoIbge) =>
+            setMunicipioSelecionado(municipioPorCodigo.get(codigoIbge) ?? null)
+          }
+          aoClicarEstado={aoClicarEstadoNoMapa}
+        />
+      </div>
 
+      {/* Painel de controle tático flutuante (esquerda): Camada Base +
+          Lentes de Priorização + abas Ranking/Filtros. top-4/bottom-4 (em
+          vez de vh) para a altura acompanhar o <main> do LayoutApp sem
+          contas de viewport. */}
+      <div className="absolute top-4 bottom-4 left-4 z-10 flex w-80 flex-col gap-3 sm:top-6 sm:bottom-6 sm:left-6">
+        <div className="shrink-0 rounded-2xl border border-white/90 bg-white/70 p-4 shadow-[0_12px_40px_rgb(0,0,0,0.08)] backdrop-blur-xl">
+          <SeletorIndicador indicadores={INDICADORES_MAPA} valor={indicador.id} aoMudar={setIndicadorId} />
           {/* Esclarecimento metodológico do indicador ativo (quando houver —
               irradiação e CadÚnico EXIGEM contextualização, ver indicadores.ts). */}
           {indicador.descricao && (
-            <div className="min-w-0 max-w-xl flex-1 md:mx-6">
-              <span className="block font-mono text-[10px] font-semibold text-violet-700 uppercase">
-                Nota Científica
+            <div className="mt-3 border-t border-stone-200/70 pt-3">
+              <span className="block text-[10px] font-bold tracking-widest text-stone-500 uppercase">
+                Nota científica
               </span>
-              <p className="text-[11px] leading-normal text-slate-500">{indicador.descricao}</p>
+              <p className="mt-0.5 text-xs leading-normal text-stone-600">{indicador.descricao}</p>
             </div>
           )}
+        </div>
 
-          <div className="flex shrink-0 items-center gap-4">
-            <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
-              <input
-                type="checkbox"
-                checked={destaqueLigado}
-                onChange={(evento) => aoAlternarDestaque(evento.target.checked)}
-                className="h-4 w-4"
-              />
-              Destacar Vazios de Acesso
-              {carregandoVazios && <span className="text-slate-400">carregando…</span>}
-            </label>
-            <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
-              <input
-                type="checkbox"
-                checked={descompassoLigado}
-                onChange={(evento) => aoAlternarDescompasso(evento.target.checked)}
-                className="h-4 w-4"
-              />
-              Descompasso Morfológico
-              {vazios && (
-                <span className="text-slate-400">
-                  ({vazios.municipios.filter((m) => m.descompassoMorfologico).length})
-                </span>
-              )}
-            </label>
+        <div className="shrink-0 rounded-2xl border border-red-200/60 bg-red-50/60 p-4 shadow-[0_12px_40px_rgb(185,28,28,0.08)] backdrop-blur-xl">
+          <div className="mb-3 flex items-center gap-2 border-b border-red-200/70 pb-2">
+            <span className="text-[10px] font-bold tracking-widest text-red-900 uppercase">
+              Lentes de priorização
+            </span>
+          </div>
+          <div className="flex flex-col gap-2">
+            <InterruptorLente
+              rotulo="Destacar Vazios de Acesso"
+              ligado={destaqueLigado}
+              aoAlternar={aoAlternarDestaque}
+              nota={carregandoVazios ? 'carregando…' : undefined}
+            />
+            <InterruptorLente
+              rotulo="Descompasso Morfológico"
+              ligado={descompassoLigado}
+              aoAlternar={aoAlternarDescompasso}
+              nota={vazios ? `(${vazios.municipios.filter((m) => m.descompassoMorfologico).length})` : undefined}
+            />
             <button
               type="button"
               onClick={() => aoAlternarHeatmap(!heatmapLigado)}
-              className={`flex items-center gap-1.5 rounded-lg border px-4 py-2.5 text-xs font-semibold shadow-xs transition-all ${
+              className={`mt-1 w-full rounded-lg px-4 py-2 text-xs font-bold shadow-sm transition-all ${
                 heatmapLigado
-                  ? 'border-violet-700 bg-violet-600 text-white'
-                  : 'border-violet-200 bg-white text-violet-700 hover:bg-violet-50'
+                  ? 'bg-red-700 text-white hover:bg-red-800'
+                  : 'border border-red-200 bg-white/70 text-red-800 hover:bg-white'
               }`}
             >
-              {heatmapLigado ? 'Ver Mapa Normal' : 'Modo Vazios de Acesso (Heatmap)'}
+              {heatmapLigado ? 'Ver mapa normal' : 'Gerar heatmap de exclusão'}
             </button>
           </div>
+
+          {/* Avisos operacionais — mesmas condições de antes, só reposicionados. */}
+          {heatmapLigado && (
+            <p className="mt-2 text-xs text-stone-500">
+              O indicador do mapa fica esmaecido enquanto o heatmap está ativo.
+            </p>
+          )}
+          {erroVazios && <p className="mt-2 text-xs text-red-600">{erroVazios}</p>}
+          {(destaqueLigado || heatmapLigado || descompassoLigado) &&
+            vazios &&
+            vazios.avisos.totalPrecisaReextrairMmgd > 0 && (
+            <p className="mt-2 text-xs text-amber-700">
+              {vazios.avisos.totalPrecisaReextrairMmgd.toLocaleString('pt-BR')} municípios fora da
+              classificação (MMGD residencial pendente de re-extração — ver CLAUDE.md).
+            </p>
+          )}
+          {filtrosDashboardAtivos && abaSidebar !== 'filtros' && (
+            <p className="mt-2 text-xs text-amber-700">
+              Filtro ativo: {codigosVisiveis?.length ?? 0} de {listaMunicipios.length} municípios
+              visíveis.
+            </p>
+          )}
         </div>
 
-        {/* Avisos operacionais do sub-header */}
-        {heatmapLigado && (
-          <p className="mt-2 text-xs text-slate-400">
-            O indicador do mapa fica esmaecido enquanto o heatmap está ativo.
-          </p>
-        )}
-        {erroVazios && <p className="mt-2 text-xs text-red-600">{erroVazios}</p>}
-        {(destaqueLigado || heatmapLigado || descompassoLigado) &&
-          vazios &&
-          vazios.avisos.totalPrecisaReextrairMmgd > 0 && (
-          <p className="mt-2 text-xs text-amber-600">
-            {vazios.avisos.totalPrecisaReextrairMmgd.toLocaleString('pt-BR')} municípios fora da
-            classificação (MMGD residencial pendente de re-extração — ver CLAUDE.md).
-          </p>
-        )}
-        {filtrosDashboardAtivos && abaSidebar !== 'filtros' && (
-          <p className="mt-2 text-xs text-amber-600">
-            Filtro ativo: {codigosVisiveis?.length ?? 0} de {listaMunicipios.length} municípios
-            visíveis.
-          </p>
-        )}
-      </section>
-
-      <div className="flex min-h-0 flex-1">
-        {/* Sidebar em abas: Ranking (RF-030 a RF-036) | Filtros (RF-046/047) */}
-        <aside className="flex w-80 shrink-0 flex-col border-r border-slate-200 bg-white">
-          <div className="flex gap-1 border-b border-slate-100 bg-slate-50 p-1">
+        {/* Abas: Ranking (RF-030 a RF-036) | Filtros (RF-046/047) */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/90 bg-white/70 shadow-[0_12px_40px_rgb(0,0,0,0.08)] backdrop-blur-xl">
+          <div className="flex shrink-0 gap-1 border-b border-stone-200/70 p-1.5">
             <button
               type="button"
               onClick={() => setAbaSidebar('ranking')}
-              className={`flex-1 rounded-md py-2 text-xs font-semibold transition-all ${
+              className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all ${
                 abaSidebar === 'ranking'
-                  ? 'border border-slate-200/60 bg-white text-slate-900 shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-800'
+                  ? 'bg-white text-stone-900 shadow-sm'
+                  : 'text-stone-500 hover:text-stone-800'
               }`}
             >
               Ranking estadual
@@ -470,13 +517,13 @@ export function PaginaMapa() {
             <button
               type="button"
               onClick={() => setAbaSidebar('filtros')}
-              className={`flex-1 rounded-md py-2 text-xs font-semibold transition-all ${
+              className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all ${
                 abaSidebar === 'filtros'
-                  ? 'border border-slate-200/60 bg-white text-slate-900 shadow-2xs'
-                  : 'text-slate-500 hover:text-slate-800'
+                  ? 'bg-white text-stone-900 shadow-sm'
+                  : 'text-stone-500 hover:text-stone-800'
               }`}
             >
-              Filtros do Mapa
+              Filtros do mapa
             </button>
           </div>
           <div className="min-h-0 flex-1">
@@ -512,75 +559,59 @@ export function PaginaMapa() {
               />
             )}
           </div>
-        </aside>
+        </div>
+      </div>
 
-        <div className="relative min-w-0 flex-1">
-          <MapaMunicipios
-            dados={dados}
+      {/* Legenda/heatmap flutuante — no modo heatmap (RF-057) o painel do
+          heatmap substitui a legenda do choropleth (modo exclusivo: o
+          choropleth está esmaecido). */}
+      <div className="absolute bottom-6 left-4 z-10 sm:left-6">
+        {heatmapLigado && vazios ? (
+          <PainelHeatmapVazios
+            totalVazios={vazios.municipios.length}
+            medianaNacional={vazios.medianaNacional}
+            notaMetodologica={vazios.notaMetodologica}
+          />
+        ) : (
+          <Legenda
             indicador={indicador}
             quebras={quebras}
-            codigosDestaque={codigosDestaque}
-            codigosDescompasso={codigosDescompasso}
-            pontosHeatmap={pontosHeatmap}
-            foco={foco}
-            estados={estados}
-            ufDestacada={ufDestacada || null}
-            codigoDestacado={municipioSelecionado?.codigoIbge ?? null}
-            codigosVisiveis={codigosVisiveis}
-            aoClicarMunicipio={(codigoIbge) =>
-              setMunicipioSelecionado(municipioPorCodigo.get(codigoIbge) ?? null)
-            }
-            aoClicarEstado={aoClicarEstadoNoMapa}
+            destaqueLigado={destaqueLigado && !!vazios}
+            totalDestacados={vazios?.municipios.length ?? 0}
           />
-
-          {/* Legenda — no modo heatmap (RF-057) o painel do heatmap substitui a
-            legenda do choropleth (modo exclusivo: o choropleth está esmaecido). */}
-        <div className="absolute bottom-6 left-4">
-          {heatmapLigado && vazios ? (
-            <PainelHeatmapVazios
-              totalVazios={vazios.municipios.length}
-              medianaNacional={vazios.medianaNacional}
-              notaMetodologica={vazios.notaMetodologica}
-            />
-          ) : (
-            <Legenda
-              indicador={indicador}
-              quebras={quebras}
-              destaqueLigado={destaqueLigado && !!vazios}
-              totalDestacados={vazios?.municipios.length ?? 0}
-            />
-          )}
-        </div>
-
-        {/* Estados de carga/erro do GeoJSON nacional */}
-        {carregando && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/70">
-            <p className="rounded-lg bg-white px-4 py-2 text-sm text-slate-600 shadow">
-              Carregando a malha municipal (~5.570 municípios)…
-            </p>
-          </div>
-        )}
-        {erro && !carregando && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/70">
-            <div className="rounded-lg bg-white px-4 py-3 text-sm shadow">
-              <p className="text-red-600">{erro}</p>
-              <p className="mt-1 text-slate-500">
-                O backend está rodando? (<code>make dev</code> na raiz do projeto)
-              </p>
-            </div>
-          </div>
         )}
       </div>
 
-        {municipioSelecionado && (
+      {/* Estados de carga/erro do GeoJSON nacional */}
+      {carregando && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-stone-100/60 backdrop-blur-sm">
+          <p className="rounded-2xl border border-white/90 bg-white/90 px-5 py-3 text-sm font-medium text-stone-600 shadow-[0_12px_40px_rgb(0,0,0,0.1)] backdrop-blur-xl">
+            Carregando a malha municipal (~5.570 municípios)…
+          </p>
+        </div>
+      )}
+      {erro && !carregando && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-stone-100/60 backdrop-blur-sm">
+          <div className="rounded-2xl border border-white/90 bg-white/90 px-5 py-4 text-sm shadow-[0_12px_40px_rgb(0,0,0,0.1)] backdrop-blur-xl">
+            <p className="font-semibold text-red-600">{erro}</p>
+            <p className="mt-1 text-stone-500">
+              O backend está rodando? (<code>make dev</code> na raiz do projeto)
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Painel de detalhe do município — flutuante à direita. */}
+      {municipioSelecionado && (
+        <div className="absolute top-4 bottom-4 right-4 z-10 sm:top-6 sm:right-6 sm:bottom-6">
           <PainelMunicipio
             municipio={municipioSelecionado}
             aoFechar={() => setMunicipioSelecionado(null)}
             medianaIrradiacao={vazios?.medianaNacional.potencialSolarKwhM2Dia ?? null}
             limiarPrecariedadeHabitacionalAlta={vazios?.limiarPrecariedadeHabitacionalAlta ?? null}
           />
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

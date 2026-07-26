@@ -72,27 +72,27 @@ export function PainelFiltrosDashboard({
   }
 
   return (
-    <div className="flex h-full flex-col bg-white">
-      <div className="border-b border-slate-100 bg-slate-50 p-3">
-        <span className="block font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
-          Refinar Cobertura
+    <div className="flex h-full flex-col">
+      <div className="border-b border-stone-200/70 p-3">
+        <span className="block font-mono text-[10px] font-bold tracking-wider text-stone-500 uppercase">
+          Refinar cobertura
         </span>
-        <h2 className="text-sm font-semibold text-slate-900">Filtros (Dashboard Público)</h2>
-        <p className="font-mono text-xs text-slate-500">
+        <h2 className="text-sm font-bold text-stone-900">Filtros (Dashboard Público)</h2>
+        <p className="font-mono text-xs text-stone-500">
           {totalVisiveis.toLocaleString('pt-BR')} de {totalMunicipios.toLocaleString('pt-BR')}{' '}
           municípios
         </p>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        <label htmlFor="filtro-uf" className="mb-1 block text-xs font-semibold text-slate-600">
+        <label htmlFor="filtro-uf" className="mb-1 block text-xs font-semibold text-stone-600">
           Estado
         </label>
         <select
           id="filtro-uf"
           value={uf}
           onChange={(evento) => aoMudarUf(evento.target.value)}
-          className="mb-3 w-full rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-800 focus:bg-white focus:ring-1 focus:ring-violet-500 focus:outline-none"
+          className="mb-3 w-full rounded-lg border border-stone-200/80 bg-white/70 px-2 py-1.5 text-sm text-stone-800 shadow-sm backdrop-blur-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-400/20"
         >
           <option value="">Todos os estados</option>
           {ufs.map(([sigla, nomeEstado]) => (
@@ -102,14 +102,14 @@ export function PainelFiltrosDashboard({
           ))}
         </select>
 
-        <label htmlFor="filtro-regiao" className="mb-1 block text-xs font-semibold text-slate-600">
+        <label htmlFor="filtro-regiao" className="mb-1 block text-xs font-semibold text-stone-600">
           Região
         </label>
         <select
           id="filtro-regiao"
           value={regiao}
           onChange={(evento) => aoMudarRegiao(evento.target.value)}
-          className="mb-3 w-full rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-800 focus:bg-white focus:ring-1 focus:ring-violet-500 focus:outline-none"
+          className="mb-3 w-full rounded-lg border border-stone-200/80 bg-white/70 px-2 py-1.5 text-sm text-stone-800 shadow-sm backdrop-blur-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-400/20"
         >
           <option value="">Todas as regiões</option>
           {regioes.map((nomeRegiao) => (
@@ -119,7 +119,7 @@ export function PainelFiltrosDashboard({
           ))}
         </select>
 
-        <p className="mb-1 block text-xs font-semibold text-slate-600">
+        <p className="mb-1 block text-xs font-semibold text-stone-600">
           Faixa de potência instalada (kW)
         </p>
         <div className="mb-3 flex items-center gap-2">
@@ -131,9 +131,9 @@ export function PainelFiltrosDashboard({
             placeholder="Mín."
             value={potenciaMin}
             onChange={(evento) => aoMudarPotenciaMin(evento.target.value)}
-            className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-800 focus:bg-white focus:ring-1 focus:ring-violet-500 focus:outline-none"
+            className="w-full rounded-lg border border-stone-200/80 bg-white/70 px-2 py-1.5 text-sm text-stone-800 shadow-sm backdrop-blur-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-400/20"
           />
-          <span className="text-slate-400">–</span>
+          <span className="text-stone-400">–</span>
           <input
             type="number"
             min={0}
@@ -142,13 +142,13 @@ export function PainelFiltrosDashboard({
             placeholder="Máx."
             value={potenciaMax}
             onChange={(evento) => aoMudarPotenciaMax(evento.target.value)}
-            className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-800 focus:bg-white focus:ring-1 focus:ring-violet-500 focus:outline-none"
+            className="w-full rounded-lg border border-stone-200/80 bg-white/70 px-2 py-1.5 text-sm text-stone-800 shadow-sm backdrop-blur-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-400/20"
           />
         </div>
 
         <label
           htmlFor="filtro-periodo"
-          className="mb-1 block text-xs font-semibold text-slate-400"
+          className="mb-1 block text-xs font-semibold text-stone-400"
           title="O Atlas guarda só o snapshot mais recente de cada indicador — sem série temporal, não há período para filtrar (mesma limitação do ranking por variação, RF-034). Ver CLAUDE.md."
         >
           Período (indisponível)
@@ -156,11 +156,11 @@ export function PainelFiltrosDashboard({
         <select
           id="filtro-periodo"
           disabled
-          className="mb-1 w-full cursor-not-allowed rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm text-slate-400"
+          className="mb-1 w-full cursor-not-allowed rounded-lg border border-stone-200/80 bg-white/40 px-2 py-1.5 text-sm text-stone-400"
         >
           <option>Snapshot mais recente (único disponível)</option>
         </select>
-        <p className="mb-3 text-xs text-slate-400">
+        <p className="mb-3 text-xs text-stone-400">
           Sem série temporal no banco ainda — filtro por período fica para quando houver histórico.
         </p>
 
@@ -168,14 +168,14 @@ export function PainelFiltrosDashboard({
           <button
             type="button"
             onClick={aoLimparFiltros}
-            className="mb-4 w-full rounded border border-slate-300 px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+            className="mb-4 w-full rounded-lg border border-stone-200/80 bg-white/50 px-2 py-1.5 text-sm text-stone-700 shadow-sm backdrop-blur-sm hover:bg-white/80"
           >
             Limpar filtros
           </button>
         )}
 
-        <div className="border-t border-slate-100 pt-3">
-          <p className="mb-2 font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+        <div className="border-t border-stone-200/70 pt-3">
+          <p className="mb-2 font-mono text-[10px] font-bold tracking-wider text-stone-500 uppercase">
             Baixar dados públicos (RF-047)
           </p>
           <div className="flex gap-1.5">
@@ -183,7 +183,7 @@ export function PainelFiltrosDashboard({
               type="button"
               onClick={() => aoExportar('csv')}
               disabled={exportando !== null}
-              className="flex-1 rounded border border-slate-200 px-2.5 py-2 text-[10px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="flex-1 rounded-lg border border-stone-200/80 bg-white/50 px-2.5 py-2 text-[10px] font-semibold text-stone-700 shadow-sm backdrop-blur-sm hover:bg-white/80 disabled:opacity-50"
             >
               {exportando === 'csv' ? 'Exportando…' : 'CSV'}
             </button>
@@ -191,13 +191,13 @@ export function PainelFiltrosDashboard({
               type="button"
               onClick={() => aoExportar('geojson')}
               disabled={exportando !== null}
-              className="flex-1 rounded border border-slate-200 px-2.5 py-2 text-[10px] font-semibold text-violet-700 hover:bg-violet-50 disabled:opacity-50"
+              className="flex-1 rounded-lg border border-red-200/70 bg-red-50/60 px-2.5 py-2 text-[10px] font-semibold text-red-700 shadow-sm backdrop-blur-sm hover:bg-red-50/90 disabled:opacity-50"
             >
               {exportando === 'geojson' ? 'Exportando…' : 'GeoJSON'}
             </button>
           </div>
           {erroExportacao && <p className="mt-1 text-xs text-red-600">{erroExportacao}</p>}
-          <p className="mt-2 text-xs text-slate-400">
+          <p className="mt-2 text-xs text-stone-400">
             O download respeita os filtros de estado/região/potência acima.
           </p>
         </div>

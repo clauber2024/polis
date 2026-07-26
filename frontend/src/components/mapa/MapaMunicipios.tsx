@@ -40,16 +40,29 @@ export const COR_SEM_DADO = '#e2e8f0';
 const COR_FUNDO_MODO_HEATMAP = '#eef2f7';
 
 /**
- * Rampa do heatmap (transparente → violeta escuro) — mesma família do
- * violeta que já identifica "Vazio de Acesso" no destaque e nos badges
- * (#7c3aed), para manter a identidade visual do conceito.
+ * Destaque de Vazios de Acesso (25/07/2026, auditoria de UX/UI) — trocado de
+ * contorno colorido por "atenuação ativa": municípios fora do filtro caem
+ * pra um cinza neutro (COR_ATENUADA) e baixa opacidade; os Vazios de Acesso
+ * ganham preenchimento sólido carmim (COR_DESTAQUE_VAZIO) em opacidade alta.
+ * Contorno sozinho, com centenas de municípios pequenos lado a lado (ex.:
+ * interior do Nordeste), virava um "borrão" de linhas sobrepostas — a
+ * técnica de dimming resolve isso sem depender da espessura do traço.
+ */
+export const COR_DESTAQUE_VAZIO = '#b91c1c';
+const COR_ATENUADA = '#e7e5e4';
+
+/**
+ * Rampa do heatmap (transparente → terracota escuro) — mesma família de cor
+ * que identifica "Vazio de Acesso" no destaque e nos badges (#ea580c,
+ * paleta institucional do Pólis desde 25/07/2026 — antes era violeta),
+ * para manter a identidade visual do conceito.
  */
 export const RAMPA_HEATMAP: [number, string][] = [
-  [0, 'rgba(124, 58, 237, 0)'],
-  [0.15, '#ede9fe'],
-  [0.4, '#c4b5fd'],
-  [0.65, '#8b5cf6'],
-  [1, '#5b21b6'],
+  [0, 'rgba(234, 88, 12, 0)'],
+  [0.15, '#ffedd5'],
+  [0.4, '#fdba74'],
+  [0.65, '#f97316'],
+  [1, '#9a3412'],
 ];
 
 const FONTE = 'municipios';
@@ -58,7 +71,6 @@ const FONTE_ESTADOS = 'estados';
 const FONTE_ROTULOS = 'municipios-rotulos';
 const CAMADA_PREENCHIMENTO = 'municipios-preenchimento';
 const CAMADA_CONTORNO = 'municipios-contorno';
-const CAMADA_DESTAQUE = 'vazios-destaque';
 const CAMADA_DESTAQUE_DESCOMPASSO = 'descompasso-destaque';
 const CAMADA_HEATMAP = 'vazios-heatmap';
 const CAMADA_ESTADOS = 'estados-contorno';
@@ -129,10 +141,11 @@ interface MapaMunicipiosProps {
   codigosDestaque: string[] | null;
   /**
    * Códigos IBGE com alerta de Descompasso Morfológico ativo (21/07/2026,
-   * `descompassoMorfologico` do backend) ou null para desligar — camada
+   * `descompassoMorfologico` do backend) ou null para desligar — mecanismo
    * independente do destaque de Vazios de Acesso (um município pode ter os
-   * dois ao mesmo tempo, por isso cores/traço diferentes em vez de reusar
-   * CAMADA_DESTAQUE).
+   * dois ao mesmo tempo): este continua sendo contorno tracejado
+   * (CAMADA_DESTAQUE_DESCOMPASSO), enquanto Vazios de Acesso virou
+   * dimming do preenchimento.
    */
   codigosDescompasso: string[] | null;
   /**
@@ -147,7 +160,7 @@ interface MapaMunicipiosProps {
    * Contornos estaduais (GET /api/estados) ou null enquanto não carregou —
    * camada de REFERÊNCIA visual (limite de estados por cima do choropleth,
    * 14/07/2026). Desenhada ABAIXO do destaque de Vazios de Acesso de
-   * propósito: o violeta do destaque continua sendo a linha mais proeminente.
+   * propósito: o terracota do destaque continua sendo a linha mais proeminente.
    */
   estados: EstadosGeoJson | null;
   /**
@@ -384,18 +397,12 @@ export function MapaMunicipios({
       // escuras. Ajuste feito após validação visual de 09/07/2026.
       paint: { 'line-color': '#64748b', 'line-width': 0.3, 'line-opacity': 0.4 },
     });
-    mapa.addLayer({
-      id: CAMADA_DESTAQUE,
-      type: 'line',
-      source: FONTE,
-      filter: ['boolean', false],
-      paint: { 'line-color': '#7c3aed', 'line-width': 1.4 },
-    });
-
-    // Descompasso Morfológico (21/07/2026) — traço tracejado vermelho,
-    // deliberadamente diferente do violeta sólido de Vazios de Acesso: um
-    // município pode ter os dois alertas ao mesmo tempo, e as duas camadas
-    // precisam continuar distinguíveis quando sobrepostas.
+    // Descompasso Morfológico (21/07/2026) — traço tracejado carmim. Vazios
+    // de Acesso não usa mais contorno (virou dimming do preenchimento, ver
+    // COR_DESTAQUE_VAZIO/COR_ATENUADA acima), então esta é a única camada
+    // de destaque em linha que resta — um município pode ter os dois
+    // alertas ao mesmo tempo (Vazio de Acesso via fill + Descompasso via
+    // linha tracejada por cima).
     mapa.addLayer({
       id: CAMADA_DESTAQUE_DESCOMPASSO,
       type: 'line',
@@ -405,8 +412,8 @@ export function MapaMunicipios({
     });
 
     // Contorno engrossado do município selecionado (15/07/2026) — mesma
-    // solução do destaque de estado; acima do destaque violeta de Vazios
-    // (é a seleção ativa do usuário, a linha mais importante do momento).
+    // solução do destaque de estado; fica por cima do preenchimento (é a
+    // seleção ativa do usuário, a linha mais importante do momento).
     mapa.addLayer({
       id: CAMADA_MUNICIPIO_DESTACADO,
       type: 'line',
@@ -448,19 +455,54 @@ export function MapaMunicipios({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- corChoropleth é aplicado pelo efeito abaixo nas atualizações; pontosRotulos deriva de dados
   }, [dados, mapaCarregado]);
 
-  // Troca de indicador → só repinta a camada (sem recriar fonte). No modo
-  // heatmap (RF-057) o choropleth esmaece para o fundo neutro — modo
-  // exclusivo, ver COR_FUNDO_MODO_HEATMAP.
+  // Troca de indicador, modo heatmap e destaque de Vazios de Acesso — os
+  // três disputam o MESMO paint property (fill-color/fill-opacity) da
+  // camada de preenchimento, por isso vivem num efeito só, com prioridade
+  // heatmap > destaque > choropleth normal (heatmap continua sendo modo
+  // EXCLUSIVO, ver COR_FUNDO_MODO_HEATMAP). Destaque via "atenuação ativa"
+  // (25/07/2026, auditoria de UX/UI) — substitui o antigo contorno colorido
+  // (CAMADA_DESTAQUE, removida): municípios fora do filtro esmaecem para
+  // COR_ATENUADA em opacidade baixa, os Vazios de Acesso ganham
+  // preenchimento sólido em COR_DESTAQUE_VAZIO. Contorno-only virava um
+  // "borrão" de linhas sobrepostas em regiões com muitos municípios pequenos
+  // lado a lado (ex.: interior do Nordeste) — fill resolve isso sem depender
+  // da espessura do traço.
   const modoHeatmap = pontosHeatmap !== null;
+  const modoDestaque = !modoHeatmap && !!codigosDestaque && codigosDestaque.length > 0;
   useEffect(() => {
     const mapa = mapaRef.current;
     if (!mapa || !mapaCarregado || !mapa.getLayer(CAMADA_PREENCHIMENTO)) return;
-    mapa.setPaintProperty(
-      CAMADA_PREENCHIMENTO,
-      'fill-color',
-      modoHeatmap ? COR_FUNDO_MODO_HEATMAP : corChoropleth,
-    );
-  }, [corChoropleth, modoHeatmap, mapaCarregado, dados]);
+
+    if (modoHeatmap) {
+      mapa.setPaintProperty(CAMADA_PREENCHIMENTO, 'fill-color', COR_FUNDO_MODO_HEATMAP);
+      mapa.setPaintProperty(CAMADA_PREENCHIMENTO, 'fill-opacity', 0.85);
+      return;
+    }
+
+    if (modoDestaque && codigosDestaque) {
+      const ehVazio = [
+        'in',
+        ['get', 'codigoIbge'],
+        ['literal', codigosDestaque],
+      ] as unknown as ExpressionSpecification;
+      mapa.setPaintProperty(CAMADA_PREENCHIMENTO, 'fill-color', [
+        'case',
+        ehVazio,
+        COR_DESTAQUE_VAZIO,
+        COR_ATENUADA,
+      ] as unknown as ExpressionSpecification);
+      mapa.setPaintProperty(CAMADA_PREENCHIMENTO, 'fill-opacity', [
+        'case',
+        ehVazio,
+        0.85,
+        0.3,
+      ] as unknown as ExpressionSpecification);
+      return;
+    }
+
+    mapa.setPaintProperty(CAMADA_PREENCHIMENTO, 'fill-color', corChoropleth);
+    mapa.setPaintProperty(CAMADA_PREENCHIMENTO, 'fill-opacity', 0.85);
+  }, [corChoropleth, modoHeatmap, modoDestaque, codigosDestaque, mapaCarregado, dados]);
 
   // Liga/desliga/atualiza a camada heatmap (RF-057). Fonte e camada são
   // criadas de forma lazy no primeiro uso; desligar só esconde (visibility),
@@ -517,10 +559,11 @@ export function MapaMunicipios({
   }, [pontosHeatmap, mapaCarregado]);
 
   // Camada de limite dos estados — adicionada quando o GeoJSON de estados
-  // chega. Inserida ANTES (= por baixo) do destaque de Vazios de Acesso,
-  // para o violeta continuar sendo a linha mais proeminente do mapa; e
+  // chega. Inserida ANTES (= por baixo) do destaque de Descompasso
+  // Morfológico, para essa linha continuar sendo a mais proeminente do
+  // mapa (Vazios de Acesso não usa mais contorno, ver COR_DESTAQUE_VAZIO);
   // depende de `dados` porque as camadas municipais precisam existir antes
-  // (senão o beforeId CAMADA_DESTAQUE ainda não existe).
+  // (senão o beforeId CAMADA_DESTAQUE_DESCOMPASSO ainda não existe).
   useEffect(() => {
     const mapa = mapaRef.current;
     if (!mapa || !mapaCarregado || !estados || !dados) return;
@@ -543,7 +586,7 @@ export function MapaMunicipios({
         maxzoom: ZOOM_CLIQUE_ESTADO,
         paint: { 'fill-color': '#000000', 'fill-opacity': 0.001 },
       },
-      mapa.getLayer(CAMADA_DESTAQUE) ? CAMADA_DESTAQUE : undefined,
+      mapa.getLayer(CAMADA_DESTAQUE_DESCOMPASSO) ? CAMADA_DESTAQUE_DESCOMPASSO : undefined,
     );
     mapa.on('click', CAMADA_ESTADOS_FILL, (evento) => {
       const uf = evento.features?.[0]?.properties?.uf;
@@ -567,7 +610,7 @@ export function MapaMunicipios({
           'line-opacity': 0.75,
         },
       },
-      mapa.getLayer(CAMADA_DESTAQUE) ? CAMADA_DESTAQUE : undefined,
+      mapa.getLayer(CAMADA_DESTAQUE_DESCOMPASSO) ? CAMADA_DESTAQUE_DESCOMPASSO : undefined,
     );
 
     // Contorno destacado do estado selecionado (ranking/filtro, 15/07/2026).
@@ -583,7 +626,7 @@ export function MapaMunicipios({
           'line-width': ['interpolate', ['linear'], ['zoom'], 3, 1.8, 8, 3.2],
         },
       },
-      mapa.getLayer(CAMADA_DESTAQUE) ? CAMADA_DESTAQUE : undefined,
+      mapa.getLayer(CAMADA_DESTAQUE_DESCOMPASSO) ? CAMADA_DESTAQUE_DESCOMPASSO : undefined,
     );
 
     // Rótulos de ESTADO no zoom amplo (15/07/2026) — `pontoRotulo` do backend
@@ -664,23 +707,9 @@ export function MapaMunicipios({
     }
   }, [codigoDestacado, mapaCarregado, dados]);
 
-  // Liga/desliga o contorno de destaque dos Vazios de Acesso.
-  useEffect(() => {
-    const mapa = mapaRef.current;
-    if (!mapa || !mapaCarregado || !mapa.getLayer(CAMADA_DESTAQUE)) return;
-    if (codigosDestaque && codigosDestaque.length > 0) {
-      mapa.setFilter(CAMADA_DESTAQUE, [
-        'in',
-        ['get', 'codigoIbge'],
-        ['literal', codigosDestaque],
-      ] as unknown as FilterSpecification);
-    } else {
-      mapa.setFilter(CAMADA_DESTAQUE, ['boolean', false]);
-    }
-  }, [codigosDestaque, mapaCarregado, dados]);
-
-  // Liga/desliga o contorno de destaque de Descompasso Morfológico (mesmo
-  // padrão do destaque de Vazios de Acesso acima, camada independente).
+  // Liga/desliga o contorno de destaque de Descompasso Morfológico —
+  // Vazios de Acesso não usa mais contorno (ver o efeito de
+  // fill-color/fill-opacity abaixo, que já reage a codigosDestaque).
   useEffect(() => {
     const mapa = mapaRef.current;
     if (!mapa || !mapaCarregado || !mapa.getLayer(CAMADA_DESTAQUE_DESCOMPASSO)) return;
@@ -697,8 +726,8 @@ export function MapaMunicipios({
 
   // Filtro do Dashboard Público (RF-046) — esconde (não esmaece) municípios
   // fora da faixa/estado/região selecionados, no preenchimento E no contorno.
-  // Independente do destaque de Vazios de Acesso (camada separada,
-  // CAMADA_DESTAQUE) e do heatmap — filtrar o choropleth não afeta essas
+  // Independente do destaque de Vazios de Acesso (dimming do próprio
+  // preenchimento) e do heatmap — filtrar o choropleth não afeta essas
   // outras camadas de propósito (fora do escopo do RF-046).
   useEffect(() => {
     const mapa = mapaRef.current;
@@ -751,22 +780,22 @@ export function MapaMunicipios({
 
       {hover && municipioHover && (
         <div
-          className="pointer-events-none absolute z-20 max-w-[260px] rounded-xl border border-slate-700/85 bg-slate-900/95 p-3 text-xs text-white shadow-xl backdrop-blur-md"
+          className="pointer-events-none absolute z-20 max-w-[260px] rounded-xl border border-stone-700/85 bg-stone-900/95 p-3 text-xs text-white shadow-xl backdrop-blur-md"
           style={{ left: hover.x, top: hover.y, transform: 'translate(-50%, -110%)' }}
         >
-          <p className="text-xs font-bold tracking-tight text-slate-100">
+          <p className="text-xs font-bold tracking-tight text-stone-100">
             {municipioHover.nome}
           </p>
-          <p className="font-mono text-[9px] text-slate-400">
+          <p className="font-mono text-[9px] text-stone-400">
             {municipioHover.regiao} · {municipioHover.uf}
           </p>
 
-          <div className="mt-2 space-y-1 rounded border border-slate-800/50 bg-slate-800/40 p-2">
-            <div className="flex items-center justify-between text-[8.5px] text-slate-400">
+          <div className="mt-2 space-y-1 rounded border border-stone-800/50 bg-stone-800/40 p-2">
+            <div className="flex items-center justify-between text-[8.5px] text-stone-400">
               <span>Indicador Ativo</span>
             </div>
-            <div className="text-[10px] font-semibold text-slate-200">{indicador.rotulo}</div>
-            <div className="font-mono text-xs font-bold text-violet-400">
+            <div className="text-[10px] font-semibold text-stone-200">{indicador.rotulo}</div>
+            <div className="font-mono text-xs font-bold text-red-400">
               {municipioHover[indicador.id] !== null
                 ? `${formatarValor(municipioHover[indicador.id] as number, indicador.formato)}${indicador.unidade ? ` ${indicador.unidade}` : ''}`
                 : 'Não disponível'}
@@ -774,21 +803,21 @@ export function MapaMunicipios({
           </div>
 
           {indicador.metadados && (
-            <div className="mt-1.5 grid grid-cols-2 gap-2 border-t border-slate-800/60 pt-1.5 text-[9px]">
+            <div className="mt-1.5 grid grid-cols-2 gap-2 border-t border-stone-800/60 pt-1.5 text-[9px]">
               <div>
-                <span className="block font-mono text-[7.5px] tracking-wider text-slate-500 uppercase">
+                <span className="block font-mono text-[7.5px] tracking-wider text-stone-500 uppercase">
                   Confiança
                 </span>
                 <span className="font-bold text-emerald-400">{indicador.metadados.confianca}</span>
               </div>
               <div>
-                <span className="block font-mono text-[7.5px] tracking-wider text-slate-500 uppercase">
+                <span className="block font-mono text-[7.5px] tracking-wider text-stone-500 uppercase">
                   Natureza
                 </span>
-                <span className="font-bold text-cyan-400">{indicador.metadados.natureza}</span>
+                <span className="font-bold text-orange-400">{indicador.metadados.natureza}</span>
               </div>
-              <div className="col-span-2 font-mono text-[8px] text-slate-500">
-                <span className="text-slate-400">Fonte:</span> {indicador.metadados.fonte}
+              <div className="col-span-2 font-mono text-[8px] text-stone-500">
+                <span className="text-stone-400">Fonte:</span> {indicador.metadados.fonte}
               </div>
             </div>
           )}

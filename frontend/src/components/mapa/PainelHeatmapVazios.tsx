@@ -31,11 +31,11 @@ export function PainelHeatmapVazios({
   notaMetodologica,
 }: PainelHeatmapVaziosProps) {
   return (
-    <div className="max-w-72 rounded border border-violet-100 bg-white/95 p-3 text-xs shadow-md backdrop-blur-sm">
-      <p className="mb-1 font-mono text-[10px] font-bold tracking-wider text-violet-700 uppercase">
+    <div className="max-w-72 rounded-2xl border border-orange-200/70 bg-orange-50/70 p-4 text-sm shadow-[0_12px_40px_rgb(0,0,0,0.1)] backdrop-blur-xl">
+      <p className="mb-1.5 font-mono text-[11px] font-bold tracking-wider text-orange-800 uppercase">
         Camada de Vazios de Acesso
       </p>
-      <p className="mb-2 leading-snug text-slate-500">
+      <p className="mb-3 text-xs leading-snug text-stone-600">
         {totalVazios.toLocaleString('pt-BR')} municípios com alto potencial solar (irradiação ≥{' '}
         {formatarValor(medianaNacional.potencialSolarKwhM2Dia, 'numero')} kWh/m²·dia) e baixa MMGD
         residencial per capita (&lt;{' '}
@@ -43,22 +43,22 @@ export function PainelHeatmapVazios({
         medianas nacionais, classificação do backend.
       </p>
 
-      <div className="h-2.5 rounded" style={{ background: GRADIENTE }} />
-      <div className="mt-0.5 flex justify-between font-mono text-[10px] text-slate-500">
+      <div className="h-3 rounded-full shadow-inner" style={{ background: GRADIENTE }} />
+      <div className="mt-1 flex justify-between font-mono text-xs text-stone-500">
         <span>menor concentração</span>
         <span>maior</span>
       </div>
 
-      <p className="mt-2 leading-snug text-slate-500">
+      <p className="mt-3 text-xs leading-snug text-stone-600">
         Intensidade ponderada pelo IVS (municípios mais vulneráveis pesam mais — mesmo critério de
         priorização do ranking). Municípios sem IVS entram com peso mínimo.
       </p>
 
       <details className="mt-2">
-        <summary className="cursor-pointer font-mono text-[10px] font-semibold tracking-wide text-violet-700 uppercase hover:text-violet-900">
+        <summary className="cursor-pointer font-mono text-xs font-semibold tracking-wide text-orange-800 uppercase hover:text-orange-900">
           Nota metodológica
         </summary>
-        <p className="mt-1 leading-snug text-slate-500">{notaMetodologica}</p>
+        <p className="mt-1 text-xs leading-snug text-stone-600">{notaMetodologica}</p>
       </details>
     </div>
   );

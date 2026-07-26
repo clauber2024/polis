@@ -78,7 +78,7 @@ export function CartaoDescompassoMorfologico({
   }
 
   return (
-    <div className="mx-4 mt-3 rounded-lg border-2 border-red-300 bg-red-50 p-3">
+    <div className="mx-4 mt-3 rounded-lg border-2 border-red-300/80 bg-red-50/80 p-3">
       <p className="mb-1 font-mono text-[10px] font-bold tracking-wider text-red-700 uppercase">
         ⚠ Descompasso morfológico
       </p>

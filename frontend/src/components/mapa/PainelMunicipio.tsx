@@ -42,14 +42,14 @@ function DetalhamentoSetores({ setores }: { setores: SetorCensitario[] }) {
         <li key={setor.id} className="rounded-lg border border-slate-100 p-2 text-xs">
           <div className="flex items-baseline justify-between gap-2">
             <span className="min-w-0 flex-1 truncate text-slate-700">{setor.nomeExibicao}</span>
-            <span className="shrink-0 font-mono font-semibold text-violet-700">
+            <span className="shrink-0 font-mono font-semibold text-red-700">
               {formatarValor(setor.potenciaInstaladaKw, 'numero')} kW
             </span>
           </div>
           <div className="mt-1 h-1 overflow-hidden rounded-full bg-slate-100">
             {setor.potenciaInstaladaKw !== null && (
               <div
-                className="h-full rounded-full bg-violet-400"
+                className="h-full rounded-full bg-red-400"
                 style={{
                   width: `${Math.max(2, (setor.potenciaInstaladaKw / maximo) * 100)}%`,
                 }}
@@ -245,7 +245,7 @@ export function PainelMunicipio({
   const notaMunicipio = NOTAS_MUNICIPIO[municipio.codigoIbge];
 
   return (
-    <aside className="flex h-full w-80 flex-col overflow-y-auto border-l border-slate-200 bg-white shadow-xs">
+    <aside className="flex h-full w-80 flex-col overflow-y-auto rounded-3xl border border-white/90 bg-white/85 shadow-[0_12px_40px_rgb(0,0,0,0.12)] backdrop-blur-2xl">
       <div className="flex items-start justify-between gap-2 border-b border-slate-100 p-4">
         <div className="space-y-1">
           <h2 className="font-display text-lg leading-tight font-bold text-slate-900">
@@ -337,7 +337,7 @@ export function PainelMunicipio({
           <button
             type="button"
             onClick={() => setDetalhamentoAberto((aberto) => !aberto)}
-            className="flex w-full items-center justify-between rounded-lg border border-violet-200 bg-violet-50/60 px-3 py-2 text-left text-sm font-semibold text-violet-800 hover:bg-violet-50"
+            className="flex w-full items-center justify-between rounded-lg border border-red-200 bg-red-50/60 px-3 py-2 text-left text-sm font-semibold text-red-800 hover:bg-red-50"
           >
             <span>Ver detalhamento interno ({setores.setores.length} setores censitários)</span>
             <span aria-hidden="true">{detalhamentoAberto ? '▲' : '▼'}</span>
