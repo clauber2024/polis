@@ -597,6 +597,8 @@ export function PaginaMapa() {
             quebras={quebras}
             destaqueLigado={destaqueLigado && !!vazios}
             totalDestacados={vazios?.municipios.length ?? 0}
+            descompassoLigado={descompassoLigado && !!vazios}
+            totalDescompasso={codigosDescompasso?.length ?? 0}
           />
         )}
       </div>

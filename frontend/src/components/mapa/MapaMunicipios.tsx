@@ -40,16 +40,29 @@ export const COR_SEM_DADO = '#e2e8f0';
 const COR_FUNDO_MODO_HEATMAP = '#eef2f7';
 
 /**
- * Destaque de Vazios de Acesso (25/07/2026, auditoria de UX/UI) — trocado de
- * contorno colorido por "atenuação ativa": municípios fora do filtro caem
- * pra um cinza neutro (COR_ATENUADA) e baixa opacidade; os Vazios de Acesso
- * ganham preenchimento sólido carmim (COR_DESTAQUE_VAZIO) em opacidade alta.
- * Contorno sozinho, com centenas de municípios pequenos lado a lado (ex.:
- * interior do Nordeste), virava um "borrão" de linhas sobrepostas — a
- * técnica de dimming resolve isso sem depender da espessura do traço.
+ * Lentes de Priorização — Vazios de Acesso e Descompasso Morfológico
+ * (25/07/2026, 2ª rodada de auditoria de UX/UI). Tentativa anterior
+ * substituía o preenchimento inteiro por um esquema de "atenuação"
+ * (município fora do filtro virava cinza, dentro virava carmim sólido) —
+ * corrigido aqui porque isso ESCONDIA o indicador ativo, anulando o
+ * propósito de cruzar "quem é Vazio de Acesso" com "qual o valor do
+ * indicador ali" ao mesmo tempo. Agora são duas camadas de preenchimento
+ * TRANSLÚCIDAS extras, sobrepostas ao indicador (que continua sempre
+ * visível, só com a opacidade reduzida quando alguma lente está ligada —
+ * ver OPACIDADE_BASE_COM_LENTE). Onde as duas lentes coincidem, o WebGL
+ * soma os canais alfa sozinho, sem cálculo de cor manual.
  */
+export const COR_LENTE_VAZIOS = 'rgba(185, 28, 28, 0.55)';
+const COR_LENTE_VAZIOS_CONTORNO = 'rgba(185, 28, 28, 1)';
+export const COR_LENTE_DESCOMPASSO = 'rgba(245, 158, 11, 0.55)';
+const COR_LENTE_DESCOMPASSO_CONTORNO = 'rgba(217, 119, 6, 1)';
+const OPACIDADE_BASE_NORMAL = 0.85;
+const OPACIDADE_BASE_COM_LENTE = 0.45;
+
+/** Versões sólidas das cores das lentes — só para UI (swatch da legenda,
+ * badges), nunca aplicadas como paint do mapa (lá são sempre translúcidas). */
 export const COR_DESTAQUE_VAZIO = '#b91c1c';
-const COR_ATENUADA = '#e7e5e4';
+export const COR_DESTAQUE_DESCOMPASSO = '#d97706';
 
 /** Badge de confiança do tooltip de hover — cor reflete o dado real
  * (`indicador.metadados.confianca`), não fixa: "Baixa" em verde-sucesso
@@ -80,7 +93,8 @@ const FONTE_ESTADOS = 'estados';
 const FONTE_ROTULOS = 'municipios-rotulos';
 const CAMADA_PREENCHIMENTO = 'municipios-preenchimento';
 const CAMADA_CONTORNO = 'municipios-contorno';
-const CAMADA_DESTAQUE_DESCOMPASSO = 'descompasso-destaque';
+const CAMADA_LENTE_VAZIOS = 'lente-vazios-acesso';
+const CAMADA_LENTE_DESCOMPASSO = 'lente-descompasso';
 const CAMADA_HEATMAP = 'vazios-heatmap';
 const CAMADA_ESTADOS = 'estados-contorno';
 const CAMADA_ESTADOS_FILL = 'estados-fill';
@@ -146,15 +160,19 @@ interface MapaMunicipiosProps {
   indicador: IndicadorMapa;
   /** Cortes internos das 5 classes (calcularQuebrasQuantis) — mesmos da legenda. */
   quebras: number[];
-  /** Códigos IBGE a destacar (quadrante Vazio de Acesso) ou null para desligar. */
+  /**
+   * Códigos IBGE a destacar (quadrante Vazio de Acesso) ou null para
+   * desligar — vira a lente translúcida CAMADA_LENTE_VAZIOS, sobreposta
+   * ao indicador ativo (não substitui mais o preenchimento, ver
+   * COR_LENTE_VAZIOS).
+   */
   codigosDestaque: string[] | null;
   /**
    * Códigos IBGE com alerta de Descompasso Morfológico ativo (21/07/2026,
-   * `descompassoMorfologico` do backend) ou null para desligar — mecanismo
-   * independente do destaque de Vazios de Acesso (um município pode ter os
-   * dois ao mesmo tempo): este continua sendo contorno tracejado
-   * (CAMADA_DESTAQUE_DESCOMPASSO), enquanto Vazios de Acesso virou
-   * dimming do preenchimento.
+   * `descompassoMorfologico` do backend) ou null para desligar — lente
+   * translúcida independente da de Vazios de Acesso (CAMADA_LENTE_DESCOMPASSO);
+   * um município pode ter as duas ligadas ao mesmo tempo, e o WebGL soma os
+   * alfas das duas sozinho, sem cálculo de cor manual.
    */
   codigosDescompasso: string[] | null;
   /**
@@ -168,8 +186,8 @@ interface MapaMunicipiosProps {
   /**
    * Contornos estaduais (GET /api/estados) ou null enquanto não carregou —
    * camada de REFERÊNCIA visual (limite de estados por cima do choropleth,
-   * 14/07/2026). Desenhada ABAIXO do destaque de Vazios de Acesso de
-   * propósito: o terracota do destaque continua sendo a linha mais proeminente.
+   * 14/07/2026). Desenhada ABAIXO das lentes de priorização de propósito:
+   * os alertas continuam sendo o elemento mais proeminente do mapa.
    */
   estados: EstadosGeoJson | null;
   /**
@@ -406,18 +424,33 @@ export function MapaMunicipios({
       // escuras. Ajuste feito após validação visual de 09/07/2026.
       paint: { 'line-color': '#64748b', 'line-width': 0.3, 'line-opacity': 0.4 },
     });
-    // Descompasso Morfológico (21/07/2026) — traço tracejado carmim. Vazios
-    // de Acesso não usa mais contorno (virou dimming do preenchimento, ver
-    // COR_DESTAQUE_VAZIO/COR_ATENUADA acima), então esta é a única camada
-    // de destaque em linha que resta — um município pode ter os dois
-    // alertas ao mesmo tempo (Vazio de Acesso via fill + Descompasso via
-    // linha tracejada por cima).
+    // Lentes de Priorização (25/07/2026, 2ª rodada) — preenchimentos
+    // translúcidos, nascem desligadas (filter false) e SOBREPÕEM o
+    // indicador ativo em vez de substituí-lo (ver comentário de
+    // COR_LENTE_VAZIOS/COR_LENTE_DESCOMPASSO acima). Um traço tracejado
+    // (usado antes para Descompasso) some visualmente em zoom nacional com
+    // muitos municípios pequenos — fill translúcido não tem esse problema.
     mapa.addLayer({
-      id: CAMADA_DESTAQUE_DESCOMPASSO,
-      type: 'line',
+      id: CAMADA_LENTE_VAZIOS,
+      type: 'fill',
       source: FONTE,
       filter: ['boolean', false],
-      paint: { 'line-color': '#dc2626', 'line-width': 1.6, 'line-dasharray': [2, 1.5] },
+      paint: {
+        'fill-color': COR_LENTE_VAZIOS,
+        'fill-outline-color': COR_LENTE_VAZIOS_CONTORNO,
+        'fill-opacity-transition': { duration: 300, delay: 0 },
+      } as unknown as maplibregl.FillLayerSpecification['paint'],
+    });
+    mapa.addLayer({
+      id: CAMADA_LENTE_DESCOMPASSO,
+      type: 'fill',
+      source: FONTE,
+      filter: ['boolean', false],
+      paint: {
+        'fill-color': COR_LENTE_DESCOMPASSO,
+        'fill-outline-color': COR_LENTE_DESCOMPASSO_CONTORNO,
+        'fill-opacity-transition': { duration: 300, delay: 0 },
+      } as unknown as maplibregl.FillLayerSpecification['paint'],
     });
 
     // Contorno engrossado do município selecionado (15/07/2026) — mesma
@@ -464,54 +497,55 @@ export function MapaMunicipios({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- corChoropleth é aplicado pelo efeito abaixo nas atualizações; pontosRotulos deriva de dados
   }, [dados, mapaCarregado]);
 
-  // Troca de indicador, modo heatmap e destaque de Vazios de Acesso — os
-  // três disputam o MESMO paint property (fill-color/fill-opacity) da
-  // camada de preenchimento, por isso vivem num efeito só, com prioridade
-  // heatmap > destaque > choropleth normal (heatmap continua sendo modo
-  // EXCLUSIVO, ver COR_FUNDO_MODO_HEATMAP). Destaque via "atenuação ativa"
-  // (25/07/2026, auditoria de UX/UI) — substitui o antigo contorno colorido
-  // (CAMADA_DESTAQUE, removida): municípios fora do filtro esmaecem para
-  // COR_ATENUADA em opacidade baixa, os Vazios de Acesso ganham
-  // preenchimento sólido em COR_DESTAQUE_VAZIO. Contorno-only virava um
-  // "borrão" de linhas sobrepostas em regiões com muitos municípios pequenos
-  // lado a lado (ex.: interior do Nordeste) — fill resolve isso sem depender
-  // da espessura do traço.
+  // Troca de indicador e modo heatmap — os dois disputam o MESMO paint
+  // property (fill-color) da camada de preenchimento, por isso vivem num
+  // efeito só (heatmap continua sendo modo EXCLUSIVO, ver
+  // COR_FUNDO_MODO_HEATMAP). fill-opacity também reage às lentes de
+  // priorização (25/07/2026, 2ª rodada): quando Vazios de Acesso e/ou
+  // Descompasso Morfológico estão ligados, a opacidade do indicador cai
+  // pra OPACIDADE_BASE_COM_LENTE — dá contraste pras lentes translúcidas
+  // (CAMADA_LENTE_VAZIOS/CAMADA_LENTE_DESCOMPASSO, camadas PRÓPRIAS, ver
+  // abaixo) sem apagar o indicador de base, que continua a mesma cor de
+  // sempre (o corte por "atenuação" tentado antes escondia o indicador —
+  // corrigido aqui).
   const modoHeatmap = pontosHeatmap !== null;
-  const modoDestaque = !modoHeatmap && !!codigosDestaque && codigosDestaque.length > 0;
+  const algumaLenteAtiva =
+    !modoHeatmap &&
+    ((!!codigosDestaque && codigosDestaque.length > 0) ||
+      (!!codigosDescompasso && codigosDescompasso.length > 0));
   useEffect(() => {
     const mapa = mapaRef.current;
     if (!mapa || !mapaCarregado || !mapa.getLayer(CAMADA_PREENCHIMENTO)) return;
 
     if (modoHeatmap) {
       mapa.setPaintProperty(CAMADA_PREENCHIMENTO, 'fill-color', COR_FUNDO_MODO_HEATMAP);
-      mapa.setPaintProperty(CAMADA_PREENCHIMENTO, 'fill-opacity', 0.85);
-      return;
-    }
-
-    if (modoDestaque && codigosDestaque) {
-      const ehVazio = [
-        'in',
-        ['get', 'codigoIbge'],
-        ['literal', codigosDestaque],
-      ] as unknown as ExpressionSpecification;
-      mapa.setPaintProperty(CAMADA_PREENCHIMENTO, 'fill-color', [
-        'case',
-        ehVazio,
-        COR_DESTAQUE_VAZIO,
-        COR_ATENUADA,
-      ] as unknown as ExpressionSpecification);
-      mapa.setPaintProperty(CAMADA_PREENCHIMENTO, 'fill-opacity', [
-        'case',
-        ehVazio,
-        0.85,
-        0.3,
-      ] as unknown as ExpressionSpecification);
+      mapa.setPaintProperty(CAMADA_PREENCHIMENTO, 'fill-opacity', OPACIDADE_BASE_NORMAL);
       return;
     }
 
     mapa.setPaintProperty(CAMADA_PREENCHIMENTO, 'fill-color', corChoropleth);
-    mapa.setPaintProperty(CAMADA_PREENCHIMENTO, 'fill-opacity', 0.85);
-  }, [corChoropleth, modoHeatmap, modoDestaque, codigosDestaque, mapaCarregado, dados]);
+    mapa.setPaintProperty(
+      CAMADA_PREENCHIMENTO,
+      'fill-opacity',
+      algumaLenteAtiva ? OPACIDADE_BASE_COM_LENTE : OPACIDADE_BASE_NORMAL,
+    );
+  }, [corChoropleth, modoHeatmap, algumaLenteAtiva, mapaCarregado, dados]);
+
+  // Liga/desliga a lente de Vazios de Acesso (preenchimento translúcido
+  // sobreposto ao indicador, ver COR_LENTE_VAZIOS).
+  useEffect(() => {
+    const mapa = mapaRef.current;
+    if (!mapa || !mapaCarregado || !mapa.getLayer(CAMADA_LENTE_VAZIOS)) return;
+    if (codigosDestaque && codigosDestaque.length > 0) {
+      mapa.setFilter(CAMADA_LENTE_VAZIOS, [
+        'in',
+        ['get', 'codigoIbge'],
+        ['literal', codigosDestaque],
+      ] as unknown as FilterSpecification);
+    } else {
+      mapa.setFilter(CAMADA_LENTE_VAZIOS, ['boolean', false]);
+    }
+  }, [codigosDestaque, mapaCarregado, dados]);
 
   // Liga/desliga/atualiza a camada heatmap (RF-057). Fonte e camada são
   // criadas de forma lazy no primeiro uso; desligar só esconde (visibility),
@@ -568,11 +602,10 @@ export function MapaMunicipios({
   }, [pontosHeatmap, mapaCarregado]);
 
   // Camada de limite dos estados — adicionada quando o GeoJSON de estados
-  // chega. Inserida ANTES (= por baixo) do destaque de Descompasso
-  // Morfológico, para essa linha continuar sendo a mais proeminente do
-  // mapa (Vazios de Acesso não usa mais contorno, ver COR_DESTAQUE_VAZIO);
-  // depende de `dados` porque as camadas municipais precisam existir antes
-  // (senão o beforeId CAMADA_DESTAQUE_DESCOMPASSO ainda não existe).
+  // chega. Inserida ANTES (= por baixo) das lentes de priorização, para
+  // elas continuarem sendo o elemento mais proeminente do mapa; depende de
+  // `dados` porque as camadas municipais precisam existir antes (senão o
+  // beforeId CAMADA_LENTE_VAZIOS ainda não existe).
   useEffect(() => {
     const mapa = mapaRef.current;
     if (!mapa || !mapaCarregado || !estados || !dados) return;
@@ -595,7 +628,7 @@ export function MapaMunicipios({
         maxzoom: ZOOM_CLIQUE_ESTADO,
         paint: { 'fill-color': '#000000', 'fill-opacity': 0.001 },
       },
-      mapa.getLayer(CAMADA_DESTAQUE_DESCOMPASSO) ? CAMADA_DESTAQUE_DESCOMPASSO : undefined,
+      mapa.getLayer(CAMADA_LENTE_VAZIOS) ? CAMADA_LENTE_VAZIOS : undefined,
     );
     mapa.on('click', CAMADA_ESTADOS_FILL, (evento) => {
       const uf = evento.features?.[0]?.properties?.uf;
@@ -619,7 +652,7 @@ export function MapaMunicipios({
           'line-opacity': 0.75,
         },
       },
-      mapa.getLayer(CAMADA_DESTAQUE_DESCOMPASSO) ? CAMADA_DESTAQUE_DESCOMPASSO : undefined,
+      mapa.getLayer(CAMADA_LENTE_VAZIOS) ? CAMADA_LENTE_VAZIOS : undefined,
     );
 
     // Contorno destacado do estado selecionado (ranking/filtro, 15/07/2026).
@@ -635,7 +668,7 @@ export function MapaMunicipios({
           'line-width': ['interpolate', ['linear'], ['zoom'], 3, 1.8, 8, 3.2],
         },
       },
-      mapa.getLayer(CAMADA_DESTAQUE_DESCOMPASSO) ? CAMADA_DESTAQUE_DESCOMPASSO : undefined,
+      mapa.getLayer(CAMADA_LENTE_VAZIOS) ? CAMADA_LENTE_VAZIOS : undefined,
     );
 
     // Rótulos de ESTADO no zoom amplo (15/07/2026) — `pontoRotulo` do backend
@@ -716,26 +749,28 @@ export function MapaMunicipios({
     }
   }, [codigoDestacado, mapaCarregado, dados]);
 
-  // Liga/desliga o contorno de destaque de Descompasso Morfológico —
-  // Vazios de Acesso não usa mais contorno (ver o efeito de
-  // fill-color/fill-opacity abaixo, que já reage a codigosDestaque).
+  // Liga/desliga a lente de Descompasso Morfológico — mesmo padrão da
+  // lente de Vazios de Acesso acima; as duas são independentes, um
+  // município pode ter as duas ligadas ao mesmo tempo (é exatamente o
+  // cruzamento que a ferramenta existe pra mostrar — onde as lentes se
+  // sobrepõem, o WebGL soma os alfas sozinho).
   useEffect(() => {
     const mapa = mapaRef.current;
-    if (!mapa || !mapaCarregado || !mapa.getLayer(CAMADA_DESTAQUE_DESCOMPASSO)) return;
+    if (!mapa || !mapaCarregado || !mapa.getLayer(CAMADA_LENTE_DESCOMPASSO)) return;
     if (codigosDescompasso && codigosDescompasso.length > 0) {
-      mapa.setFilter(CAMADA_DESTAQUE_DESCOMPASSO, [
+      mapa.setFilter(CAMADA_LENTE_DESCOMPASSO, [
         'in',
         ['get', 'codigoIbge'],
         ['literal', codigosDescompasso],
       ] as unknown as FilterSpecification);
     } else {
-      mapa.setFilter(CAMADA_DESTAQUE_DESCOMPASSO, ['boolean', false]);
+      mapa.setFilter(CAMADA_LENTE_DESCOMPASSO, ['boolean', false]);
     }
   }, [codigosDescompasso, mapaCarregado, dados]);
 
   // Filtro do Dashboard Público (RF-046) — esconde (não esmaece) municípios
   // fora da faixa/estado/região selecionados, no preenchimento E no contorno.
-  // Independente do destaque de Vazios de Acesso (dimming do próprio
+  // Independente das lentes de priorização (opacidade do próprio
   // preenchimento) e do heatmap — filtrar o choropleth não afeta essas
   // outras camadas de propósito (fora do escopo do RF-046).
   useEffect(() => {
