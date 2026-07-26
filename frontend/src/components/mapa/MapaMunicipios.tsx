@@ -780,41 +780,42 @@ export function MapaMunicipios({
 
       {hover && municipioHover && (
         <div
-          className="pointer-events-none absolute z-20 max-w-[260px] rounded-xl border border-stone-700/85 bg-stone-900/95 p-3 text-xs text-white shadow-xl backdrop-blur-md"
+          className="pointer-events-none absolute z-[100] max-w-[240px] rounded-xl border border-white/80 bg-white/85 p-4 shadow-[0_12px_40px_rgb(0,0,0,0.12)] backdrop-blur-xl"
           style={{ left: hover.x, top: hover.y, transform: 'translate(-50%, -110%)' }}
         >
-          <p className="text-xs font-bold tracking-tight text-stone-100">
-            {municipioHover.nome}
-          </p>
-          <p className="font-mono text-[9px] text-stone-400">
-            {municipioHover.regiao} · {municipioHover.uf}
-          </p>
+          <div className="mb-3 border-b border-stone-200/80 pb-2">
+            <h4 className="text-sm leading-none font-black uppercase text-stone-900">
+              {municipioHover.nome}
+            </h4>
+            <span className="text-[10px] font-bold tracking-widest text-stone-500 uppercase">
+              {municipioHover.regiao} ({municipioHover.uf})
+            </span>
+          </div>
 
-          <div className="mt-2 space-y-1 rounded border border-stone-800/50 bg-stone-800/40 p-2">
-            <div className="flex items-center justify-between text-[8.5px] text-stone-400">
-              <span>Indicador Ativo</span>
-            </div>
-            <div className="text-[10px] font-semibold text-stone-200">{indicador.rotulo}</div>
-            <div className="font-mono text-xs font-bold text-red-400">
+          <div className="flex flex-col gap-1">
+            <span className="text-[9px] font-extrabold tracking-wider text-stone-400 uppercase">
+              {indicador.rotulo}
+            </span>
+            <span className="text-lg font-extrabold text-red-700">
               {municipioHover[indicador.id] !== null
                 ? `${formatarValor(municipioHover[indicador.id] as number, indicador.formato)}${indicador.unidade ? ` ${indicador.unidade}` : ''}`
                 : 'Não disponível'}
-            </div>
+            </span>
           </div>
 
           {indicador.metadados && (
-            <div className="mt-1.5 grid grid-cols-2 gap-2 border-t border-stone-800/60 pt-1.5 text-[9px]">
+            <div className="mt-3 grid grid-cols-2 gap-2 border-t border-stone-200/80 pt-2 text-[9px]">
               <div>
-                <span className="block font-mono text-[7.5px] tracking-wider text-stone-500 uppercase">
+                <span className="block font-mono text-[7.5px] tracking-wider text-stone-400 uppercase">
                   Confiança
                 </span>
-                <span className="font-bold text-emerald-400">{indicador.metadados.confianca}</span>
+                <span className="font-bold text-stone-700">{indicador.metadados.confianca}</span>
               </div>
               <div>
-                <span className="block font-mono text-[7.5px] tracking-wider text-stone-500 uppercase">
+                <span className="block font-mono text-[7.5px] tracking-wider text-stone-400 uppercase">
                   Natureza
                 </span>
-                <span className="font-bold text-orange-400">{indicador.metadados.natureza}</span>
+                <span className="font-bold text-stone-700">{indicador.metadados.natureza}</span>
               </div>
               <div className="col-span-2 font-mono text-[8px] text-stone-500">
                 <span className="text-stone-400">Fonte:</span> {indicador.metadados.fonte}

@@ -44,7 +44,15 @@ export interface IndicadorMapa {
 const RAMPA_AMBAR: IndicadorMapa['cores'] = ['#fef3c7', '#fcd34d', '#f59e0b', '#d97706', '#92400e'];
 const RAMPA_AZUL: IndicadorMapa['cores'] = ['#dbeafe', '#93c5fd', '#3b82f6', '#1d4ed8', '#1e3a8a'];
 const RAMPA_VERMELHA: IndicadorMapa['cores'] = ['#fee2e2', '#fca5a5', '#ef4444', '#b91c1c', '#7f1d1d'];
-const RAMPA_VERDE: IndicadorMapa['cores'] = ['#dcfce7', '#86efac', '#22c55e', '#15803d', '#14532d'];
+/**
+ * Escala monocromática pedra/chumbo (25/07/2026, auditoria de UX/UI) —
+ * substitui o antigo verde (associado a "aprovação"/"sustentabilidade" e
+ * fora da paleta institucional) para variáveis de renda, financiamento e
+ * capital humano: aqui a cor só codifica magnitude, não é um alerta. Cores
+ * vibrantes (âmbar/vermelho) ficam reservadas para irradiação e
+ * vulnerabilidade — e para as Lentes de Priorização.
+ */
+const RAMPA_PEDRA: IndicadorMapa['cores'] = ['#f5f5f4', '#d6d3d1', '#78716c', '#44403c', '#1c1917'];
 
 export const INDICADORES_MAPA: IndicadorMapa[] = [
   {
@@ -113,7 +121,7 @@ export const INDICADORES_MAPA: IndicadorMapa[] = [
     unidade: null,
     formato: 'moeda',
     sentido: 'positivo',
-    cores: RAMPA_VERDE,
+    cores: RAMPA_PEDRA,
     metadados: { natureza: 'Observado', confianca: 'Alta', fonte: 'IBGE — Censo Demográfico' },
   },
   {
@@ -154,7 +162,7 @@ export const INDICADORES_MAPA: IndicadorMapa[] = [
       'Contratos da modalidade solar do programa Reforma Casa Brasil (Caixa/Ministério ' +
       'das Cidades), por 10.000 habitantes — extrato pontual nov/2025–abr/2026, não é ' +
       'série histórica nem fonte pública automatizável.',
-    cores: RAMPA_VERDE,
+    cores: RAMPA_PEDRA,
     metadados: {
       natureza: 'Observado',
       confianca: 'Média',
@@ -167,7 +175,7 @@ export const INDICADORES_MAPA: IndicadorMapa[] = [
     unidade: null,
     formato: 'percentual',
     sentido: 'positivo',
-    cores: RAMPA_VERDE,
+    cores: RAMPA_PEDRA,
     metadados: { natureza: 'Observado', confianca: 'Alta', fonte: 'IBGE — Censo Demográfico' },
   },
 ];

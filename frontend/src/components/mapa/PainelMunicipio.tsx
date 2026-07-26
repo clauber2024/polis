@@ -246,7 +246,7 @@ export function PainelMunicipio({
 
   return (
     <aside className="flex h-full w-80 flex-col overflow-y-auto rounded-3xl border border-white/90 bg-white/85 shadow-[0_12px_40px_rgb(0,0,0,0.12)] backdrop-blur-2xl">
-      <div className="flex items-start justify-between gap-2 border-b border-slate-100 p-4">
+      <div className="flex items-start justify-between gap-2 border-b border-stone-200/70 p-5">
         <div className="space-y-1">
           <h2 className="font-display text-lg leading-tight font-bold text-slate-900">
             {municipio.nome}
@@ -267,7 +267,7 @@ export function PainelMunicipio({
       </div>
 
       {/* RF-058: relatório-resumo exportável em PDF do território selecionado. */}
-      <div className="border-b border-slate-100 px-4 py-2.5">
+      <div className="border-b border-stone-200/70 px-5 py-3">
         <button
           type="button"
           onClick={aoBaixarRelatorio}
@@ -292,35 +292,41 @@ export function PainelMunicipio({
       />
 
       {grupos.map((grupo) => (
-        <section key={grupo.titulo} className="border-b border-slate-100 p-4">
-          <h3 className="mb-2 font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+        <section key={grupo.titulo} className="border-b border-stone-200/70 p-5">
+          <h3 className="mb-3 border-b border-stone-200/80 pb-2 text-[10px] font-extrabold tracking-widest text-stone-400 uppercase">
             {grupo.titulo}
           </h3>
-          <dl className="space-y-1.5">
+          <dl className="flex flex-col gap-2">
             {grupo.linhas.map((linha) => {
               const valor = municipio[linha.campo];
               const nota = valor === null ? notaAusencia(linha.campo, municipio) : null;
               return (
                 <div
                   key={linha.rotulo}
-                  className={`rounded p-1.5 text-sm ${valor === null ? 'bg-amber-50/50' : ''}`}
+                  className={`rounded-lg p-2.5 transition-colors ${
+                    valor === null ? 'bg-amber-50/60' : 'bg-stone-50/60 hover:bg-stone-100/60'
+                  }`}
                 >
-                  <div className="flex items-baseline justify-between gap-3">
-                    <dt className="text-slate-600">{linha.rotulo}</dt>
-                    <dd className="text-right font-mono font-semibold whitespace-nowrap text-slate-900">
+                  <dt className="text-[10px] font-bold tracking-wider text-stone-500 uppercase">
+                    {linha.rotulo}
+                  </dt>
+                  <dd className="mt-1 flex items-baseline gap-1">
+                    <span className="text-base font-black whitespace-nowrap text-stone-900">
                       {formatarValor(valor, linha.formato)}
-                      {valor !== null && linha.unidade ? (
-                        <span className="ml-1 font-normal text-slate-400">{linha.unidade}</span>
-                      ) : null}
-                    </dd>
-                  </div>
+                    </span>
+                    {valor !== null && linha.unidade && (
+                      <span className="text-xs font-bold text-stone-500">{linha.unidade}</span>
+                    )}
+                  </dd>
                   {linha.descricao && (
-                    <p className="mt-0.5 text-xs leading-snug text-slate-400">
+                    <p className="mt-2 border-l-2 border-stone-200 pl-2 text-[9px] leading-relaxed font-medium text-stone-400">
                       {linha.descricao}
                     </p>
                   )}
                   {nota && (
-                    <p className="mt-0.5 text-xs leading-snug text-amber-800 italic">{nota}</p>
+                    <p className="mt-2 border-l-2 border-amber-300 pl-2 text-[9px] leading-relaxed font-medium text-amber-800 italic">
+                      {nota}
+                    </p>
                   )}
                 </div>
               );
@@ -333,7 +339,7 @@ export function PainelMunicipio({
           o backend confirma granularidade fina disponível para este
           município (hoje, só São Paulo). */}
       {setores?.temGranularidadeFina && (
-        <section className="border-b border-slate-100 p-4">
+        <section className="border-b border-stone-200/70 p-5">
           <button
             type="button"
             onClick={() => setDetalhamentoAberto((aberto) => !aberto)}
