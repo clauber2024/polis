@@ -217,9 +217,11 @@ export interface MunicipioClassificado {
   descompassoMorfologico: boolean;
   classificacaoIvsh: ClassificacaoIvsh | null;
   /**
-   * Lente "Déficit de Crédito Crítico": vazio de acesso E zero contratos
-   * CONFIRMADOS do Reforma Casa Brasil Solar (NULL = sem registro no
-   * extrato, não conta). Ver vaziosDeAcesso.service.ts, backend.
+   * Lente "Déficit de Crédito Crítico": vazio de acesso E ausência de
+   * contrato do Reforma Casa Brasil Solar (NULL conta como zero — o
+   * extrato do SIC/Caixa é uma carga única e completa, ausência = zero
+   * confirmado, não dado pendente; revisão de 26/07/2026, ver
+   * vaziosDeAcesso.service.ts no backend).
    */
   alertaDeficitCredito: boolean;
 }

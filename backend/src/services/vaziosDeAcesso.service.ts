@@ -105,12 +105,19 @@ export interface MunicipioClassificado {
   classificacaoIvsh: ClassificacaoIvsh | null;
   /**
    * Lente "Déficit de Crédito Crítico" (decisão executiva do usuário,
-   * 26/07/2026): vazio de acesso E ZERO contratos CONFIRMADOS do Reforma
-   * Casa Brasil Solar (nov/2025-abr/2026, migration 0027). NULL (município
-   * nunca apareceu no extrato do SIC/Caixa) NÃO aciona o alerta — só o zero
-   * documentado conta, para dar ao gestor certeza de que o programa
-   * realmente não chegou lá, não que o dado simplesmente falta. Derivada
-   * aqui, nunca persistida (mesma decisão de arquitetura de
+   * 26/07/2026, REVISADA em 26/07/2026 após investigação de bug — ver
+   * `calcularAlertaDeficitCredito`): vazio de acesso E o município NÃO
+   * aparece com contrato confirmado do Reforma Casa Brasil Solar
+   * (nov/2025-abr/2026, migration 0027) — NULL e 0 contam igualmente aqui.
+   * A decisão original distinguia NULL ("não processado") de 0 ("zero
+   * confirmado"), mas o extractor real
+   * (`etl/loaders/extrair_reforma_casa_brasil_solar.py`) só grava linha para
+   * os 1.093 municípios PRESENTES no extrato — nunca escreve 0 explícito
+   * para os ausentes, e o extrato é uma carga ÚNICA e completa para a
+   * janela (não incremental). Sob a regra original, `alertaDeficitCredito`
+   * nunca era `true` para nenhum município (bug relatado: lentes/filtros
+   * sempre vazios) — NULL aqui É o zero confirmado, não dado pendente.
+   * Derivada, nunca persistida (mesma decisão de arquitetura de
    * descompassoMorfologico, acima).
    */
   alertaDeficitCredito: boolean;
@@ -287,18 +294,29 @@ function calcularDescompassoMorfologico(
 }
 
 /**
- * Lente "Déficit de Crédito Crítico" (decisão executiva do usuário,
- * 26/07/2026) — ver docstring do campo `alertaDeficitCredito` em
- * MunicipioClassificado para a motivação completa. `=== 0` (não `<= 0` nem
- * `!numeroContratos`) é proposital: `null` (sem registro no extrato) precisa
- * falhar essa comparação sem cair em nenhum outro ramo, o que `===` já
- * garante em JS/TS sem precisar de tratamento explícito adicional.
+ * Lente "Déficit de Crédito Crítico" — ver docstring do campo
+ * `alertaDeficitCredito` em MunicipioClassificado para a motivação e o
+ * histórico completo da revisão de 26/07/2026.
+ *
+ * `numeroContratosReformaCasaBrasilSolar === null` CONTA como zero de
+ * propósito (revisão pós-bug): o extractor
+ * (`etl/loaders/extrair_reforma_casa_brasil_solar.py`) só grava linha para
+ * os municípios PRESENTES no extrato do SIC/Caixa — é uma carga única e
+ * declarada completa para nov/2025-abr/2026, não incremental. Um município
+ * ausente do extrato não é "ainda não processado" (como seria, por
+ * exemplo, em `unidadesHabitacionaisFgts`, indicador de fonte incremental
+ * diferente) — é confirmadamente zero contratos nessa janela. Exigir `=== 0`
+ * literal fazia a lente nunca acender para ninguém, porque o extractor
+ * nunca escreve um 0 explícito, só omite a linha.
  */
 function calcularAlertaDeficitCredito(
   quadrante: Quadrante | null,
   numeroContratosReformaCasaBrasilSolar: number | null,
 ): boolean {
-  return quadrante === 'vazio_de_acesso' && numeroContratosReformaCasaBrasilSolar === 0;
+  return (
+    quadrante === 'vazio_de_acesso' &&
+    (numeroContratosReformaCasaBrasilSolar === null || numeroContratosReformaCasaBrasilSolar === 0)
+  );
 }
 
 /**
