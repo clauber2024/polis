@@ -91,7 +91,13 @@ export function PaginaMapa() {
   const [carregando, setCarregando] = useState(true);
   const [estados, setEstados] = useState<EstadosGeoJson | null>(null);
 
-  const [indicadorId, setIndicadorId] = useState(INDICADORES_MAPA[0].id);
+  // Indicador padrão do mapa (25/07/2026, auditoria de UX/UI): MMGD
+  // residencial per capita, não mais o primeiro item de INDICADORES_MAPA
+  // (irradiação) — é o indicador mais direto para o caso de uso principal
+  // do Atlas (adoção real de energia solar), então abre o mapa já nele.
+  const [indicadorId, setIndicadorId] = useState<(typeof INDICADORES_MAPA)[number]['id']>(
+    'mmgdResidencialPer1000Hab',
+  );
   const indicador = INDICADORES_MAPA.find((i) => i.id === indicadorId) ?? INDICADORES_MAPA[0];
 
   const [destaqueLigado, setDestaqueLigado] = useState(false);

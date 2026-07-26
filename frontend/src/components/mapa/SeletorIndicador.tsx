@@ -13,23 +13,30 @@ interface SeletorIndicadorProps {
  * (PaginaLanding.tsx), para o usuário reconhecer a mesma taxonomia em vez de
  * inventar agrupamentos novos. Só ordena/rotula os IDs reais de
  * INDICADORES_MAPA — nenhum indicador novo, nenhuma sigla trocada.
+ *
+ * Ordem das pastas reajustada em 25/07/2026 (2ª rodada): Energia e
+ * Infraestrutura Elétrica sobe pro topo (MMGD residencial per capita é o
+ * indicador padrão do mapa agora, ver PaginaMapa.tsx) e Território e Clima
+ * desce pro fim — deixa de "travar" a atenção primária do gestor público.
+ * Dentro de Vulnerabilidade Social e Renda, IVSH sobe antes do IVS (é o
+ * índice de priorização, o mais acionável dos dois).
  */
 const GRUPOS: { titulo: string; ids: IndicadorMapa['id'][] }[] = [
-  {
-    titulo: 'Território e Clima',
-    ids: ['irradiacaoMediaKwhM2Dia'],
-  },
   {
     titulo: 'Energia e Infraestrutura Elétrica',
     ids: ['mmgdResidencialPer1000Hab', 'mmgdPer1000Hab', 'tarifaEnergiaResidencial'],
   },
   {
     titulo: 'Vulnerabilidade Social e Renda',
-    ids: ['ivs', 'ivsh', 'percentualPobrezaCadunico', 'rendaMediaDomiciliar', 'taxaAlfabetizacao'],
+    ids: ['ivsh', 'ivs', 'percentualPobrezaCadunico', 'rendaMediaDomiciliar', 'taxaAlfabetizacao'],
   },
   {
     titulo: 'Moradia e Crédito Habitacional',
     ids: ['contratosReformaCasaBrasilSolarPer10000Hab'],
+  },
+  {
+    titulo: 'Território e Clima',
+    ids: ['irradiacaoMediaKwhM2Dia'],
   },
 ];
 
