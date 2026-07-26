@@ -182,6 +182,13 @@ export function PainelMunicipio({
       titulo: 'Indicadores sociais',
       linhas: [
         { campo: 'ivs', rotulo: 'IVS', formato: 'numero', destaque: true },
+        {
+          campo: 'ivsh',
+          rotulo: 'IVSH (sócio-habitacional)',
+          formato: 'numero',
+          descricao:
+            'Média entre IVS, precariedade física da moradia (cortiços, paredes inadequadas, favelas) e insegurança da posse da terra — inclui a dimensão de moradia que o IVS consolidado exclui de propósito. Fundamenta os alertas de Descompasso Morfológico.',
+        },
         { campo: 'rendaMediaDomiciliar', rotulo: 'Renda média domiciliar', formato: 'moeda' },
         {
           campo: 'percentualCadunico',
