@@ -191,6 +191,12 @@ passo 4 realmente terminou sem erros graves).
    Vercel (ex: `https://atlas-solar-justo.vercel.app`) — sem isso o CORS bloqueia as
    chamadas do frontend em produção. Redeploy o backend após salvar a variável.
 
+> `frontend/vercel.json` (25/07/2026) faz o *rewrite* de qualquer rota para `/index.html`
+> — sem ele, a Vercel serve as rotas do React Router (`/mapa`, `/painel-analitico` etc.)
+> como arquivo estático literal e devolve 404 ao acessar a URL direto ou dar refresh
+> (erro `404: NOT_FOUND` da própria Vercel, não um bug do app). Se recriar o projeto do
+> zero na Vercel, confirme que esse arquivo existe antes do primeiro deploy.
+
 ## 7. Teste ponta a ponta
 
 Abra a URL da Vercel no navegador: landing page carregando os indicadores nacionais, mapa
