@@ -4,12 +4,15 @@ import { baixarRelatorioTerritorio, buscarSetoresCensitarios } from '../../servi
 import { formatarValor, type FormatoIndicador } from '../../utils/formatadores';
 import { NOTAS_MUNICIPIO, notaAusencia, type CampoNumerico } from '../../utils/notasAusencia';
 import { CartaoDescompassoMorfologico } from './CartaoDescompassoMorfologico';
+import { CartaoVazioDeAcesso } from './CartaoVazioDeAcesso';
 
 interface PainelMunicipioProps {
   municipio: MunicipioComIndicadores;
   aoFechar: () => void;
-  /** Mediana nacional de irradiação (GET /api/vazios-de-acesso, mesmo lazy load do destaque/heatmap) — usada pelo CartaoDescompassoMorfologico; null enquanto não carregou. */
+  /** Mediana nacional de irradiação (GET /api/vazios-de-acesso, mesmo lazy load do destaque/heatmap) — usada pelo CartaoVazioDeAcesso e pelo CartaoDescompassoMorfologico; null enquanto não carregou. */
   medianaIrradiacao: number | null;
+  /** Mediana nacional de MMGD residencial per capita (mesmo lazy load acima) — usada pelo CartaoVazioDeAcesso; null enquanto não carregou. */
+  medianaMmgdResidencialPer1000Hab: number | null;
   /** Percentil 90 nacional de precariedade habitacional (mesmo lazy load acima) — usado pelo CartaoDescompassoMorfologico; null enquanto não carregou. */
   limiarPrecariedadeHabitacionalAlta: number | null;
 }
@@ -91,6 +94,7 @@ export function PainelMunicipio({
   municipio,
   aoFechar,
   medianaIrradiacao,
+  medianaMmgdResidencialPer1000Hab,
   limiarPrecariedadeHabitacionalAlta,
 }: PainelMunicipioProps) {
   // RF-058: geração do relatório-resumo em PDF do território selecionado.
@@ -305,6 +309,12 @@ export function PainelMunicipio({
             {notaMunicipio}
           </p>
         )}
+
+        <CartaoVazioDeAcesso
+          municipio={municipio}
+          medianaIrradiacao={medianaIrradiacao}
+          medianaMmgdResidencialPer1000Hab={medianaMmgdResidencialPer1000Hab}
+        />
 
         <CartaoDescompassoMorfologico
           municipio={municipio}

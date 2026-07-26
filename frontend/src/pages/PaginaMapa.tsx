@@ -629,6 +629,7 @@ export function PaginaMapa() {
             municipio={municipioSelecionado}
             aoFechar={() => setMunicipioSelecionado(null)}
             medianaIrradiacao={vazios?.medianaNacional.potencialSolarKwhM2Dia ?? null}
+            medianaMmgdResidencialPer1000Hab={vazios?.medianaNacional.mmgdResidencialPer1000Hab ?? null}
             limiarPrecariedadeHabitacionalAlta={vazios?.limiarPrecariedadeHabitacionalAlta ?? null}
           />
         </div>
