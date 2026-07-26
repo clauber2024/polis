@@ -18,13 +18,14 @@ import { PaginaStatusDados } from './pages/PaginaStatusDados';
  * tem header próprio, mais simples (só logo + "Entrar") — por isso NÃO usa
  * este layout, ver App() abaixo.
  */
-/** Aba do header — sublinhado violeta quando a rota está ativa (padrão visual
- * do protótipo AI Studio; NavLink dá o estado ativo de graça, sem estado manual). */
+/** Aba do header — sublinhado carmim quando a rota está ativa (paleta Pólis,
+ * 25/07/2026 — antes era violeta, resíduo do protótipo AI Studio original;
+ * NavLink dá o estado ativo de graça, sem estado manual). */
 function classeAba({ isActive }: { isActive: boolean }) {
   return `flex h-full items-center border-b-2 px-1 transition-all ${
     isActive
-      ? 'border-violet-600 text-violet-600'
-      : 'border-transparent text-slate-500 hover:text-violet-600'
+      ? 'border-red-700 text-red-700'
+      : 'border-transparent text-slate-500 hover:text-red-700'
   }`;
 }
 
@@ -36,7 +37,7 @@ function LayoutApp() {
     <div className="flex h-full flex-col font-sans">
       <header className="flex h-16 shrink-0 items-center gap-6 border-b border-slate-200 bg-white px-6 shadow-2xs">
         <Link to="/" className="flex items-center gap-3 transition-opacity hover:opacity-95">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-violet-600">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-stone-900">
             <span className="h-4 w-4 rounded-full border-2 border-white" />
           </span>
           <span>

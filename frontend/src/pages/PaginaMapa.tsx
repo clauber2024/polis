@@ -430,8 +430,21 @@ export function PaginaMapa() {
           Lentes de Priorização + abas Ranking/Filtros. top-4/bottom-4 (em
           vez de vh) para a altura acompanhar o <main> do LayoutApp sem
           contas de viewport. */}
-      <div className="absolute top-4 bottom-4 left-4 z-10 flex w-80 flex-col gap-3 sm:top-6 sm:bottom-6 sm:left-6">
-        <div className="shrink-0 rounded-2xl border border-white/90 bg-white/70 p-4 shadow-[0_12px_40px_rgb(0,0,0,0.08)] backdrop-blur-xl">
+      {/* z-30 (não z-10): este wrapper compete por empilhamento contra os
+          irmãos dele no nível raiz da página (legenda, painel de município)
+          — como o SeletorIndicador aqui dentro precisa abrir por cima de
+          TUDO, o wrapper precisa vencer essa disputa, não só a interna entre
+          os 3 cards (ver comentário no card do indicador, abaixo). */}
+      <div className="absolute top-4 bottom-4 left-4 z-30 flex w-80 flex-col gap-3 sm:top-6 sm:bottom-6 sm:left-6">
+        {/* z-20/z-10/z-0 nos 3 blocos abaixo (25/07/2026, bug real de
+            stacking context): backdrop-blur força cada card a virar seu
+            próprio stacking context, então o z-30 do dropdown de
+            SeletorIndicador fica preso DENTRO do stacking context deste
+            card — sem um z-index explícito aqui (maior que o dos irmãos
+            abaixo), o card de Lentes (mais tarde no DOM) ganhava a disputa
+            de empilhamento e engolia o menu. Como os 3 são itens flex,
+            z-index já funciona neles sem precisar de position:relative. */}
+        <div className="relative z-20 shrink-0 rounded-2xl border border-white/90 bg-white/70 p-4 shadow-[0_12px_40px_rgb(0,0,0,0.08)] backdrop-blur-xl">
           <SeletorIndicador indicadores={INDICADORES_MAPA} valor={indicador.id} aoMudar={setIndicadorId} />
           {/* Esclarecimento metodológico do indicador ativo (quando houver —
               irradiação e CadÚnico EXIGEM contextualização, ver indicadores.ts). */}
@@ -445,7 +458,7 @@ export function PaginaMapa() {
           )}
         </div>
 
-        <div className="shrink-0 rounded-2xl border border-red-200/60 bg-red-50/60 p-4 shadow-[0_12px_40px_rgb(185,28,28,0.08)] backdrop-blur-xl">
+        <div className="relative z-10 shrink-0 rounded-2xl border border-red-200/60 bg-red-50/60 p-4 shadow-[0_12px_40px_rgb(185,28,28,0.08)] backdrop-blur-xl">
           <div className="mb-3 flex items-center gap-2 border-b border-red-200/70 pb-2">
             <span className="text-[10px] font-bold tracking-widest text-red-900 uppercase">
               Lentes de priorização
@@ -501,7 +514,7 @@ export function PaginaMapa() {
         </div>
 
         {/* Abas: Ranking (RF-030 a RF-036) | Filtros (RF-046/047) */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/90 bg-white/70 shadow-[0_12px_40px_rgb(0,0,0,0.08)] backdrop-blur-xl">
+        <div className="relative z-0 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/90 bg-white/70 shadow-[0_12px_40px_rgb(0,0,0,0.08)] backdrop-blur-xl">
           <div className="flex shrink-0 gap-1 border-b border-stone-200/70 p-1.5">
             <button
               type="button"
@@ -584,14 +597,14 @@ export function PaginaMapa() {
 
       {/* Estados de carga/erro do GeoJSON nacional */}
       {carregando && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-stone-100/60 backdrop-blur-sm">
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-stone-100/60 backdrop-blur-sm">
           <p className="rounded-2xl border border-white/90 bg-white/90 px-5 py-3 text-sm font-medium text-stone-600 shadow-[0_12px_40px_rgb(0,0,0,0.1)] backdrop-blur-xl">
             Carregando a malha municipal (~5.570 municípios)…
           </p>
         </div>
       )}
       {erro && !carregando && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-stone-100/60 backdrop-blur-sm">
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-stone-100/60 backdrop-blur-sm">
           <div className="rounded-2xl border border-white/90 bg-white/90 px-5 py-4 text-sm shadow-[0_12px_40px_rgb(0,0,0,0.1)] backdrop-blur-xl">
             <p className="font-semibold text-red-600">{erro}</p>
             <p className="mt-1 text-stone-500">
