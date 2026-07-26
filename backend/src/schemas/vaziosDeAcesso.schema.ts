@@ -62,6 +62,12 @@ export const listarVaziosDeAcessoQuerySchema = z.object({
     .optional()
     .transform((valor) => (valor === undefined ? undefined : valor === 'true')),
 
+  /** Filtra só municípios com a lente "Déficit de Crédito Crítico" ativa (ver `alertaDeficitCredito` em MunicipioClassificado, vaziosDeAcesso.service.ts). */
+  alertaDeficitCredito: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((valor) => (valor === undefined ? undefined : valor === 'true')),
+
   ordenarPor: z.enum(CRITERIOS_ORDENACAO).default('ivs'),
 
   // IVS é NEGATIVO (maior = mais vulnerável) — o default 'desc' prioriza os

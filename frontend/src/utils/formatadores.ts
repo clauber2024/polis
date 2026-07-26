@@ -25,6 +25,27 @@ export function formatarDataHora(isoString: string): string {
   return formatoDataHora.format(new Date(isoString));
 }
 
+const NOMES_MES_ABREVIADOS = [
+  'jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez',
+];
+
+/**
+ * Formata uma coluna DATE pura (ex: `periodo_referencia`, 'YYYY-MM-DD') como
+ * "mês/ano" (ex: "jun/2026") — usado nas datas-base da lente "Déficit de
+ * Crédito Crítico" (26/07/2026). Parseia a string diretamente, sem passar
+ * por `Date`/`timeZone`, de propósito: `periodo_referencia` é uma DATE, não
+ * uma TIMESTAMPTZ (diferente de `criadoEm`/`atualizadoEm` acima) —
+ * convertê-la para America/Sao_Paulo via `Date` deslocaria o dia para trás
+ * (UTC-3 em cima de meia-noite UTC), uma armadilha real para datas puras,
+ * não o mesmo caso de `formatarDataHora`.
+ */
+export function formatarMesAno(dataIso: string | null): string {
+  if (!dataIso) return 'sem dado';
+  const [ano, mes] = dataIso.split('-');
+  const indiceMes = Number(mes) - 1;
+  return `${NOMES_MES_ABREVIADOS[indiceMes] ?? mes}/${ano}`;
+}
+
 export function formatarValor(
   valor: number | null | undefined,
   formato: FormatoIndicador,

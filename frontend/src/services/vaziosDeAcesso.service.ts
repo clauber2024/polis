@@ -33,6 +33,8 @@ export interface VaziosDeAcessoCompleto {
   medianaNacional: ListarVaziosDeAcessoResultado['metodologia']['medianaNacional'];
   /** Percentil 90 nacional de precariedade habitacional — usado pelo CartaoDescompassoMorfologico, ver docs/DECISOES.md. */
   limiarPrecariedadeHabitacionalAlta: number;
+  /** Datas-base da lente "Déficit de Crédito Crítico" — ver ListarVaziosDeAcessoResultado. */
+  periodoReferenciaLenteDeficitCredito: ListarVaziosDeAcessoResultado['metodologia']['periodoReferenciaLenteDeficitCredito'];
   /** Rótulos dos eixos da classificação, como o backend os define (metodologia). */
   eixoX: string;
   eixoY: string;
@@ -41,6 +43,7 @@ export interface VaziosDeAcessoCompleto {
   avisos: ListarVaziosDeAcessoResultado['avisos'];
   resumoPorQuadrante: ListarVaziosDeAcessoResultado['resumoPorQuadrante'];
   resumoDescompasso: ListarVaziosDeAcessoResultado['resumoDescompasso'];
+  resumoAlertaDeficitCredito: ListarVaziosDeAcessoResultado['resumoAlertaDeficitCredito'];
   municipios: MunicipioClassificado[];
 }
 
@@ -73,12 +76,14 @@ async function paginarClassificacao(
   return {
     medianaNacional: primeira.metodologia.medianaNacional,
     limiarPrecariedadeHabitacionalAlta: primeira.metodologia.limiarPrecariedadeHabitacionalAlta,
+    periodoReferenciaLenteDeficitCredito: primeira.metodologia.periodoReferenciaLenteDeficitCredito,
     eixoX: primeira.metodologia.eixoX,
     eixoY: primeira.metodologia.eixoY,
     notaMetodologica: primeira.notaMetodologica,
     avisos: primeira.avisos,
     resumoPorQuadrante: primeira.resumoPorQuadrante,
     resumoDescompasso: primeira.resumoDescompasso,
+    resumoAlertaDeficitCredito: primeira.resumoAlertaDeficitCredito,
     municipios,
   };
 }

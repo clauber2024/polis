@@ -72,6 +72,7 @@ interface LinhaPainelBruta {
   percentualPobrezaCadunico: number | null;
   indicePrecariedadeMoradia: number | null;
   percentualApartamento: number | null;
+  numeroContratosReformaCasaBrasilSolar: number | null;
 }
 
 export interface MunicipioClassificado {
@@ -102,6 +103,17 @@ export interface MunicipioClassificado {
    * demais usos de MunicipioClassificado (Painel Analítico, RF-058).
    */
   classificacaoIvsh: ClassificacaoIvsh | null;
+  /**
+   * Lente "Déficit de Crédito Crítico" (decisão executiva do usuário,
+   * 26/07/2026): vazio de acesso E ZERO contratos CONFIRMADOS do Reforma
+   * Casa Brasil Solar (nov/2025-abr/2026, migration 0027). NULL (município
+   * nunca apareceu no extrato do SIC/Caixa) NÃO aciona o alerta — só o zero
+   * documentado conta, para dar ao gestor certeza de que o programa
+   * realmente não chegou lá, não que o dado simplesmente falta. Derivada
+   * aqui, nunca persistida (mesma decisão de arquitetura de
+   * descompassoMorfologico, acima).
+   */
+  alertaDeficitCredito: boolean;
 }
 
 /**
@@ -154,7 +166,8 @@ async function buscarPainelBruto(): Promise<LinhaPainelBruta[]> {
         vsc.renda_media_domiciliar        AS "rendaMediaDomiciliar",
         vsc.percentual_pobreza_cadunico   AS "percentualPobrezaCadunico",
         moradia.indice_precariedade_moradia AS "indicePrecariedadeMoradia",
-        vsc.percentual_apartamento        AS "percentualApartamento"
+        vsc.percentual_apartamento        AS "percentualApartamento",
+        vsc.numero_contratos_reforma_casa_brasil_solar AS "numeroContratosReformaCasaBrasilSolar"
     FROM municipios m
     JOIN unidades_espaciais ue
         ON ue.municipio_pai_codigo_ibge = m.codigo_ibge AND ue.tipo = 'municipio'
@@ -167,6 +180,36 @@ async function buscarPainelBruto(): Promise<LinhaPainelBruta[]> {
   `);
 
   return resultado.rows as unknown as LinhaPainelBruta[];
+}
+
+let cachePainelBruto: LinhaPainelBruta[] | null = null;
+let painelBrutoEmAndamento: Promise<LinhaPainelBruta[]> | null = null;
+
+/**
+ * Cache em memória de processo — mesmo padrão de estados.service.ts
+ * (`buscarEstadosGeoJson`): o JOIN de `buscarPainelBruto` cruza município x
+ * MMGD x irradiação x indicadores sociais x IVSH x moradia para ~5.570
+ * municípios a cada chamada (usada por 3 endpoints: listagem, comparação do
+ * Painel Analítico e relatório-resumo individual) — caro o bastante para
+ * valer cache, e estável entre cargas de ETL, que rodam manualmente aqui
+ * (não em background). Se o ETL rodar com o backend já no ar, reiniciar o
+ * processo para refletir os dados novos — mesmo trade-off já aceito em
+ * estados.service.ts, não um risco novo introduzido aqui.
+ */
+function buscarPainelBrutoCacheado(): Promise<LinhaPainelBruta[]> {
+  if (cachePainelBruto) return Promise.resolve(cachePainelBruto);
+  // Deduplica requisições concorrentes durante o primeiro cálculo (caro).
+  if (!painelBrutoEmAndamento) {
+    painelBrutoEmAndamento = buscarPainelBruto()
+      .then((resultado) => {
+        cachePainelBruto = resultado;
+        return resultado;
+      })
+      .finally(() => {
+        painelBrutoEmAndamento = null;
+      });
+  }
+  return painelBrutoEmAndamento;
 }
 
 function mediana(valores: number[]): number | null {
@@ -241,6 +284,21 @@ function calcularDescompassoMorfologico(
   const verticalizacaoAlta = linha.percentualApartamento !== null && linha.percentualApartamento > 50;
 
   return irradiacaoAlta && (precariedadeAlta || verticalizacaoAlta);
+}
+
+/**
+ * Lente "Déficit de Crédito Crítico" (decisão executiva do usuário,
+ * 26/07/2026) — ver docstring do campo `alertaDeficitCredito` em
+ * MunicipioClassificado para a motivação completa. `=== 0` (não `<= 0` nem
+ * `!numeroContratos`) é proposital: `null` (sem registro no extrato) precisa
+ * falhar essa comparação sem cair em nenhum outro ramo, o que `===` já
+ * garante em JS/TS sem precisar de tratamento explícito adicional.
+ */
+function calcularAlertaDeficitCredito(
+  quadrante: Quadrante | null,
+  numeroContratosReformaCasaBrasilSolar: number | null,
+): boolean {
+  return quadrante === 'vazio_de_acesso' && numeroContratosReformaCasaBrasilSolar === 0;
 }
 
 /**
@@ -391,6 +449,10 @@ function classificarPainel(linhas: LinhaPainelBruta[]): PainelClassificado {
         precariedadeHabitacionalAltaP90,
       ),
       classificacaoIvsh: null,
+      alertaDeficitCredito: calcularAlertaDeficitCredito(
+        quadrante,
+        linha.numeroContratosReformaCasaBrasilSolar,
+      ),
     };
   });
 
@@ -436,6 +498,19 @@ export interface ListarVaziosDeAcessoResultado {
     };
     /** Percentil 90 nacional de indice_precariedade_moradia — limiar de "alta precariedade habitacional" usado pelo CartaoDescompassoMorfologico (frontend). Não é um corte fixo: recalculado a partir da distribuição real a cada requisição, ver `percentil()`. */
     limiarPrecariedadeHabitacionalAlta: number;
+    /**
+     * Datas-base da lente "Déficit de Crédito Crítico" (decisão executiva do
+     * usuário, 26/07/2026) — transparência metodológica sobre o descasamento
+     * temporal entre as duas fontes: MMGD atualiza por snapshot do extractor
+     * (potencialmente mensal), Casa Brasil Solar é um extrato manual único
+     * (migration 0027). Consultadas via MAX(), não fixadas no código, para
+     * não desatualizar quando uma nova carga acontecer. `null` só se a
+     * respectiva tabela/coluna ainda não tiver nenhum registro carregado.
+     */
+    periodoReferenciaLenteDeficitCredito: {
+      mmgdMaisRecente: string | null;
+      casaBrasilSolar: string | null;
+    };
   };
   notaMetodologica: string;
   avisos: {
@@ -447,12 +522,15 @@ export interface ListarVaziosDeAcessoResultado {
   resumoPorQuadrante: Record<Quadrante, number>;
   /** Contagem de municípios com descompassoMorfologico=true no recorte já filtrado por geografia (não por quadrante — o alerta é independente de quadrante). */
   resumoDescompasso: number;
+  /** Contagem de municípios com alertaDeficitCredito=true no recorte já filtrado por geografia (subconjunto de vazio_de_acesso, ver `calcularAlertaDeficitCredito`). */
+  resumoAlertaDeficitCredito: number;
   filtrosAplicados: {
     uf: string | null;
     regiao: string | null;
     quadrante: string | null;
     classificacaoIvsh: string | null;
     descompassoMorfologico: boolean | null;
+    alertaDeficitCredito: boolean | null;
   };
   paginacao: {
     pagina: number;
@@ -463,10 +541,36 @@ export interface ListarVaziosDeAcessoResultado {
   resultados: MunicipioClassificado[];
 }
 
+interface PeriodosReferenciaLenteDeficitCredito {
+  mmgdMaisRecente: string | null;
+  casaBrasilSolar: string | null;
+}
+
+/**
+ * Datas-base exibidas no toggle da lente (ver docstring de
+ * `periodoReferenciaLenteDeficitCredito` acima). Consulta leve — dois MAX()
+ * cobertos pelos índices já existentes (`mmgd_unidade_periodo_idx`,
+ * `indicadores_sociais_unidade_periodo_idx`) — por isso não passa pelo mesmo
+ * cache de `buscarPainelBrutoCacheado`, que existe para o JOIN caro, não
+ * para consultas deste porte.
+ */
+async function buscarPeriodosReferenciaLenteDeficitCredito(): Promise<PeriodosReferenciaLenteDeficitCredito> {
+  const resultado = await db.execute(sql`
+    SELECT
+      (SELECT MAX(periodo_referencia) FROM mmgd_indicadores)::text AS "mmgdMaisRecente",
+      (SELECT MAX(periodo_referencia) FROM indicadores_sociais
+        WHERE numero_contratos_reforma_casa_brasil_solar IS NOT NULL)::text AS "casaBrasilSolar"
+  `);
+  return resultado.rows[0] as unknown as PeriodosReferenciaLenteDeficitCredito;
+}
+
 export async function listarVaziosDeAcesso(
   query: ListarVaziosDeAcessoQuery,
 ): Promise<ListarVaziosDeAcessoResultado> {
-  const linhasBrutas = await buscarPainelBruto();
+  const [linhasBrutas, periodoReferenciaLenteDeficitCredito] = await Promise.all([
+    buscarPainelBrutoCacheado(),
+    buscarPeriodosReferenciaLenteDeficitCredito(),
+  ]);
   const painel = classificarPainel(linhasBrutas);
 
   // classificacaoIvsh é quintil DENTRO do quadrante vazio_de_acesso (não
@@ -503,6 +607,7 @@ export async function listarVaziosDeAcesso(
     } as Record<Quadrante, number>,
   );
   const resumoDescompasso = filtradoPorGeografia.filter((m) => m.descompassoMorfologico).length;
+  const resumoAlertaDeficitCredito = filtradoPorGeografia.filter((m) => m.alertaDeficitCredito).length;
 
   const filtradoPorQuadrante = query.quadrante
     ? filtradoPorGeografia.filter((municipio) => municipio.quadrante === query.quadrante)
@@ -517,7 +622,14 @@ export async function listarVaziosDeAcesso(
       ? filtradoPorIvsh
       : filtradoPorIvsh.filter((municipio) => municipio.descompassoMorfologico === query.descompassoMorfologico);
 
-  const ordenado = ordenarMunicipios(filtradoPorDescompasso, query.ordenarPor, query.ordem);
+  const filtradoPorAlertaDeficitCredito =
+    query.alertaDeficitCredito === undefined
+      ? filtradoPorDescompasso
+      : filtradoPorDescompasso.filter(
+          (municipio) => municipio.alertaDeficitCredito === query.alertaDeficitCredito,
+        );
+
+  const ordenado = ordenarMunicipios(filtradoPorAlertaDeficitCredito, query.ordenarPor, query.ordem);
 
   const totalResultados = ordenado.length;
   const totalPaginas = Math.max(1, Math.ceil(totalResultados / query.porPagina));
@@ -540,6 +652,7 @@ export async function listarVaziosDeAcesso(
         mmgdResidencialPer1000Hab: painel.medianaMmgdResidencialPerCapita,
       },
       limiarPrecariedadeHabitacionalAlta: painel.precariedadeHabitacionalAltaP90,
+      periodoReferenciaLenteDeficitCredito,
     },
     notaMetodologica: NOTA_METODOLOGICA,
     avisos: {
@@ -550,12 +663,14 @@ export async function listarVaziosDeAcesso(
     },
     resumoPorQuadrante,
     resumoDescompasso,
+    resumoAlertaDeficitCredito,
     filtrosAplicados: {
       uf: query.uf ?? null,
       regiao: query.regiao ?? null,
       quadrante: query.quadrante ?? null,
       classificacaoIvsh: query.classificacaoIvsh ?? null,
       descompassoMorfologico: query.descompassoMorfologico ?? null,
+      alertaDeficitCredito: query.alertaDeficitCredito ?? null,
     },
     paginacao: {
       pagina: query.pagina,
@@ -619,7 +734,7 @@ export interface ClassificarMunicipiosResultado {
 export async function classificarMunicipios(
   codigos: string[],
 ): Promise<ClassificarMunicipiosResultado> {
-  const linhasBrutas = await buscarPainelBruto();
+  const linhasBrutas = await buscarPainelBrutoCacheado();
   const painel = classificarPainel(linhasBrutas);
   const porCodigo = new Map(painel.municipios.map((m) => [m.codigoIbge, m]));
 
@@ -663,7 +778,7 @@ export interface ClassificacaoMunicipioIndividual {
 export async function classificarMunicipioIndividual(
   codigoIbge: string,
 ): Promise<ClassificacaoMunicipioIndividual | null> {
-  const linhasBrutas = await buscarPainelBruto();
+  const linhasBrutas = await buscarPainelBrutoCacheado();
   const painel = classificarPainel(linhasBrutas);
   const municipio = painel.municipios.find((m) => m.codigoIbge === codigoIbge);
   if (!municipio) return null;

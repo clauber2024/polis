@@ -56,6 +56,15 @@ export const COR_LENTE_VAZIOS = 'rgba(185, 28, 28, 0.55)';
 const COR_LENTE_VAZIOS_CONTORNO = 'rgba(185, 28, 28, 1)';
 export const COR_LENTE_DESCOMPASSO = 'rgba(245, 158, 11, 0.55)';
 const COR_LENTE_DESCOMPASSO_CONTORNO = 'rgba(217, 119, 6, 1)';
+/**
+ * Amarelo-ouro (não o mesmo tom âmbar/laranja de COR_LENTE_DESCOMPASSO, de
+ * propósito — as duas lentes podem estar ligadas ao mesmo tempo e precisam
+ * ser diferenciáveis visualmente) para a lente "Déficit de Crédito Crítico"
+ * (26/07/2026, decisão executiva do usuário sobre a arquitetura híbrida
+ * Indicador + Lente do Reforma Casa Brasil Solar).
+ */
+export const COR_LENTE_DEFICIT_CREDITO = 'rgba(234, 179, 8, 0.55)';
+const COR_LENTE_DEFICIT_CREDITO_CONTORNO = 'rgba(161, 98, 7, 1)';
 const OPACIDADE_BASE_NORMAL = 0.85;
 const OPACIDADE_BASE_COM_LENTE = 0.45;
 
@@ -95,6 +104,7 @@ const CAMADA_PREENCHIMENTO = 'municipios-preenchimento';
 const CAMADA_CONTORNO = 'municipios-contorno';
 const CAMADA_LENTE_VAZIOS = 'lente-vazios-acesso';
 const CAMADA_LENTE_DESCOMPASSO = 'lente-descompasso';
+const CAMADA_LENTE_DEFICIT_CREDITO = 'lente-deficit-credito';
 const CAMADA_HEATMAP = 'vazios-heatmap';
 const CAMADA_ESTADOS = 'estados-contorno';
 const CAMADA_ESTADOS_FILL = 'estados-fill';
@@ -176,6 +186,15 @@ interface MapaMunicipiosProps {
    */
   codigosDescompasso: string[] | null;
   /**
+   * Códigos IBGE com a lente "Déficit de Crédito Crítico" ativa (26/07/2026,
+   * `alertaDeficitCredito` do backend: vazio de acesso E zero contratos
+   * confirmados do Reforma Casa Brasil Solar) ou null para desligar — lente
+   * translúcida independente das outras duas (CAMADA_LENTE_DEFICIT_CREDITO);
+   * como é sempre um SUBCONJUNTO de codigosDestaque, na prática aparece
+   * sobreposta à lente de Vazios de Acesso quando as duas estão ligadas.
+   */
+  codigosDeficitCredito: string[] | null;
+  /**
    * Pontos do heatmap de Vazios de Acesso (RF-057) ou null para desligar.
    * Não-nulo também ESMAECE o choropleth (modo exclusivo). Quem monta os
    * pontos e calcula os pesos é a página — aqui só renderização.
@@ -247,6 +266,7 @@ export function MapaMunicipios({
   quebras,
   codigosDestaque,
   codigosDescompasso,
+  codigosDeficitCredito,
   pontosHeatmap,
   foco,
   estados,
@@ -452,6 +472,17 @@ export function MapaMunicipios({
         'fill-opacity-transition': { duration: 300, delay: 0 },
       } as unknown as maplibregl.FillLayerSpecification['paint'],
     });
+    mapa.addLayer({
+      id: CAMADA_LENTE_DEFICIT_CREDITO,
+      type: 'fill',
+      source: FONTE,
+      filter: ['boolean', false],
+      paint: {
+        'fill-color': COR_LENTE_DEFICIT_CREDITO,
+        'fill-outline-color': COR_LENTE_DEFICIT_CREDITO_CONTORNO,
+        'fill-opacity-transition': { duration: 300, delay: 0 },
+      } as unknown as maplibregl.FillLayerSpecification['paint'],
+    });
 
     // Contorno engrossado do município selecionado (15/07/2026) — mesma
     // solução do destaque de estado; fica por cima do preenchimento (é a
@@ -512,7 +543,8 @@ export function MapaMunicipios({
   const algumaLenteAtiva =
     !modoHeatmap &&
     ((!!codigosDestaque && codigosDestaque.length > 0) ||
-      (!!codigosDescompasso && codigosDescompasso.length > 0));
+      (!!codigosDescompasso && codigosDescompasso.length > 0) ||
+      (!!codigosDeficitCredito && codigosDeficitCredito.length > 0));
   useEffect(() => {
     const mapa = mapaRef.current;
     if (!mapa || !mapaCarregado || !mapa.getLayer(CAMADA_PREENCHIMENTO)) return;
@@ -767,6 +799,23 @@ export function MapaMunicipios({
       mapa.setFilter(CAMADA_LENTE_DESCOMPASSO, ['boolean', false]);
     }
   }, [codigosDescompasso, mapaCarregado, dados]);
+
+  // Liga/desliga a lente de Déficit de Crédito Crítico — mesmo padrão das
+  // duas lentes acima, independente delas (embora seja sempre um subconjunto
+  // de codigosDestaque, ver docstring da prop).
+  useEffect(() => {
+    const mapa = mapaRef.current;
+    if (!mapa || !mapaCarregado || !mapa.getLayer(CAMADA_LENTE_DEFICIT_CREDITO)) return;
+    if (codigosDeficitCredito && codigosDeficitCredito.length > 0) {
+      mapa.setFilter(CAMADA_LENTE_DEFICIT_CREDITO, [
+        'in',
+        ['get', 'codigoIbge'],
+        ['literal', codigosDeficitCredito],
+      ] as unknown as FilterSpecification);
+    } else {
+      mapa.setFilter(CAMADA_LENTE_DEFICIT_CREDITO, ['boolean', false]);
+    }
+  }, [codigosDeficitCredito, mapaCarregado, dados]);
 
   // Filtro do Dashboard Público (RF-046) — esconde (não esmaece) municípios
   // fora da faixa/estado/região selecionados, no preenchimento E no contorno.

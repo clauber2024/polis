@@ -216,6 +216,12 @@ export interface MunicipioClassificado {
    */
   descompassoMorfologico: boolean;
   classificacaoIvsh: ClassificacaoIvsh | null;
+  /**
+   * Lente "Déficit de Crédito Crítico": vazio de acesso E zero contratos
+   * CONFIRMADOS do Reforma Casa Brasil Solar (NULL = sem registro no
+   * extrato, não conta). Ver vaziosDeAcesso.service.ts, backend.
+   */
+  alertaDeficitCredito: boolean;
 }
 
 /**
@@ -442,6 +448,11 @@ export interface ListarVaziosDeAcessoResultado {
     };
     /** Percentil 90 nacional de indicePrecariedadeMoradia — limiar de "alta precariedade" do CartaoDescompassoMorfologico. */
     limiarPrecariedadeHabitacionalAlta: number;
+    /** Datas-base da lente "Déficit de Crédito Crítico" — exibir na UI do toggle para transparência do descasamento temporal entre as duas fontes. */
+    periodoReferenciaLenteDeficitCredito: {
+      mmgdMaisRecente: string | null;
+      casaBrasilSolar: string | null;
+    };
   };
   notaMetodologica: string;
   avisos: {
@@ -453,12 +464,15 @@ export interface ListarVaziosDeAcessoResultado {
   resumoPorQuadrante: Record<Quadrante, number>;
   /** Contagem de municípios com descompassoMorfologico=true no recorte já filtrado por geografia. */
   resumoDescompasso: number;
+  /** Contagem de municípios com alertaDeficitCredito=true no recorte já filtrado por geografia. */
+  resumoAlertaDeficitCredito: number;
   filtrosAplicados: {
     uf: string | null;
     regiao: string | null;
     quadrante: string | null;
     classificacaoIvsh: ClassificacaoIvsh | null;
     descompassoMorfologico: boolean | null;
+    alertaDeficitCredito: boolean | null;
   };
   paginacao: Paginacao;
   resultados: MunicipioClassificado[];

@@ -5,6 +5,7 @@ import { formatarValor, type FormatoIndicador } from '../../utils/formatadores';
 import { NOTAS_MUNICIPIO, notaAusencia, type CampoNumerico } from '../../utils/notasAusencia';
 import { CartaoDescompassoMorfologico } from './CartaoDescompassoMorfologico';
 import { CartaoVazioDeAcesso } from './CartaoVazioDeAcesso';
+import { CartaoDeficitCredito } from './CartaoDeficitCredito';
 
 interface PainelMunicipioProps {
   municipio: MunicipioComIndicadores;
@@ -15,6 +16,13 @@ interface PainelMunicipioProps {
   medianaMmgdResidencialPer1000Hab: number | null;
   /** Percentil 90 nacional de precariedade habitacional (mesmo lazy load acima) — usado pelo CartaoDescompassoMorfologico; null enquanto não carregou. */
   limiarPrecariedadeHabitacionalAlta: number | null;
+  /** `alertaDeficitCredito` já classificado (GET /api/vazios-de-acesso, mesmo lazy load acima) — usado pelo CartaoDeficitCredito; `false` enquanto não carregou (card não aparece até então). */
+  alertaDeficitCredito: boolean;
+  /** Datas-base da lente "Déficit de Crédito Crítico" — usado pelo CartaoDeficitCredito; `null` enquanto não carregou. */
+  periodoReferenciaLenteDeficitCredito: {
+    mmgdMaisRecente: string | null;
+    casaBrasilSolar: string | null;
+  } | null;
 }
 
 /**
@@ -96,6 +104,8 @@ export function PainelMunicipio({
   medianaIrradiacao,
   medianaMmgdResidencialPer1000Hab,
   limiarPrecariedadeHabitacionalAlta,
+  alertaDeficitCredito,
+  periodoReferenciaLenteDeficitCredito,
 }: PainelMunicipioProps) {
   // RF-058: geração do relatório-resumo em PDF do território selecionado.
   const [gerandoRelatorio, setGerandoRelatorio] = useState(false);
@@ -327,6 +337,11 @@ export function PainelMunicipio({
           municipio={municipio}
           medianaIrradiacao={medianaIrradiacao}
           limiarPrecariedadeHabitacionalAlta={limiarPrecariedadeHabitacionalAlta}
+        />
+
+        <CartaoDeficitCredito
+          alertaDeficitCredito={alertaDeficitCredito}
+          periodoReferenciaLenteDeficitCredito={periodoReferenciaLenteDeficitCredito}
         />
 
         {grupos.map((grupo) => {

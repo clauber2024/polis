@@ -20,6 +20,7 @@ import {
 } from '../services/vaziosDeAcesso.service';
 import type { FeatureCollectionMunicipios, MunicipioComIndicadores } from '../types/api';
 import { centroDaGeometria } from '../utils/geometria';
+import { formatarMesAno } from '../utils/formatadores';
 import { INDICADORES_MAPA, calcularQuebrasQuantis } from '../utils/indicadores';
 
 /**
@@ -110,6 +111,12 @@ export function PaginaMapa() {
   // de um Vazio de Acesso já é o caso de maior interesse (potencial alto E
   // MMGD baixo E barreira morfológica), então não justifica o fetch maior.
   const [descompassoLigado, setDescompassoLigado] = useState(false);
+  // Déficit de Crédito Crítico (26/07/2026, decisão executiva do usuário) —
+  // mesmo padrão lazy do Descompasso Morfológico: escopado ao MESMO
+  // conjunto já carregado (quadrante vazio_de_acesso), já que a lente é
+  // sempre um subconjunto dele (`alertaDeficitCredito` só é true dentro de
+  // vazio_de_acesso, ver vaziosDeAcesso.service.ts).
+  const [deficitCreditoLigado, setDeficitCreditoLigado] = useState(false);
   const [vazios, setVazios] = useState<VaziosDeAcessoCompleto | null>(null);
   const [carregandoVazios, setCarregandoVazios] = useState(false);
   const [erroVazios, setErroVazios] = useState<string | null>(null);
@@ -215,6 +222,11 @@ export function PaginaMapa() {
     if (ligado) garantirVaziosCarregados();
   }
 
+  function aoAlternarDeficitCredito(ligado: boolean) {
+    setDeficitCreditoLigado(ligado);
+    if (ligado) garantirVaziosCarregados();
+  }
+
   // O CartaoDescompassoMorfologico (painel de detalhe) precisa da mediana
   // nacional de irradiação para comparar o município selecionado contra o
   // país — mesma classificação lazy já usada pelo destaque/heatmap/ranking,
@@ -246,6 +258,17 @@ export function PaginaMapa() {
         ? vazios.municipios.filter((m) => m.descompassoMorfologico).map((m) => m.codigoIbge)
         : null,
     [descompassoLigado, vazios],
+  );
+
+  // Déficit de Crédito Crítico — mesma técnica: classificação 100% do
+  // backend (`alertaDeficitCredito` já vem calculado em cada município de
+  // `vazios`), aqui só filtra o array já carregado.
+  const codigosDeficitCredito = useMemo(
+    () =>
+      deficitCreditoLigado && vazios
+        ? vazios.municipios.filter((m) => m.alertaDeficitCredito).map((m) => m.codigoIbge)
+        : null,
+    [deficitCreditoLigado, vazios],
   );
 
   // Badges do ranking (RF-032) — mesma classificação do backend, como Set.
@@ -419,6 +442,7 @@ export function PaginaMapa() {
           quebras={quebras}
           codigosDestaque={codigosDestaque}
           codigosDescompasso={codigosDescompasso}
+          codigosDeficitCredito={codigosDeficitCredito}
           pontosHeatmap={pontosHeatmap}
           foco={foco}
           estados={estados}
@@ -483,6 +507,16 @@ export function PaginaMapa() {
               aoAlternar={aoAlternarDescompasso}
               nota={vazios ? `(${vazios.municipios.filter((m) => m.descompassoMorfologico).length})` : undefined}
             />
+            <InterruptorLente
+              rotulo="Déficit de Crédito Crítico"
+              ligado={deficitCreditoLigado}
+              aoAlternar={aoAlternarDeficitCredito}
+              nota={
+                vazios
+                  ? `(${vazios.municipios.filter((m) => m.alertaDeficitCredito).length})`
+                  : undefined
+              }
+            />
             <button
               type="button"
               onClick={() => aoAlternarHeatmap(!heatmapLigado)}
@@ -503,12 +537,23 @@ export function PaginaMapa() {
             </p>
           )}
           {erroVazios && <p className="mt-2 text-xs text-red-600">{erroVazios}</p>}
-          {(destaqueLigado || heatmapLigado || descompassoLigado) &&
+          {(destaqueLigado || heatmapLigado || descompassoLigado || deficitCreditoLigado) &&
             vazios &&
             vazios.avisos.totalPrecisaReextrairMmgd > 0 && (
             <p className="mt-2 text-xs text-amber-700">
               {vazios.avisos.totalPrecisaReextrairMmgd.toLocaleString('pt-BR')} municípios fora da
               classificação (MMGD residencial pendente de re-extração — ver CLAUDE.md).
+            </p>
+          )}
+          {/* Transparência metodológica (decisão executiva do usuário,
+              26/07/2026): as duas fontes da lente não são contemporâneas —
+              MMGD é snapshot do extractor, Casa Brasil Solar é um extrato
+              manual único (migration 0027). Mostrar as datas-base antes de
+              qualquer questionamento técnico do gestor, não só sob demanda. */}
+          {deficitCreditoLigado && vazios && (
+            <p className="mt-2 text-xs text-stone-500">
+              Datas-base: MMGD {formatarMesAno(vazios.periodoReferenciaLenteDeficitCredito.mmgdMaisRecente)}{' '}
+              | Casa Brasil Solar {formatarMesAno(vazios.periodoReferenciaLenteDeficitCredito.casaBrasilSolar)}
             </p>
           )}
           {filtrosDashboardAtivos && abaSidebar !== 'filtros' && (
@@ -631,6 +676,11 @@ export function PaginaMapa() {
             medianaIrradiacao={vazios?.medianaNacional.potencialSolarKwhM2Dia ?? null}
             medianaMmgdResidencialPer1000Hab={vazios?.medianaNacional.mmgdResidencialPer1000Hab ?? null}
             limiarPrecariedadeHabitacionalAlta={vazios?.limiarPrecariedadeHabitacionalAlta ?? null}
+            alertaDeficitCredito={
+              vazios?.municipios.find((m) => m.codigoIbge === municipioSelecionado.codigoIbge)
+                ?.alertaDeficitCredito ?? false
+            }
+            periodoReferenciaLenteDeficitCredito={vazios?.periodoReferenciaLenteDeficitCredito ?? null}
           />
         </div>
       )}
