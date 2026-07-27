@@ -26,6 +26,53 @@ import type {
 import { INDICADORES_COMPARAVEIS } from '../utils/indicadoresComparacao';
 import { gerarDiagnosticos } from '../utils/diagnosticosComparacao';
 
+/** Ícones inline (mesmo padrão de CartaoVazioDeAcesso.tsx — sem dependência de lucide-react, ainda não usada no projeto). */
+function IconeGrafico({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
+    </svg>
+  );
+}
+
+function IconeAlerta({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </svg>
+  );
+}
+
+function IconePlay({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <polygon points="5 3 19 12 5 21 5 3" />
+    </svg>
+  );
+}
+
 /**
  * Painel Analítico / Cruzamento de Variáveis (RF-049 a RF-053).
  *
@@ -37,6 +84,17 @@ import { gerarDiagnosticos } from '../utils/diagnosticosComparacao';
  * RF-053 "série temporal" segue fora de escopo — o backend só serve o
  * snapshot mais recente de cada indicador (mesma limitação já documentada
  * para RF-034/ranking por variação).
+ *
+ * Redesign de 27/07/2026 (feedback do usuário): a tela tinha jargão de
+ * arquitetura vazando para o usuário final ("ver ARQUITETURA.md", "~28
+ * requisições paginadas") e o diagnóstico nacional de Vazios de Acesso —
+ * o elemento de maior peso analítico da tela, e o único que não depende de
+ * nenhuma seleção prévia — estava rebaixado a uma caixa secundária no fim
+ * da página. Reordenado para logo após o cabeçalho, com CTA sólido em vez
+ * de outline, e moldura glass (bg-white/70 + backdrop-blur) para dar peso
+ * visual condizente com um instrumento de priorização, não um formulário de
+ * consulta. A tabela/gráfico/radar de comparação de municípios (abaixo)
+ * NÃO foram redesenhados nesta sessão — mesmo padrão visual de antes.
  */
 export function PainelAnalitico() {
   const [municipios, setMunicipios] = useState<MunicipioComIndicadores[]>([]);
@@ -303,47 +361,114 @@ export function PainelAnalitico() {
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-6 font-sans">
-      <div className="rounded border border-slate-200 bg-white p-6 shadow-2xs">
-        <span className="mb-1 inline-flex items-center gap-1.5 rounded bg-violet-50 px-2.5 py-1 font-mono text-[10px] font-bold tracking-wider text-violet-700 uppercase">
-          Análise Científica Multidimensional
+      {/* Cabeçalho estratégico — ancorado na pergunta que a tela responde,
+          não em nomenclatura de banco de dados (feedback do usuário,
+          27/07/2026). */}
+      <div className="rounded-2xl bg-white/70 p-8 shadow-xl ring-1 ring-stone-900/5 backdrop-blur-xl">
+        <span className="mb-3 inline-flex items-center gap-2 rounded-full border border-red-200/60 bg-red-50 px-3 py-1">
+          <IconeGrafico className="h-3.5 w-3.5 text-red-700" />
+          <span className="text-[10px] font-black tracking-widest text-red-700 uppercase">
+            Diagnóstico de Justiça Energética
+          </span>
         </span>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Painel Analítico</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Cruzamento de Variáveis: compare 2 a 10 municípios pelos indicadores do Atlas.
+        <h1 className="text-3xl font-black tracking-tight text-stone-900">
+          Onde o sol não vira acesso
+        </h1>
+        <p className="mt-2 max-w-2xl text-sm font-medium text-stone-500">
+          Veja, no país inteiro, onde a abundância de potencial solar não se converte em adoção
+          residencial — ou compare municípios específicos lado a lado pelos indicadores do Atlas.
         </p>
       </div>
 
-      <section className="mt-5">
-        <h2 className="font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
-          Municípios
+      {/* Diagnóstico nacional de Vazios de Acesso — não depende de nenhuma
+          seleção prévia, por isso vem primeiro: é o elemento de maior peso
+          analítico da tela (feedback do usuário, 27/07/2026 — antes ficava
+          rebaixado a uma caixa secundária no fim da página). */}
+      <section className="mt-6 rounded-2xl bg-white/70 p-8 shadow-xl ring-1 ring-stone-900/5 backdrop-blur-xl">
+        <h2 className="text-lg font-black tracking-tight text-stone-900">
+          Matriz nacional de Vazios de Acesso
         </h2>
-        <div className="mt-2">
-          <SeletorMunicipios selecionados={municipios} aoMudarSelecionados={setMunicipios} />
-        </div>
+        <p className="mt-1 max-w-2xl text-sm text-stone-500">
+          Dispersão dos ~5,5 mil municípios do país nos eixos reais da metodologia — irradiação
+          solar × adoção residencial de MMGD per capita —, com as medianas nacionais dividindo os
+          quatro quadrantes de prioridade.
+        </p>
+
+        {!quadrantesNacionais && (
+          <div className="mt-6 flex flex-col items-center justify-center rounded-xl border border-dashed border-stone-300 bg-stone-50/50 p-10 text-center">
+            <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-stone-200">
+              <IconeGrafico className="h-5 w-5 text-stone-400" />
+            </div>
+            <h3 className="mb-1 text-sm font-bold text-stone-900">Matriz pronta para carregar</h3>
+            <p className="mb-6 max-w-md text-xs font-medium text-stone-500">
+              Classifica os ~5.500 municípios do país nos quatro quadrantes de prioridade —
+              pode levar alguns segundos.
+            </p>
+            <button
+              type="button"
+              onClick={carregarQuadrantesNacionais}
+              disabled={carregandoQuadrantes}
+              className="group relative inline-flex items-center gap-2 rounded-lg bg-red-700 px-6 py-3 font-bold text-white shadow-sm transition-all hover:bg-red-800 focus:ring-2 focus:ring-red-700 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
+            >
+              <IconePlay className="h-4 w-4 fill-white transition-transform group-hover:scale-110" />
+              {carregandoQuadrantes ? 'Carregando…' : 'Carregar matriz nacional'}
+            </button>
+            {erroQuadrantes && <p className="mt-3 text-xs text-red-600">{erroQuadrantes}</p>}
+          </div>
+        )}
+
+        {quadrantesNacionais && (
+          <div className="mt-6 rounded-xl bg-white p-4 ring-1 ring-stone-200">
+            <GraficoQuadrantes dados={quadrantesNacionais} />
+          </div>
+        )}
       </section>
 
-      <section className="mt-5">
-        <h2 className="font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
-          Indicadores
+      {/* Comparação de municípios selecionados — agrupada num único contêiner
+          visual (antes os campos ficavam soltos, sem moldura). */}
+      <section className="mt-6 rounded-2xl bg-white/70 p-6 shadow-xl ring-1 ring-stone-900/5 backdrop-blur-xl">
+        <h2 className="text-sm font-black tracking-tight text-stone-900">
+          Comparação lado a lado
         </h2>
-        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
-          {INDICADORES_COMPARAVEIS.map((indicador) => (
-            <label key={indicador.id} className="flex items-center gap-2 text-sm text-slate-700">
-              <input
-                type="checkbox"
-                checked={indicadoresIds.has(indicador.id)}
-                onChange={() => aoAlternarIndicador(indicador.id)}
-                className="h-4 w-4"
-              />
-              {indicador.rotulo}
-            </label>
-          ))}
-        </div>
-        <p className="mt-2 text-xs text-slate-400">
-          Índice de Pobreza Energética Regional e Tarifa Social não aparecem aqui: ambos dependem
-          do TSEE (Beneficiários da CDE/ANEEL), bloqueado até existir dado de jan/2026 em diante —
-          ver ARQUITETURA.md.
+        <p className="mt-1 text-xs font-medium text-stone-500">
+          Escolha de 2 a 10 municípios específicos para comparar pelos indicadores do Atlas.
         </p>
+
+        <div className="mt-5">
+          <h3 className="text-[10px] font-bold tracking-wider text-stone-400 uppercase">
+            Municípios
+          </h3>
+          <div className="mt-2">
+            <SeletorMunicipios selecionados={municipios} aoMudarSelecionados={setMunicipios} />
+          </div>
+        </div>
+
+        <div className="mt-5">
+          <h3 className="text-[10px] font-bold tracking-wider text-stone-400 uppercase">
+            Indicadores
+          </h3>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
+            {INDICADORES_COMPARAVEIS.map((indicador) => (
+              <label key={indicador.id} className="flex items-center gap-2 text-sm text-stone-700">
+                <input
+                  type="checkbox"
+                  checked={indicadoresIds.has(indicador.id)}
+                  onChange={() => aoAlternarIndicador(indicador.id)}
+                  className="h-4 w-4"
+                />
+                {indicador.rotulo}
+              </label>
+            ))}
+          </div>
+          <div className="mt-3 flex items-start gap-2 rounded-md bg-stone-100/60 p-2.5 text-[10px] text-stone-500">
+            <IconeAlerta className="h-3.5 w-3.5 shrink-0 text-stone-400" />
+            <p>
+              Índice de Pobreza Energética Regional e Tarifa Social não aparecem aqui: ambos
+              dependem de um indicador regulatório (benefício tarifário social da ANEEL) ainda sem
+              cobertura nacional.
+            </p>
+          </div>
+        </div>
       </section>
 
       {!podeComparar && (
@@ -456,45 +581,6 @@ export function PainelAnalitico() {
           <DiagnosticoComparacao diagnostico={diagnostico} />
         </>
       )}
-
-      {/* Scatter nacional de quadrantes — independente da comparação acima
-          (visão do país inteiro, não dos municípios selecionados). */}
-      <section className="mt-8 rounded border border-slate-200 bg-white p-6 shadow-2xs">
-        <h2 className="font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
-          Quadrantes nacionais — Vazios de Acesso
-        </h2>
-        <p className="mt-1 text-xs text-slate-500">
-          Dispersão dos ~5,5 mil municípios classificados pelo backend nos eixos reais da
-          metodologia (irradiação solar × MMGD residencial per capita), com as medianas
-          nacionais dividindo os quatro quadrantes.
-        </p>
-
-        {!quadrantesNacionais && (
-          <div className="mt-3">
-            <button
-              type="button"
-              onClick={carregarQuadrantesNacionais}
-              disabled={carregandoQuadrantes}
-              className="rounded-lg border border-violet-200 bg-white px-4 py-2.5 text-xs font-semibold text-violet-700 shadow-xs transition-all hover:bg-violet-50 disabled:opacity-50"
-            >
-              {carregandoQuadrantes
-                ? 'Carregando a classificação nacional…'
-                : 'Carregar gráfico de quadrantes'}
-            </button>
-            <p className="mt-1 text-xs text-slate-400">
-              Busca a classificação completa no backend (~28 requisições paginadas) — por isso
-              só carrega quando você pedir.
-            </p>
-            {erroQuadrantes && <p className="mt-1 text-xs text-red-600">{erroQuadrantes}</p>}
-          </div>
-        )}
-
-        {quadrantesNacionais && (
-          <div className="mt-4">
-            <GraficoQuadrantes dados={quadrantesNacionais} />
-          </div>
-        )}
-      </section>
     </div>
   );
 }
