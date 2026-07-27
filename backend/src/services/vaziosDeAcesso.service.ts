@@ -492,21 +492,27 @@ function classificarPainel(linhas: LinhaPainelBruta[]): PainelClassificado {
   };
 }
 
+/**
+ * Texto exibido diretamente ao usuário final junto de qualquer visualização
+ * desta classificação (mapa, painel analítico) — sem jargão de
+ * desenvolvimento (nomes de arquivo, identificadores internos de requisito,
+ * numeração de migração de banco de dados): só as premissas estatísticas
+ * que quem vai tomar decisão sobre o resultado precisa conhecer.
+ */
 export const NOTA_METODOLOGICA =
-  'Esta classificação é um corte bivariado simples (irradiação solar x MMGD residencial ' +
-  'per capita), SEM controlar renda. A análise de correlação MMGD x indicadores sociais ' +
-  'já mostrou que renda é o preditor mais robusto de MMGD nacionalmente — parte da ' +
-  'concentração de Vazios de Acesso em regiões de menor renda (ex: Nordeste) reflete o ' +
-  'próprio gargalo de renda documentado, não só um efeito "puro" de potencial solar ' +
-  'desperdiçado. Isso não invalida o resultado para fins de RF-055/RF-056 (que pedem ' +
-  'justamente esse corte simples, potencial x acesso), mas deve ser lido com essa ' +
-  'ressalva — mesmo cuidado metodológico já previsto para o Índice de Pobreza Energética ' +
-  'Regional (RF-080). Ver ARQUITETURA.md, seção "Identificação e ranking de Vazios de Acesso". ' +
-  'O campo "ivsh" (IVS + precariedade habitacional + insegurança da posse, migration 0028) é ' +
-  'uma alternativa de priorização para quem quer considerar moradia — auditoria de 18/07/2026 ' +
-  '(docs/RELATORIO_AUDITORIA_MORADIA_SOLAR.md) confirmou que precariedade habitacional e este ' +
-  'quadrante (potencial solar x MMGD residencial) são dimensões parcialmente independentes: o ' +
-  'IVS puro (usado como padrão) não captura moradia de propósito (migration 0015).';
+  'Esta classificação é um corte bivariado simples (irradiação solar × MMGD residencial ' +
+  'per capita), sem controlar renda. Uma análise de correlação anterior já mostrou que ' +
+  'renda é o preditor mais robusto de MMGD em nível nacional — parte da concentração de ' +
+  'Vazios de Acesso em regiões de menor renda (ex.: Nordeste) reflete o próprio gargalo de ' +
+  'renda já documentado, não só um efeito "puro" de potencial solar desperdiçado. Isso não ' +
+  'invalida o resultado para fins de priorização territorial (que pede justamente esse ' +
+  'corte simples, potencial × acesso), mas deve ser lido com essa ressalva — mesmo cuidado ' +
+  'metodológico já previsto para o Índice de Pobreza Energética Regional. O campo "ivsh" ' +
+  '(vulnerabilidade social + precariedade habitacional + insegurança da posse) é uma ' +
+  'alternativa de priorização para quem quer considerar moradia — uma auditoria anterior ' +
+  'confirmou que precariedade habitacional e este quadrante (potencial solar × MMGD ' +
+  'residencial) são dimensões parcialmente independentes: o índice de vulnerabilidade ' +
+  'social padrão não captura moradia, de propósito.';
 
 export interface ListarVaziosDeAcessoResultado {
   metodologia: {
@@ -704,10 +710,11 @@ export async function listarVaziosDeAcesso(
       criterioQuadrante:
         'Mediana nacional de cada eixo. "Vazio de Acesso" = irradiação >= mediana E MMGD residencial per capita < mediana.',
       criterioPriorizacaoPadrao:
-        'IVS Consolidado, decrescente (indicador negativo — maior valor = mais vulnerável primeiro). ' +
-        'Reordenável via ?ordenarPor — inclui "ivsh" (IVS + precariedade habitacional + insegurança ' +
-        'da posse, migration 0028) para priorização que considera moradia, já que o IVS puro exclui ' +
-        'essa dimensão de propósito (ver notaMetodologica).',
+        'Índice de Vulnerabilidade Social consolidado, decrescente (indicador negativo — maior ' +
+        'valor = mais vulnerável primeiro). Também pode ser ordenado pelo IVSH (Índice de ' +
+        'Vulnerabilidade Sócio-Habitacional-Energética — vulnerabilidade social + precariedade ' +
+        'habitacional + insegurança da posse) para priorização que considera moradia, já que o ' +
+        'índice padrão exclui essa dimensão de propósito (ver nota metodológica).',
       medianaNacional: {
         potencialSolarKwhM2Dia: painel.medianaIrradiacao,
         mmgdResidencialPer1000Hab: painel.medianaMmgdResidencialPerCapita,
