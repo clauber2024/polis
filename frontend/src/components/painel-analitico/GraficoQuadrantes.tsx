@@ -1,44 +1,165 @@
 import { useMemo, useState } from 'react';
 import type { VaziosDeAcessoCompleto } from '../../services/vaziosDeAcesso.service';
-import type { Quadrante } from '../../types/api';
-import { formatarValor } from '../../utils/formatadores';
+import type { MunicipioClassificado, Quadrante } from '../../types/api';
+import { formatarValor, type FormatoIndicador } from '../../utils/formatadores';
+
+/** Ícone inline (mesmo padrão de CartaoVazioDeAcesso.tsx — sem dependência de lucide-react). */
+function IconeAlerta({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </svg>
+  );
+}
 
 /**
- * Scatter de quadrantes da classificação de Vazios de Acesso (14/07/2026 —
- * ideia adaptada do protótipo `atlas-mmgd-solar`, mas com os EIXOS REAIS da
- * metodologia do Atlas: irradiação solar × MMGD residencial per capita, com
- * as medianas nacionais vindas do backend. O protótipo plotava MMGD × IVS,
- * que NÃO é a classificação real — IVS é critério de priorização (RF-056),
- * não eixo de quadrante).
+ * Laboratório multidimensional do Painel Analítico (27/07/2026, decisão do
+ * usuário): substitui o scatter fixo de Vazios de Acesso (irradiação × MMGD
+ * residencial per capita — essa matriz continua existindo, na íntegra, na
+ * página dedicada /vazios-de-acesso) por um cruzamento LIVRE entre qualquer
+ * par de 7 indicadores municipais. Duas decisões de arquitetura fixadas
+ * pelo usuário, não renegociáveis por este componente:
+ *
+ * 1. A COR/CLASSIFICAÇÃO de cada ponto é SEMPRE a classificação oficial de
+ *    Vazio de Acesso (irradiação × MMGD residencial per capita, medianas do
+ *    backend) — nunca muda com os eixos escolhidos aqui. Um município sem
+ *    classificação oficial (falta irradiação/MMGD, 4 casos) não aparece no
+ *    laboratório, mesmo quando os eixos escolhidos não dependem desses dois
+ *    indicadores — a cor é uma âncora fixa, não um dado por cruzamento.
+ * 2. Quando os dois eixos escolhidos são exatamente o par oficial
+ *    (irradiação × MMGD), a posição no gráfico e a cor do ponto
+ *    correspondem (é literalmente a Matriz de Vazios de Acesso) — linhas de
+ *    mediana NACIONAL (backend) e rótulos de canto por quadrante aparecem.
+ *    Em QUALQUER outro par, a posição no gráfico deixa de corresponder à
+ *    cor (um ponto vermelho não define mais um "quadrante Vazio de Acesso"
+ *    geométrico nesses eixos) — os rótulos de canto por quadrante são
+ *    escondidos de propósito (seriam enganosos) e as linhas tracejadas
+ *    passam a ser medianas DESTA AMOSTRA, não mais oficiais, com nota
+ *    explícita de que é um cruzamento exploratório, sem controle
+ *    estatístico nem validação — ver a caixa "Leitura exploratória" abaixo
+ *    do gráfico.
  *
  * SVG próprio, sem lib de gráfico (mesma decisão de GraficoComparacao/
- * GraficoRadar: o stack atual resolve). A COR/CLASSIFICAÇÃO de cada ponto
- * (quadrante) vem SEMPRE do backend (irradiação × MMGD) e nunca muda — o
- * único elemento que troca com `modoEixo` é a POSIÇÃO horizontal exibida,
- * uma segunda lente de leitura (18/07/2026, pedido do usuário: "Matriz de
- * Justiça Energética"). No modo IVSH, a linha vertical tracejada é a mediana
- * de IVSH DESTA amostra (calculada aqui, só para referência visual) — não é
- * um critério oficial de quadrante como a mediana de irradiação (essa sim
- * vinda do backend); por isso o modo IVSH não recebe rótulos de quadrante
- * próprios, só reaproveita os 4 já reais.
+ * GraficoRadar: o stack atual resolve).
  */
 
-type ModoEixoX = 'irradiacao' | 'ivsh';
+type IdEixo =
+  | 'irradiacaoMediaKwhM2Dia'
+  | 'mmgdResidencialPer1000Hab'
+  | 'ivs'
+  | 'ivsh'
+  | 'rendaMediaDomiciliar'
+  | 'percentualPobrezaCadunico'
+  | 'tarifaEnergiaResidencial';
 
-interface GraficoQuadrantesProps {
-  dados: VaziosDeAcessoCompleto;
+interface DescritorEixo {
+  id: IdEixo;
+  rotulo: string;
+  unidade: string | null;
+  formato: FormatoIndicador;
+  acessor: (m: MunicipioClassificado) => number | null;
+}
+
+/** Mesmos rótulo/unidade/formato já usados no catálogo de indicadores do mapa (utils/indicadores.ts) — consistência entre telas. */
+const EIXOS: DescritorEixo[] = [
+  {
+    id: 'irradiacaoMediaKwhM2Dia',
+    rotulo: 'Irradiação solar média',
+    unidade: 'kWh/m²·dia',
+    formato: 'numero',
+    acessor: (m) => m.irradiacaoMediaKwhM2Dia,
+  },
+  {
+    id: 'mmgdResidencialPer1000Hab',
+    rotulo: 'MMGD residencial per capita',
+    unidade: 'kW/1.000 hab',
+    formato: 'numero',
+    acessor: (m) => m.mmgdResidencialPer1000Hab,
+  },
+  {
+    id: 'ivs',
+    rotulo: 'Índice de Vulnerabilidade Social (IVS)',
+    unidade: null,
+    formato: 'numero',
+    acessor: (m) => m.ivs,
+  },
+  {
+    id: 'ivsh',
+    rotulo: 'IVSH (vulnerabilidade sócio-habitacional-energética)',
+    unidade: null,
+    formato: 'numero',
+    acessor: (m) => m.ivsh,
+  },
+  {
+    id: 'rendaMediaDomiciliar',
+    rotulo: 'Renda média domiciliar',
+    unidade: null,
+    formato: 'moeda',
+    acessor: (m) => m.rendaMediaDomiciliar,
+  },
+  {
+    id: 'percentualPobrezaCadunico',
+    rotulo: 'Pobreza entre famílias do CadÚnico',
+    unidade: null,
+    formato: 'percentual',
+    acessor: (m) => m.percentualPobrezaCadunico,
+  },
+  {
+    id: 'tarifaEnergiaResidencial',
+    rotulo: 'Tarifa residencial (TUSD+TE)',
+    unidade: 'R$/kWh',
+    formato: 'numero',
+    acessor: (m) => m.tarifaEnergiaResidencial,
+  },
+];
+
+function buscarEixo(id: IdEixo): DescritorEixo {
+  return EIXOS.find((eixo) => eixo.id === id) ?? EIXOS[0];
 }
 
 const LARGURA = 720;
 const ALTURA = 440;
 const MARGEM = { topo: 28, direita: 20, base: 52, esquerda: 64 };
 
-/** Cores por quadrante — violeta mantém a identidade de "Vazio de Acesso". */
+/**
+ * Cores por quadrante — vermelho/carmim para "Vazio de Acesso" (feedback do
+ * usuário, 27/07/2026): é o quadrante de exclusão/alerta do projeto, e o
+ * modelo mental de "alerta = vermelho" já usado nos badges e no CTA do
+ * Painel Analítico precisa valer aqui também. Antes era roxo, sem relação
+ * com o resto da paleta semântica.
+ */
 const COR_QUADRANTE: Record<Quadrante, string> = {
-  vazio_de_acesso: '#7c3aed',
+  vazio_de_acesso: '#b91c1c',
   acesso_pleno: '#059669',
   adocao_acima_do_potencial: '#0284c7',
   baixo_potencial_baixa_adocao: '#94a3b8',
+};
+
+/**
+ * Raio e opacidade por quadrante (feedback do usuário, 27/07/2026: quase
+ * 5.600 pontos sobrepostos viram uma massa sólida ilegível — "efeito
+ * hairball"). Opacidade baixa faz a sobreposição funcionar como mapa de
+ * calor (onde mais municípios se acumulam, a mancha fica mais escura) em
+ * vez de esconder a densidade atrás de um bloco de cor uniforme —
+ * "Vazio de Acesso" fica mais visível que os demais de propósito, é o
+ * quadrante de alerta do projeto.
+ */
+const ESTILO_PONTO: Record<Quadrante, { r: number; opacity: number }> = {
+  vazio_de_acesso: { r: 1.8, opacity: 0.55 },
+  acesso_pleno: { r: 1.4, opacity: 0.35 },
+  adocao_acima_do_potencial: { r: 1.4, opacity: 0.35 },
+  baixo_potencial_baixa_adocao: { r: 1.2, opacity: 0.18 },
 };
 
 /** Fallback de rótulo — o rótulo real vem de quadranteRotulo (backend). */
@@ -48,6 +169,25 @@ const ROTULO_FALLBACK: Record<Quadrante, string> = {
   adocao_acima_do_potencial: 'Adoção acima do potencial',
   baixo_potencial_baixa_adocao: 'Baixo potencial, baixa adoção',
 };
+
+/**
+ * Contorno por região (toggle "colorir contorno por região", decisão do
+ * usuário, 27/07/2026) — canal visual SEPARADO do preenchimento (sempre a
+ * classificação oficial de quadrante, decisão irrevogável deste
+ * componente). Paleta deliberadamente distinta de COR_QUADRANTE (nenhum
+ * matiz repetido) para não confundir os dois canais.
+ */
+const COR_REGIAO: Record<string, string> = {
+  Norte: '#7c3aed',
+  Nordeste: '#ea580c',
+  'Centro-Oeste': '#ca8a04',
+  Sudeste: '#db2777',
+  Sul: '#0d9488',
+};
+const COR_REGIAO_FALLBACK = '#334155';
+function corRegiao(regiao: string): string {
+  return COR_REGIAO[regiao] ?? COR_REGIAO_FALLBACK;
+}
 
 function percentil(valoresOrdenados: number[], p: number): number {
   if (valoresOrdenados.length === 0) return 0;
@@ -65,8 +205,14 @@ const TODOS_QUADRANTES: Quadrante[] = [
   'baixo_potencial_baixa_adocao',
 ];
 
+interface GraficoQuadrantesProps {
+  dados: VaziosDeAcessoCompleto;
+}
+
 export function GraficoQuadrantes({ dados }: GraficoQuadrantesProps) {
-  const [modoEixo, setModoEixo] = useState<ModoEixoX>('irradiacao');
+  const [eixoXId, setEixoXId] = useState<IdEixo>('irradiacaoMediaKwhM2Dia');
+  const [eixoYId, setEixoYId] = useState<IdEixo>('mmgdResidencialPer1000Hab');
+  const [corPorRegiao, setCorPorRegiao] = useState(false);
   // Filtros (21/07/2026, feedback do usuário: ~5.570 pontos poluem o
   // gráfico). Client-side — os municípios já estão todos carregados
   // (buscarClassificacaoNacionalCompleta), não justifica nova requisição.
@@ -74,6 +220,11 @@ export function GraficoQuadrantes({ dados }: GraficoQuadrantesProps) {
   const [quadrantesVisiveis, setQuadrantesVisiveis] = useState<Set<Quadrante>>(
     () => new Set(TODOS_QUADRANTES),
   );
+
+  const eixoXDescritor = useMemo(() => buscarEixo(eixoXId), [eixoXId]);
+  const eixoYDescritor = useMemo(() => buscarEixo(eixoYId), [eixoYId]);
+  const ehMatrizOficial =
+    eixoXId === 'irradiacaoMediaKwhM2Dia' && eixoYId === 'mmgdResidencialPer1000Hab';
 
   const regioesDisponiveis = useMemo(
     () => [...new Set(dados.municipios.map((m) => m.regiao))].sort((a, b) => a.localeCompare(b, 'pt-BR')),
@@ -94,7 +245,6 @@ export function GraficoQuadrantes({ dados }: GraficoQuadrantesProps) {
 
   const {
     pontos,
-    valorEixoX,
     rotulos,
     escalaX,
     escalaY,
@@ -103,39 +253,26 @@ export function GraficoQuadrantes({ dados }: GraficoQuadrantesProps) {
     tetoY,
     totalTruncados,
     medianaXAmostra,
-    totalSemIvsh,
+    medianaYAmostra,
+    totalSemDadoNosEixos,
   } = useMemo(() => {
-    const classificadosBase = dados.municipios.filter(
-      (
-        m,
-      ): m is (typeof dados.municipios)[number] & {
-        irradiacaoMediaKwhM2Dia: number;
-        mmgdResidencialPer1000Hab: number;
-        quadrante: Quadrante;
-      } =>
+    const eixoX = buscarEixo(eixoXId);
+    const eixoY = buscarEixo(eixoYId);
+
+    // Cor sempre = classificação oficial (decisão do usuário) — um
+    // município sem quadrante oficial (falta irradiação/MMGD) não entra no
+    // laboratório, mesmo que os eixos escolhidos não dependam desses dois
+    // indicadores (ver docstring do arquivo).
+    const comQuadrante = dados.municipios.filter(
+      (m): m is MunicipioClassificado & { quadrante: Quadrante } =>
         m.quadrante !== null &&
         quadrantesVisiveis.has(m.quadrante) &&
-        (regiaoFiltro === '' || m.regiao === regiaoFiltro) &&
-        typeof m.irradiacaoMediaKwhM2Dia === 'number' &&
-        typeof m.mmgdResidencialPer1000Hab === 'number',
+        (regiaoFiltro === '' || m.regiao === regiaoFiltro),
     );
 
-    // No modo IVSH, o eixo X exige uma segunda condição (ivsh não nulo) — os
-    // municípios sem IVSH calculável ficam de fora SÓ deste modo de leitura,
-    // continuam contados normalmente no resumo por quadrante do backend.
-    const classificados =
-      modoEixo === 'ivsh'
-        ? classificadosBase.filter(
-            (m): m is (typeof classificadosBase)[number] & { ivsh: number } =>
-              typeof m.ivsh === 'number',
-          )
-        : classificadosBase;
-
-    const totalSemIvsh =
-      modoEixo === 'ivsh' ? classificadosBase.length - classificados.length : 0;
-
-    const valorEixoX = (m: (typeof classificados)[number]): number =>
-      modoEixo === 'ivsh' ? (m.ivsh as number) : m.irradiacaoMediaKwhM2Dia;
+    const classificados = comQuadrante.filter(
+      (m) => eixoX.acessor(m) !== null && eixoY.acessor(m) !== null,
+    );
 
     // Rótulo real de cada quadrante: primeiro município classificado nele.
     const rotulos = { ...ROTULO_FALLBACK };
@@ -143,14 +280,21 @@ export function GraficoQuadrantes({ dados }: GraficoQuadrantesProps) {
       if (m.quadranteRotulo) rotulos[m.quadrante] = m.quadranteRotulo;
     }
 
-    const valoresX = classificados.map(valorEixoX).sort((a, b) => a - b);
-    const valoresY = classificados.map((m) => m.mmgdResidencialPer1000Hab).sort((a, b) => a - b);
+    const valoresX = classificados.map((m) => eixoX.acessor(m) as number).sort((a, b) => a - b);
+    const valoresY = classificados.map((m) => eixoY.acessor(m) as number).sort((a, b) => a - b);
 
-    // O eixo Y é MUITO assimétrico (outliers de adoção altíssima achatariam
-    // o resto do país numa linha) — truncado no p97,5 SÓ PARA EXIBIÇÃO, com
-    // aviso explícito de quantos pontos foram fixados no teto. A mediana
-    // nacional (linha) não é afetada: vem pronta do backend.
-    const tetoY = Math.max(percentil(valoresY, 0.975), dados.medianaNacional.mmgdResidencialPer1000Hab * 2);
+    const medianaYAmostra = percentil(valoresY, 0.5);
+    const medianaXAmostra = percentil(valoresX, 0.5);
+
+    // O truncamento em p97,5 (com piso de 2x a mediana) foi calibrado para
+    // a assimetria específica de MMGD residencial per capita (muitos zeros,
+    // poucos outliers altíssimos) — só se aplica quando o eixo Y É esse
+    // indicador. Para os demais eixos, usa o percentil bruto, sem inventar
+    // um piso não calibrado para eles.
+    const p975Y = percentil(valoresY, 0.975);
+    const tetoY =
+      eixoYId === 'mmgdResidencialPer1000Hab' ? Math.max(p975Y, medianaYAmostra * 2) : p975Y;
+
     const minX = valoresX[0] ?? 0;
     const maxX = valoresX[valoresX.length - 1] ?? 1;
 
@@ -161,22 +305,13 @@ export function GraficoQuadrantes({ dados }: GraficoQuadrantesProps) {
     const escalaY = (v: number) =>
       MARGEM.topo + alturaUtil - (Math.min(v, tetoY) / (tetoY || 1)) * alturaUtil;
 
-    const totalTruncados = classificados.filter(
-      (m) => m.mmgdResidencialPer1000Hab > tetoY,
-    ).length;
+    const totalTruncados = classificados.filter((m) => (eixoY.acessor(m) as number) > tetoY).length;
 
     const ticksX = Array.from({ length: 5 }, (_, i) => minX + ((maxX - minX) / 4) * i);
     const ticksY = Array.from({ length: 5 }, (_, i) => (tetoY / 4) * i);
 
-    // Mediana de X DESTA amostra — só usada como linha de referência quando
-    // não existe mediana oficial do backend para o eixo (modo IVSH). No modo
-    // irradiação, a linha oficial (dados.medianaNacional) é usada em vez
-    // desta, ver `xMediana` abaixo.
-    const medianaXAmostra = percentil(valoresX, 0.5);
-
     return {
       pontos: classificados,
-      valorEixoX,
       rotulos,
       escalaX,
       escalaY,
@@ -185,52 +320,76 @@ export function GraficoQuadrantes({ dados }: GraficoQuadrantesProps) {
       tetoY,
       totalTruncados,
       medianaXAmostra,
-      totalSemIvsh,
+      medianaYAmostra,
+      totalSemDadoNosEixos: comQuadrante.length - classificados.length,
     };
-  }, [dados, modoEixo, regiaoFiltro, quadrantesVisiveis]);
+  }, [dados, eixoXId, eixoYId, regiaoFiltro, quadrantesVisiveis]);
 
-  const xMediana =
-    modoEixo === 'ivsh' ? escalaX(medianaXAmostra) : escalaX(dados.medianaNacional.potencialSolarKwhM2Dia);
-  const yMediana = escalaY(dados.medianaNacional.mmgdResidencialPer1000Hab);
-
-  const rotuloEixoX =
-    modoEixo === 'ivsh'
-      ? 'IVSH — Vulnerabilidade Sócio-Habitacional-Energética (0 melhor, 1 pior)'
-      : dados.eixoX;
+  const xMediana = ehMatrizOficial
+    ? escalaX(dados.medianaNacional.potencialSolarKwhM2Dia)
+    : escalaX(medianaXAmostra);
+  const yMediana = ehMatrizOficial
+    ? escalaY(dados.medianaNacional.mmgdResidencialPer1000Hab)
+    : escalaY(medianaYAmostra);
 
   return (
     <div className="space-y-3">
-      {/* Alterna a POSIÇÃO horizontal exibida — a classificação/cor dos
-          pontos nunca muda, ver comentário de topo do arquivo. */}
-      <div className="flex items-center gap-1 text-xs">
-        <span className="mr-1 font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
-          Eixo X
+      {/* Cabeçalho do cruzamento atual + selo oficial/exploratório */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-sm">
+          <span className="mr-1.5 font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+            Cruzando
+          </span>
+          <span className="font-bold text-slate-800">
+            {eixoYDescritor.rotulo} × {eixoXDescritor.rotulo}
+          </span>
+        </div>
+        <span
+          className={`rounded-full px-2.5 py-1 text-[10px] font-black tracking-wider uppercase ${
+            ehMatrizOficial ? 'bg-red-700/10 text-red-800' : 'bg-amber-500/10 text-amber-700'
+          }`}
+        >
+          {ehMatrizOficial ? 'Matriz oficial' : 'Cruzamento exploratório'}
         </span>
-        {(
-          [
-            { valor: 'irradiacao', rotulo: 'Irradiação solar (oficial)' },
-            { valor: 'ivsh', rotulo: 'IVSH (lente adicional)' },
-          ] as const
-        ).map((opcao) => (
-          <button
-            key={opcao.valor}
-            type="button"
-            onClick={() => setModoEixo(opcao.valor)}
-            className={`rounded-full border px-2.5 py-1 font-semibold transition-colors ${
-              modoEixo === opcao.valor
-                ? 'border-violet-600 bg-violet-600 text-white'
-                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-            }`}
+      </div>
+
+      {/* Seletores livres de eixo (laboratório multidimensional, 27/07/2026) */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+          Eixo vertical (Y)
+          <select
+            value={eixoYId}
+            onChange={(evento) => setEixoYId(evento.target.value as IdEixo)}
+            className="rounded border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700"
           >
-            {opcao.rotulo}
-          </button>
-        ))}
+            {EIXOS.map((eixo) => (
+              <option key={eixo.id} value={eixo.id}>
+                {eixo.rotulo}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+          Eixo horizontal (X)
+          <select
+            value={eixoXId}
+            onChange={(evento) => setEixoXId(evento.target.value as IdEixo)}
+            className="rounded border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700"
+          >
+            {EIXOS.map((eixo) => (
+              <option key={eixo.id} value={eixo.id}>
+                {eixo.rotulo}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       {/* Filtros (21/07/2026): região reduz o volume de pontos; toggle por
           quadrante isola visualmente o(s) grupo(s) de interesse (ex.: só
-          "Vazio de Acesso"). Puramente client-side, não muda a classificação
-          nem as medianas — só o que é exibido/considerado na escala. */}
+          "Vazio de Acesso") — continua fazendo sentido em qualquer par de
+          eixos, já que a cor é sempre o quadrante oficial. Puramente
+          client-side, não muda a classificação nem as medianas oficiais. */}
       <div className="flex flex-wrap items-center gap-3 text-xs">
         <label className="flex items-center gap-1.5 font-semibold text-slate-600">
           Região
@@ -246,6 +405,15 @@ export function GraficoQuadrantes({ dados }: GraficoQuadrantesProps) {
               </option>
             ))}
           </select>
+        </label>
+        <label className="flex items-center gap-1.5 font-semibold text-slate-600">
+          <input
+            type="checkbox"
+            checked={corPorRegiao}
+            onChange={(evento) => setCorPorRegiao(evento.target.checked)}
+            className="rounded text-slate-700 focus:ring-slate-700"
+          />
+          Colorir contorno por região
         </label>
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
@@ -268,20 +436,53 @@ export function GraficoQuadrantes({ dados }: GraficoQuadrantesProps) {
                   style={{ backgroundColor: COR_QUADRANTE[q] }}
                 />
                 {ROTULO_FALLBACK[q]}
+                <span className="font-mono text-slate-400">
+                  ({(dados.resumoPorQuadrante[q] ?? 0).toLocaleString('pt-BR')})
+                </span>
               </button>
             );
           })}
         </div>
-        <span className="text-slate-400">{pontos.length.toLocaleString('pt-BR')} municípios exibidos</span>
+        {/* title = explicação do universo de 5.573 (não "~5.570") sob
+            demanda — pergunta legítima e recorrente, ver NOTA_UNIVERSO em
+            vaziosDeAcesso.service.ts (backend, 27/07/2026). */}
+        <span
+          className="cursor-help text-slate-400 underline decoration-dotted underline-offset-2"
+          title={dados.avisos.notaUniverso}
+        >
+          {pontos.length.toLocaleString('pt-BR')} de{' '}
+          {dados.avisos.totalMunicipios.toLocaleString('pt-BR')} municípios exibidos
+          {totalSemDadoNosEixos > 0 && ` · ${totalSemDadoNosEixos.toLocaleString('pt-BR')} sem dado neste cruzamento`}
+          {dados.avisos.totalExcluidosSemDado > 0 &&
+            ` · ${dados.avisos.totalExcluidosSemDado.toLocaleString('pt-BR')} sem classificação oficial`}
+        </span>
       </div>
+
+      {corPorRegiao && (
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-semibold text-slate-500">
+          {regioesDisponiveis.map((regiao) => (
+            <span key={regiao} className="inline-flex items-center gap-1">
+              <span
+                className="inline-block h-2.5 w-2.5 rounded-full border-2"
+                style={{ borderColor: corRegiao(regiao) }}
+              />
+              {regiao}
+            </span>
+          ))}
+        </div>
+      )}
 
       <svg
         viewBox={`0 0 ${LARGURA} ${ALTURA}`}
         role="img"
-        aria-label={`Dispersão dos municípios por ${modoEixo === 'ivsh' ? 'IVSH' : 'irradiação solar'} e MMGD residencial per capita — cor e quadrante sempre da classificação oficial (irradiação × MMGD)`}
-        className="w-full rounded border border-slate-200 bg-white"
+        aria-label={`Dispersão dos municípios por ${eixoYDescritor.rotulo} × ${eixoXDescritor.rotulo} — ${
+          ehMatrizOficial
+            ? 'cor e quadrante sempre da classificação oficial (irradiação × MMGD)'
+            : 'cor sempre da classificação oficial de Vazio de Acesso, independente destes eixos'
+        }`}
+        className="w-full bg-white"
       >
-        {/* Linhas das medianas nacionais (backend) */}
+        {/* Linhas de mediana: nacional/oficial (backend) só no par oficial; caso contrário, mediana desta amostra — ver nota "Leitura exploratória" abaixo. */}
         <line
           x1={xMediana}
           x2={xMediana}
@@ -299,34 +500,45 @@ export function GraficoQuadrantes({ dados }: GraficoQuadrantesProps) {
           strokeDasharray="4 4"
         />
 
-        {/* Rótulos dos quadrantes (posições fixas nos 4 cantos da área útil) */}
-        <text x={LARGURA - MARGEM.direita - 6} y={MARGEM.topo + 14} textAnchor="end" fontSize={10} fill="#0284c7" fontWeight={700}>
-          {rotulos.acesso_pleno}
-        </text>
-        <text x={MARGEM.esquerda + 6} y={MARGEM.topo + 14} fontSize={10} fill="#0284c7" fontWeight={400}>
-          {rotulos.adocao_acima_do_potencial}
-        </text>
-        <text x={MARGEM.esquerda + 6} y={ALTURA - MARGEM.base - 8} fontSize={10} fill="#64748b" fontWeight={400}>
-          {rotulos.baixo_potencial_baixa_adocao}
-        </text>
-        <text x={LARGURA - MARGEM.direita - 6} y={ALTURA - MARGEM.base - 8} textAnchor="end" fontSize={10} fill="#7c3aed" fontWeight={700}>
-          {rotulos.vazio_de_acesso}
-        </text>
+        {/* Rótulos de quadrante como marca d'água sutil — só fazem sentido
+            geometricamente no par oficial (irradiação × MMGD); em qualquer
+            outro par, a posição na tela não corresponde mais à cor, então
+            mostrar "Vazio de Acesso" num canto seria enganoso. */}
+        {ehMatrizOficial && (
+          <>
+            <text x={LARGURA - MARGEM.direita - 8} y={MARGEM.topo + 18} textAnchor="end" fontSize={13} fill="#0284c7" fillOpacity={0.35} fontWeight={800}>
+              {ROTULO_FALLBACK.acesso_pleno}
+            </text>
+            <text x={MARGEM.esquerda + 8} y={MARGEM.topo + 18} fontSize={13} fill="#0284c7" fillOpacity={0.35} fontWeight={800}>
+              {ROTULO_FALLBACK.adocao_acima_do_potencial}
+            </text>
+            <text x={MARGEM.esquerda + 8} y={ALTURA - MARGEM.base - 10} fontSize={13} fill="#78716c" fillOpacity={0.35} fontWeight={800}>
+              {ROTULO_FALLBACK.baixo_potencial_baixa_adocao}
+            </text>
+            <text x={LARGURA - MARGEM.direita - 8} y={ALTURA - MARGEM.base - 10} textAnchor="end" fontSize={13} fill="#b91c1c" fillOpacity={0.35} fontWeight={800}>
+              {ROTULO_FALLBACK.vazio_de_acesso}
+            </text>
+          </>
+        )}
 
-        {/* Pontos — classificação e cor 100% do backend; só a posição no
-            eixo X muda com o modo. Código IBGE bruto fica fora do tooltip
-            de propósito (só nome/UF, que já identificam o município). */}
+        {/* Pontos — preenchimento sempre a classificação oficial (irradiação
+            × MMGD); posição sempre os eixos escolhidos acima. Contorno por
+            região é opcional (canal visual separado, nunca substitui o
+            preenchimento). Código IBGE bruto fica fora do tooltip de
+            propósito (só nome/UF, que já identificam o município). */}
         {pontos.map((m) => (
           <circle
             key={m.codigoIbge}
-            cx={escalaX(valorEixoX(m))}
-            cy={escalaY(m.mmgdResidencialPer1000Hab)}
-            r={m.quadrante === 'vazio_de_acesso' ? 2.2 : 1.7}
+            cx={escalaX(eixoXDescritor.acessor(m) as number)}
+            cy={escalaY(eixoYDescritor.acessor(m) as number)}
+            r={ESTILO_PONTO[m.quadrante].r}
             fill={COR_QUADRANTE[m.quadrante]}
-            fillOpacity={m.quadrante === 'vazio_de_acesso' ? 0.75 : 0.45}
+            fillOpacity={ESTILO_PONTO[m.quadrante].opacity}
+            stroke={corPorRegiao ? corRegiao(m.regiao) : 'none'}
+            strokeWidth={corPorRegiao ? 0.8 : 0}
           >
             <title>
-              {`${m.nome} (${m.uf}) — ${rotulos[m.quadrante]}\nIrradiação: ${formatarValor(m.irradiacaoMediaKwhM2Dia, 'numero')} kWh/m²·dia · MMGD res.: ${formatarValor(m.mmgdResidencialPer1000Hab, 'numero')} kW/1.000 hab${modoEixo === 'ivsh' ? ` · IVSH: ${formatarValor(m.ivsh, 'numero')}` : ''}`}
+              {`${m.nome} (${m.uf}) — ${rotulos[m.quadrante]}\n${eixoYDescritor.rotulo}: ${formatarValor(eixoYDescritor.acessor(m), eixoYDescritor.formato)}${eixoYDescritor.unidade ? ` ${eixoYDescritor.unidade}` : ''} · ${eixoXDescritor.rotulo}: ${formatarValor(eixoXDescritor.acessor(m), eixoXDescritor.formato)}${eixoXDescritor.unidade ? ` ${eixoXDescritor.unidade}` : ''}${corPorRegiao ? ` · Região: ${m.regiao}` : ''}`}
             </title>
           </circle>
         ))}
@@ -355,7 +567,7 @@ export function GraficoQuadrantes({ dados }: GraficoQuadrantesProps) {
             fontSize={10}
             fill="#64748b"
           >
-            {formatarValor(t, 'numero')}
+            {formatarValor(t, eixoXDescritor.formato)}
           </text>
         ))}
         {ticksY.map((t) => (
@@ -367,7 +579,7 @@ export function GraficoQuadrantes({ dados }: GraficoQuadrantesProps) {
             fontSize={10}
             fill="#64748b"
           >
-            {formatarValor(t, 'inteiro')}
+            {formatarValor(t, eixoYDescritor.formato)}
           </text>
         ))}
         <text
@@ -377,7 +589,8 @@ export function GraficoQuadrantes({ dados }: GraficoQuadrantesProps) {
           fontSize={11}
           fill="#475569"
         >
-          {rotuloEixoX}
+          {eixoXDescritor.rotulo}
+          {eixoXDescritor.unidade ? ` (${eixoXDescritor.unidade})` : ''}
         </text>
         <text
           x={16}
@@ -387,68 +600,54 @@ export function GraficoQuadrantes({ dados }: GraficoQuadrantesProps) {
           fill="#475569"
           transform={`rotate(-90 16 ${MARGEM.topo + (ALTURA - MARGEM.topo - MARGEM.base) / 2})`}
         >
-          {dados.eixoY}
+          {eixoYDescritor.rotulo}
+          {eixoYDescritor.unidade ? ` (${eixoYDescritor.unidade})` : ''}
         </text>
       </svg>
 
-      {/* Legenda com as contagens do backend */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
-        {TODOS_QUADRANTES.map((q) => (
-          <span key={q} className="inline-flex items-center gap-1.5">
-            <span
-              className="inline-block h-2.5 w-2.5 rounded-full"
-              style={{ backgroundColor: COR_QUADRANTE[q] }}
-            />
-            {rotulos[q]}{' '}
-            <span className="font-mono text-slate-400">
-              ({(dados.resumoPorQuadrante[q] ?? 0).toLocaleString('pt-BR')})
-            </span>
-          </span>
-        ))}
-        <span className="inline-flex items-center gap-1.5 text-slate-400">
-          Excluídos por falta de dado:{' '}
-          <span className="font-mono">
-            {dados.avisos.totalExcluidosSemDado.toLocaleString('pt-BR')}
-          </span>
-        </span>
-      </div>
-
       {totalTruncados > 0 && (
         <p className="text-xs text-slate-400">
-          Eixo vertical truncado em {formatarValor(tetoY, 'numero')} kW/1.000 hab (percentil
-          97,5) só para exibição — {totalTruncados.toLocaleString('pt-BR')} municípios com
-          adoção acima disso aparecem fixados no topo do gráfico. A classificação deles não
-          muda com o truncamento.
+          Eixo vertical truncado em {formatarValor(tetoY, eixoYDescritor.formato)}
+          {eixoYDescritor.unidade ? ` ${eixoYDescritor.unidade}` : ''} (percentil 97,5) só para
+          exibição — {totalTruncados.toLocaleString('pt-BR')} municípios com{' '}
+          {eixoYDescritor.rotulo.toLowerCase()} acima disso aparecem fixados no topo do gráfico. A
+          classificação deles não muda com o truncamento.
         </p>
       )}
 
-      {modoEixo === 'ivsh' && (
+      {!ehMatrizOficial && (
         <p className="rounded border border-amber-100 bg-amber-50/60 p-3 text-xs leading-relaxed text-amber-900">
           <span className="mb-1 block font-mono text-[10px] font-bold tracking-wider uppercase">
-            Leitura adicional, não oficial
+            Leitura exploratória, sem validação estatística
           </span>
-          A linha vertical tracejada é a mediana de IVSH desta amostra ({formatarValor(medianaXAmostra, 'numero')}
-          ), calculada só para referência visual — diferente da linha horizontal (mediana
-          nacional de MMGD, vinda do backend), ela não é um critério de classificação. Cor e
-          quadrante de cada ponto continuam sendo sempre a classificação oficial (irradiação ×
-          MMGD residencial per capita).
-          {totalSemIvsh > 0 && (
-            <>
-              {' '}
-              {totalSemIvsh.toLocaleString('pt-BR')} municípios sem IVSH calculável ficam de
-              fora só desta visão.
-            </>
-          )}
+          As linhas tracejadas são as medianas DESTA amostra — {eixoYDescritor.rotulo.toLowerCase()}
+          {' '}({formatarValor(medianaYAmostra, eixoYDescritor.formato)}
+          {eixoYDescritor.unidade ? ` ${eixoYDescritor.unidade}` : ''}) e{' '}
+          {eixoXDescritor.rotulo.toLowerCase()} (
+          {formatarValor(medianaXAmostra, eixoXDescritor.formato)}
+          {eixoXDescritor.unidade ? ` ${eixoXDescritor.unidade}` : ''}) —, calculadas só para
+          referência visual, não um critério de classificação. A cor de cada ponto continua sendo
+          SEMPRE a classificação oficial de Vazio de Acesso (irradiação × MMGD residencial per
+          capita, ver "Matriz oficial" escolhendo esses dois eixos), não uma classificação deste
+          cruzamento — por isso a posição no gráfico não corresponde à cor em nenhum quadrante
+          aqui. Este é um cruzamento bivariado simples, sem controle de nenhuma outra variável e
+          sem teste estatístico formal — para correlações com controle estatístico validado (ex.:
+          precariedade habitacional × MMGD, controlando renda e irradiação), ver a Infraestrutura
+          Estatística do Atlas.
         </p>
       )}
 
-      {/* O backend EXIGE que a nota acompanhe qualquer exibição da classificação. */}
-      <p className="rounded border border-violet-100 bg-violet-50/50 p-3 text-xs leading-relaxed text-slate-600">
-        <span className="mb-1 block font-mono text-[10px] font-bold tracking-wider text-violet-700 uppercase">
-          Nota metodológica
-        </span>
-        {dados.notaMetodologica}
-      </p>
+      {ehMatrizOficial && (
+        <div className="rounded-lg border-l-4 border-red-700 bg-stone-50 p-4">
+          <div className="mb-2 flex items-center gap-2">
+            <IconeAlerta className="h-4 w-4 text-red-700" />
+            <h4 className="text-[10px] font-black tracking-widest text-red-800 uppercase">
+              Premissa analítica
+            </h4>
+          </div>
+          <p className="text-xs leading-relaxed font-medium text-stone-600">{dados.notaMetodologica}</p>
+        </div>
+      )}
     </div>
   );
 }

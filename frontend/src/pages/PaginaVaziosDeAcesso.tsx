@@ -123,11 +123,15 @@ export function PaginaVaziosDeAcesso() {
           priorização, só a ordem dentro dele.
         </p>
         {resultado && (
-          <p className="mt-2 font-mono text-xs text-slate-400">
+          <p
+            className="mt-2 cursor-help font-mono text-xs text-slate-400 underline decoration-dotted underline-offset-2"
+            title={resultado.avisos.notaUniverso}
+          >
             {resultado.paginacao.totalResultados.toLocaleString('pt-BR')} municípios no quadrante
             {uf && ` (filtro: ${uf})`} ·{' '}
             {resultado.avisos.totalExcluidosSemDado.toLocaleString('pt-BR')} excluídos da
-            classificação por falta de dado
+            classificação por falta de dado (de {resultado.avisos.totalMunicipios.toLocaleString('pt-BR')}{' '}
+            municípios no total)
           </p>
         )}
       </div>

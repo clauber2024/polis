@@ -77,6 +77,8 @@ interface LinhaPainelBruta {
   indicePrecariedadeMoradia: number | null;
   percentualApartamento: number | null;
   numeroContratosReformaCasaBrasilSolar: number | null;
+  /** TUSD+TE, R$/MWh (ANEEL, migration 0018) — só entrou aqui para virar eixo do laboratório multidimensional do Painel Analítico (27/07/2026), não é usada em nenhuma regra de classificação. */
+  tarifaEnergiaResidencial: number | null;
 }
 
 export interface MunicipioClassificado {
@@ -125,6 +127,8 @@ export interface MunicipioClassificado {
    * descompassoMorfologico, acima).
    */
   alertaDeficitCredito: boolean;
+  /** TUSD+TE, R$/MWh (ANEEL, migration 0018) — eixo do laboratório multidimensional do Painel Analítico (27/07/2026); não entra em nenhuma regra de classificação. */
+  tarifaEnergiaResidencial: number | null;
 }
 
 /**
@@ -178,7 +182,8 @@ async function buscarPainelBruto(): Promise<LinhaPainelBruta[]> {
         vsc.percentual_pobreza_cadunico   AS "percentualPobrezaCadunico",
         moradia.indice_precariedade_moradia AS "indicePrecariedadeMoradia",
         vsc.percentual_apartamento        AS "percentualApartamento",
-        vsc.numero_contratos_reforma_casa_brasil_solar AS "numeroContratosReformaCasaBrasilSolar"
+        vsc.numero_contratos_reforma_casa_brasil_solar AS "numeroContratosReformaCasaBrasilSolar",
+        vsc.tarifa_energia_residencial    AS "tarifaEnergiaResidencial"
     FROM municipios m
     JOIN unidades_espaciais ue
         ON ue.municipio_pai_codigo_ibge = m.codigo_ibge AND ue.tipo = 'municipio'
@@ -475,6 +480,7 @@ function classificarPainel(linhas: LinhaPainelBruta[]): PainelClassificado {
         quadrante,
         linha.numeroContratosReformaCasaBrasilSolar,
       ),
+      tarifaEnergiaResidencial: linha.tarifaEnergiaResidencial,
     };
   });
 
@@ -514,6 +520,21 @@ export const NOTA_METODOLOGICA =
   'residencial) são dimensões parcialmente independentes: o índice de vulnerabilidade ' +
   'social padrão não captura moradia, de propósito.';
 
+/**
+ * Explica por que a base tem 5.573 municípios, não os "~5.570" às vezes
+ * citados de memória como o número redondo do Brasil — dúvida legítima
+ * (usuário, 27/07/2026) sempre que a contagem aparece na interface.
+ */
+export const NOTA_UNIVERSO =
+  'A base do Atlas tem 5.573 municípios — não os "~5.570" às vezes citados de memória como o ' +
+  'número redondo do Brasil. A diferença bate com a malha municipal oficial mais recente do ' +
+  'IBGE, que já inclui Boa Esperança do Norte (MT), desmembrado de Sorriso e Nova Ubiratã em ' +
+  '2025, e dois polígonos de corpo d\'água tratados como unidade territorial na malha oficial ' +
+  '("Área Operacional Lagoa Mirim" e "Área Operacional Lagoa dos Patos", RS) — nenhum ' +
+  'município duplicado ou espúrio. Desses 5.573, 4 ficam fora desta classificação por não ' +
+  'terem dado de irradiação solar no Atlas INPE 2017: os dois polígonos de corpo d\'água, Boa ' +
+  'Esperança do Norte e Fernando de Noronha (PE).';
+
 export interface ListarVaziosDeAcessoResultado {
   metodologia: {
     eixoX: string;
@@ -546,6 +567,7 @@ export interface ListarVaziosDeAcessoResultado {
     totalClassificados: number;
     totalExcluidosSemDado: number;
     totalPrecisaReextrairMmgd: number;
+    notaUniverso: string;
   };
   resumoPorQuadrante: Record<Quadrante, number>;
   /** Contagem de municípios com descompassoMorfologico=true no recorte já filtrado por geografia (não por quadrante — o alerta é independente de quadrante). */
@@ -728,6 +750,7 @@ export async function listarVaziosDeAcesso(
       totalClassificados: painel.totalClassificados,
       totalExcluidosSemDado: painel.totalExcluidosSemDado,
       totalPrecisaReextrairMmgd: painel.totalPrecisaReextrairMmgd,
+      notaUniverso: NOTA_UNIVERSO,
     },
     resumoPorQuadrante,
     resumoDescompasso,

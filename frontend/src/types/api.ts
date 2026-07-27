@@ -224,6 +224,8 @@ export interface MunicipioClassificado {
    * vaziosDeAcesso.service.ts no backend).
    */
   alertaDeficitCredito: boolean;
+  /** TUSD+TE, R$/MWh (ANEEL) — eixo do laboratório multidimensional do Painel Analítico. */
+  tarifaEnergiaResidencial: number | null;
 }
 
 /**
@@ -462,6 +464,7 @@ export interface ListarVaziosDeAcessoResultado {
     totalClassificados: number;
     totalExcluidosSemDado: number;
     totalPrecisaReextrairMmgd: number;
+    notaUniverso: string;
   };
   resumoPorQuadrante: Record<Quadrante, number>;
   /** Contagem de municípios com descompassoMorfologico=true no recorte já filtrado por geografia. */

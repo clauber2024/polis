@@ -386,12 +386,14 @@ export function PainelAnalitico() {
           rebaixado a uma caixa secundária no fim da página). */}
       <section className="mt-6 rounded-2xl bg-white/70 p-8 shadow-xl ring-1 ring-stone-900/5 backdrop-blur-xl">
         <h2 className="text-lg font-black tracking-tight text-stone-900">
-          Matriz nacional de Vazios de Acesso
+          Laboratório multidimensional
         </h2>
         <p className="mt-1 max-w-2xl text-sm text-stone-500">
-          Dispersão dos ~5,5 mil municípios do país nos eixos reais da metodologia — irradiação
-          solar × adoção residencial de MMGD per capita —, com as medianas nacionais dividindo os
-          quatro quadrantes de prioridade.
+          Cruze qualquer par entre 7 indicadores dos ~5,5 mil municípios do país. O padrão é a
+          Matriz oficial de Vazios de Acesso (irradiação solar × adoção residencial de MMGD per
+          capita, medianas nacionais) — mude os eixos abaixo para explorar outros cruzamentos
+          (ex.: renda × tarifa, IVSH × potencial solar); a cor de cada ponto continua sendo sempre
+          a classificação oficial.
         </p>
 
         {!quadrantesNacionais && (
@@ -399,10 +401,10 @@ export function PainelAnalitico() {
             <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-stone-200">
               <IconeGrafico className="h-5 w-5 text-stone-400" />
             </div>
-            <h3 className="mb-1 text-sm font-bold text-stone-900">Matriz pronta para carregar</h3>
+            <h3 className="mb-1 text-sm font-bold text-stone-900">Laboratório pronto para carregar</h3>
             <p className="mb-6 max-w-md text-xs font-medium text-stone-500">
-              Classifica os ~5.500 municípios do país nos quatro quadrantes de prioridade —
-              pode levar alguns segundos.
+              Carrega os ~5.500 municípios do país com a classificação oficial de Vazio de Acesso —
+              depois é só escolher os eixos que quiser cruzar. Pode levar alguns segundos.
             </p>
             <button
               type="button"
@@ -411,7 +413,7 @@ export function PainelAnalitico() {
               className="group relative inline-flex items-center gap-2 rounded-lg bg-red-700 px-6 py-3 font-bold text-white shadow-sm transition-all hover:bg-red-800 focus:ring-2 focus:ring-red-700 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
             >
               <IconePlay className="h-4 w-4 fill-white transition-transform group-hover:scale-110" />
-              {carregandoQuadrantes ? 'Carregando…' : 'Carregar matriz nacional'}
+              {carregandoQuadrantes ? 'Carregando…' : 'Carregar laboratório'}
             </button>
             {erroQuadrantes && <p className="mt-3 text-xs text-red-600">{erroQuadrantes}</p>}
           </div>
