@@ -74,6 +74,23 @@ function IconePlay({ className }: { className?: string }) {
 }
 
 /**
+ * Cor do checkbox por indicador (feedback do usuário, 27/07/2026): a cor é
+ * o primeiro nível de leitura do dado — verde para acesso/adoção, amarelo
+ * para potencial natural, vermelho para vulnerabilidade — em vez do azul
+ * padrão do navegador. Independente do campo `cor` de
+ * utils/indicadoresComparacao.ts (usado nas barras do gráfico comparativo,
+ * RF-050) — mudar aquele mudaria as cores do gráfico também, fora do
+ * escopo deste ajuste.
+ */
+const COR_CHECKBOX_INDICADOR: Partial<Record<keyof MunicipioComIndicadores, string>> = {
+  mmgdResidencialPer1000Hab: 'text-emerald-600 focus:ring-emerald-600',
+  rendaMediaDomiciliar: 'text-red-600 focus:ring-red-600',
+  percentualPobrezaCadunico: 'text-red-600 focus:ring-red-600',
+  ivs: 'text-red-600 focus:ring-red-600',
+  irradiacaoMediaKwhM2Dia: 'text-amber-500 focus:ring-amber-500',
+};
+
+/**
  * Painel Analítico / Cruzamento de Variáveis (RF-049 a RF-053).
  *
  * Escopo: seleção de indicadores (RF-049), comparação lado a lado com
@@ -360,21 +377,22 @@ export function PainelAnalitico() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-6 font-sans">
+    <div className="min-h-full bg-gradient-to-br from-stone-50 to-stone-100 p-8 font-sans">
+    <div className="mx-auto max-w-5xl">
       {/* Cabeçalho estratégico — ancorado na pergunta que a tela responde,
           não em nomenclatura de banco de dados (feedback do usuário,
           27/07/2026). */}
-      <div className="rounded-2xl bg-white/70 p-8 shadow-xl ring-1 ring-stone-900/5 backdrop-blur-xl">
-        <span className="mb-3 inline-flex items-center gap-2 rounded-full border border-red-200/60 bg-red-50 px-3 py-1">
-          <IconeGrafico className="h-3.5 w-3.5 text-red-700" />
-          <span className="text-[10px] font-black tracking-widest text-red-700 uppercase">
+      <div className="rounded-2xl bg-white/70 p-8 shadow-lg shadow-stone-200/50 ring-1 ring-stone-900/5 backdrop-blur-xl">
+        <span className="mb-4 inline-flex items-center gap-2 rounded bg-red-700/10 px-2.5 py-1 ring-1 ring-red-700/20">
+          <IconeGrafico className="h-4 w-4 text-red-700" />
+          <span className="text-[10px] font-black tracking-widest text-red-800 uppercase">
             Diagnóstico de Justiça Energética
           </span>
         </span>
         <h1 className="text-3xl font-black tracking-tight text-stone-900">
           Onde o sol não vira acesso
         </h1>
-        <p className="mt-2 max-w-2xl text-sm font-medium text-stone-500">
+        <p className="mt-3 max-w-2xl text-sm leading-relaxed font-medium text-stone-500">
           Veja, no país inteiro, onde a abundância de potencial solar não se converte em adoção
           residencial — ou compare municípios específicos lado a lado pelos indicadores do Atlas.
         </p>
@@ -384,7 +402,7 @@ export function PainelAnalitico() {
           seleção prévia, por isso vem primeiro: é o elemento de maior peso
           analítico da tela (feedback do usuário, 27/07/2026 — antes ficava
           rebaixado a uma caixa secundária no fim da página). */}
-      <section className="mt-6 rounded-2xl bg-white/70 p-8 shadow-xl ring-1 ring-stone-900/5 backdrop-blur-xl">
+      <section className="mt-6 rounded-2xl bg-white/70 p-8 shadow-lg shadow-stone-200/50 ring-1 ring-stone-900/5 backdrop-blur-xl">
         <h2 className="text-lg font-black tracking-tight text-stone-900">
           Laboratório multidimensional
         </h2>
@@ -428,42 +446,40 @@ export function PainelAnalitico() {
 
       {/* Comparação de municípios selecionados — agrupada num único contêiner
           visual (antes os campos ficavam soltos, sem moldura). */}
-      <section className="mt-6 rounded-2xl bg-white/70 p-6 shadow-xl ring-1 ring-stone-900/5 backdrop-blur-xl">
-        <h2 className="text-sm font-black tracking-tight text-stone-900">
+      <section className="mt-6 rounded-2xl bg-white/70 p-8 shadow-lg shadow-stone-200/50 ring-1 ring-stone-900/5 backdrop-blur-xl">
+        <h2 className="text-lg font-black tracking-tight text-stone-900">
           Comparação lado a lado
         </h2>
-        <p className="mt-1 text-xs font-medium text-stone-500">
+        <p className="mt-1 text-sm text-stone-500">
           Escolha de 2 a 10 municípios específicos para comparar pelos indicadores do Atlas.
         </p>
 
-        <div className="mt-5">
-          <h3 className="text-[10px] font-bold tracking-wider text-stone-400 uppercase">
+        <div className="mt-6">
+          <h3 className="mb-2 text-[10px] font-bold tracking-widest text-stone-400 uppercase">
             Municípios
           </h3>
-          <div className="mt-2">
-            <SeletorMunicipios selecionados={municipios} aoMudarSelecionados={setMunicipios} />
-          </div>
+          <SeletorMunicipios selecionados={municipios} aoMudarSelecionados={setMunicipios} />
         </div>
 
-        <div className="mt-5">
-          <h3 className="text-[10px] font-bold tracking-wider text-stone-400 uppercase">
+        <div className="mt-6">
+          <h3 className="mb-3 text-[10px] font-bold tracking-widest text-stone-400 uppercase">
             Indicadores
           </h3>
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
+          <div className="grid grid-cols-2 gap-4">
             {INDICADORES_COMPARAVEIS.map((indicador) => (
-              <label key={indicador.id} className="flex items-center gap-2 text-sm text-stone-700">
+              <label key={indicador.id} className="flex cursor-pointer items-center gap-2">
                 <input
                   type="checkbox"
                   checked={indicadoresIds.has(indicador.id)}
                   onChange={() => aoAlternarIndicador(indicador.id)}
-                  className="h-4 w-4"
+                  className={`h-4 w-4 rounded border-stone-300 ${COR_CHECKBOX_INDICADOR[indicador.id] ?? 'text-stone-600 focus:ring-stone-600'}`}
                 />
-                {indicador.rotulo}
+                <span className="text-sm font-medium text-stone-700">{indicador.rotulo}</span>
               </label>
             ))}
           </div>
-          <div className="mt-3 flex items-start gap-2 rounded-md bg-stone-100/60 p-2.5 text-[10px] text-stone-500">
-            <IconeAlerta className="h-3.5 w-3.5 shrink-0 text-stone-400" />
+          <div className="mt-3 flex items-start gap-2 rounded-md border border-stone-200/60 bg-stone-100/50 p-3 text-xs text-stone-500">
+            <IconeAlerta className="h-4 w-4 shrink-0 text-stone-400" />
             <p>
               Índice de Pobreza Energética Regional e Tarifa Social não aparecem aqui: ambos
               dependem de um indicador regulatório (benefício tarifário social da ANEEL) ainda sem
@@ -583,6 +599,7 @@ export function PainelAnalitico() {
           <DiagnosticoComparacao diagnostico={diagnostico} />
         </>
       )}
+    </div>
     </div>
   );
 }
