@@ -9,9 +9,14 @@
  */
 
 import type { NextFunction, Request, Response } from 'express';
-import { listarVaziosDeAcesso, classificarMunicipios } from '../services/vaziosDeAcesso.service.js';
+import {
+  listarVaziosDeAcesso,
+  exportarVaziosDeAcessoCsv,
+  classificarMunicipios,
+} from '../services/vaziosDeAcesso.service.js';
 import type {
   ListarVaziosDeAcessoQuery,
+  ExportarVaziosDeAcessoQuery,
   ClassificarMunicipiosQuery,
 } from '../schemas/vaziosDeAcesso.schema.js';
 
@@ -24,6 +29,29 @@ export async function listarVaziosDeAcessoController(
     const query = req.query as unknown as ListarVaziosDeAcessoQuery;
     const resultado = await listarVaziosDeAcesso(query);
     res.json(resultado);
+  } catch (erro) {
+    next(erro);
+  }
+}
+
+/**
+ * GET /api/vazios-de-acesso/exportar (RF-047, mesmo padrão de
+ * exportarMunicipiosController) — download em CSV da classificação
+ * nacional completa (todos os municípios que casam com o filtro, sem
+ * paginação). Content-Type/Content-Disposition forçam download no
+ * navegador, por isso não usa res.json() puro.
+ */
+export async function exportarVaziosDeAcessoController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const query = req.query as unknown as ExportarVaziosDeAcessoQuery;
+    const csv = await exportarVaziosDeAcessoCsv(query);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="vazios-de-acesso.csv"');
+    res.send(csv);
   } catch (erro) {
     next(erro);
   }

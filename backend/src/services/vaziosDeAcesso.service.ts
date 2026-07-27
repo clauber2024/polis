@@ -42,8 +42,12 @@
 
 import { sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
+import { paraCsv } from '../utils/csv.js';
 import { CLASSIFICACAO_IVSH_VALIDAS } from '../schemas/vaziosDeAcesso.schema.js';
-import type { ListarVaziosDeAcessoQuery } from '../schemas/vaziosDeAcesso.schema.js';
+import type {
+  ListarVaziosDeAcessoQuery,
+  ExportarVaziosDeAcessoQuery,
+} from '../schemas/vaziosDeAcesso.schema.js';
 
 export type ClassificacaoIvsh = (typeof CLASSIFICACAO_IVSH_VALIDAS)[number];
 
@@ -582,9 +586,26 @@ async function buscarPeriodosReferenciaLenteDeficitCredito(): Promise<PeriodosRe
   return resultado.rows[0] as unknown as PeriodosReferenciaLenteDeficitCredito;
 }
 
-export async function listarVaziosDeAcesso(
-  query: ListarVaziosDeAcessoQuery,
-): Promise<ListarVaziosDeAcessoResultado> {
+/**
+ * Filtros/ordenação compartilhados entre listarVaziosDeAcesso (paginado) e
+ * exportarVaziosDeAcessoCsv (todos os resultados, sem página) — extraído
+ * para as duas rotas nunca divergirem na definição de quem entra em cada
+ * filtro.
+ */
+type FiltrosVaziosDeAcesso = Omit<ListarVaziosDeAcessoQuery, 'pagina' | 'porPagina'>;
+
+interface PainelFiltradoEOrdenado {
+  painel: PainelClassificado;
+  periodoReferenciaLenteDeficitCredito: PeriodosReferenciaLenteDeficitCredito;
+  resumoPorQuadrante: Record<Quadrante, number>;
+  resumoDescompasso: number;
+  resumoAlertaDeficitCredito: number;
+  ordenado: MunicipioClassificado[];
+}
+
+async function classificarFiltrarEOrdenar(
+  query: FiltrosVaziosDeAcesso,
+): Promise<PainelFiltradoEOrdenado> {
   const [linhasBrutas, periodoReferenciaLenteDeficitCredito] = await Promise.all([
     buscarPainelBrutoCacheado(),
     buscarPeriodosReferenciaLenteDeficitCredito(),
@@ -649,6 +670,28 @@ export async function listarVaziosDeAcesso(
 
   const ordenado = ordenarMunicipios(filtradoPorAlertaDeficitCredito, query.ordenarPor, query.ordem);
 
+  return {
+    painel,
+    periodoReferenciaLenteDeficitCredito,
+    resumoPorQuadrante,
+    resumoDescompasso,
+    resumoAlertaDeficitCredito,
+    ordenado,
+  };
+}
+
+export async function listarVaziosDeAcesso(
+  query: ListarVaziosDeAcessoQuery,
+): Promise<ListarVaziosDeAcessoResultado> {
+  const {
+    painel,
+    periodoReferenciaLenteDeficitCredito,
+    resumoPorQuadrante,
+    resumoDescompasso,
+    resumoAlertaDeficitCredito,
+    ordenado,
+  } = await classificarFiltrarEOrdenar(query);
+
   const totalResultados = ordenado.length;
   const totalPaginas = Math.max(1, Math.ceil(totalResultados / query.porPagina));
   const inicio = (query.pagina - 1) * query.porPagina;
@@ -698,6 +741,19 @@ export async function listarVaziosDeAcesso(
     },
     resultados,
   };
+}
+
+/**
+ * Download em CSV da classificação nacional completa (RF-047, mesmo padrão
+ * de exportarMunicipiosCsv em municipios.service.ts) — mesmos filtros e
+ * ordenação de listarVaziosDeAcesso, mas devolve TODOS os municípios que
+ * casam com o filtro numa única resposta, sem paginação. Reaproveita
+ * classificarFiltrarEOrdenar para nunca divergir da lógica de filtro do
+ * endpoint paginado.
+ */
+export async function exportarVaziosDeAcessoCsv(query: ExportarVaziosDeAcessoQuery): Promise<string> {
+  const { ordenado } = await classificarFiltrarEOrdenar(query);
+  return paraCsv(ordenado as unknown as Record<string, unknown>[]);
 }
 
 function ordenarMunicipios(

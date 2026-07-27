@@ -87,6 +87,22 @@ export const listarVaziosDeAcessoQuerySchema = z.object({
 export type ListarVaziosDeAcessoQuery = z.infer<typeof listarVaziosDeAcessoQuerySchema>;
 
 /**
+ * Download em CSV da classificação nacional completa (RF-047, mesmo padrão
+ * de exportarMunicipiosQuerySchema) — mesmos filtros/ordenação de
+ * listarVaziosDeAcessoQuerySchema, sem paginação: exporta todos os
+ * municípios que casam com o filtro, não uma página de cada vez.
+ */
+export const exportarVaziosDeAcessoQuerySchema = listarVaziosDeAcessoQuerySchema
+  .omit({ pagina: true, porPagina: true })
+  .extend({
+    formato: z.enum(['csv'], {
+      errorMap: () => ({ message: 'formato deve ser "csv".' }),
+    }),
+  });
+
+export type ExportarVaziosDeAcessoQuery = z.infer<typeof exportarVaziosDeAcessoQuerySchema>;
+
+/**
  * Painel Analítico (RF-049/050, feedback do usuário): classificação de
  * quadrante de um conjunto ESPECÍFICO de municípios (2 a 10, mesmo limite do
  * Painel Analítico) — diferente de `listarVaziosDeAcessoQuerySchema`

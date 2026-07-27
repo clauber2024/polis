@@ -3,13 +3,33 @@ import type {
   ListarVaziosDeAcessoResultado,
   MunicipioClassificado,
 } from '../types/api';
-import { obterJson } from './http';
+import { obterJson, baixarArquivo } from './http';
 
 /** GET /api/vazios-de-acesso (RF-055/056) — uma página da classificação. */
 export function buscarVaziosDeAcesso(
   params: Record<string, string>,
 ): Promise<ListarVaziosDeAcessoResultado> {
   return obterJson<ListarVaziosDeAcessoResultado>('/api/vazios-de-acesso', params);
+}
+
+/**
+ * GET /api/vazios-de-acesso/exportar (RF-047, mesmo padrão de
+ * exportarMunicipios) — baixa em CSV a classificação nacional completa
+ * (todos os municípios que casam com o filtro, sem paginação), incluindo
+ * quadrante, IVS, IVSH, descompasso morfológico e a lente de déficit de
+ * crédito. `filtros` aceita os mesmos parâmetros de buscarVaziosDeAcesso
+ * (uf, regiao, quadrante, classificacaoIvsh, descompassoMorfologico,
+ * alertaDeficitCredito, ordenarPor, ordem), exceto paginação.
+ */
+export async function exportarVaziosDeAcesso(filtros: Record<string, string>): Promise<void> {
+  const dataHoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(
+    new Date(),
+  );
+  await baixarArquivo(
+    '/api/vazios-de-acesso/exportar',
+    { ...filtros, formato: 'csv' },
+    `vazios-de-acesso-${dataHoje}.csv`,
+  );
 }
 
 /**

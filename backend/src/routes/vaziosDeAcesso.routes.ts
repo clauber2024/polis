@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import {
   listarVaziosDeAcessoController,
+  exportarVaziosDeAcessoController,
   classificarMunicipiosController,
 } from '../controllers/vaziosDeAcesso.controller.js';
 import { validateRequest } from '../middlewares/validateRequest.js';
 import {
   listarVaziosDeAcessoQuerySchema,
+  exportarVaziosDeAcessoQuerySchema,
   classificarMunicipiosQuerySchema,
 } from '../schemas/vaziosDeAcesso.schema.js';
 
@@ -26,6 +28,21 @@ vaziosDeAcessoRouter.get(
   '/vazios-de-acesso',
   validateRequest({ query: listarVaziosDeAcessoQuerySchema }),
   listarVaziosDeAcessoController,
+);
+
+/**
+ * GET /api/vazios-de-acesso/exportar (RF-047)
+ *
+ * Download em CSV da mesma classificação nacional acima, com os mesmos
+ * filtros/ordenação, mas sem paginação — todos os municípios que casam com
+ * o filtro numa única resposta (?formato=csv, mesmo padrão de
+ * /municipios/exportar). Path com 2 segmentos, não conflita com
+ * '/vazios-de-acesso'.
+ */
+vaziosDeAcessoRouter.get(
+  '/vazios-de-acesso/exportar',
+  validateRequest({ query: exportarVaziosDeAcessoQuerySchema }),
+  exportarVaziosDeAcessoController,
 );
 
 /**

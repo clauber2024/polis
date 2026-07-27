@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { buscarVaziosDeAcesso } from '../services/vaziosDeAcesso.service';
+import { buscarVaziosDeAcesso, exportarVaziosDeAcesso } from '../services/vaziosDeAcesso.service';
 import type { ClassificacaoIvsh, ListarVaziosDeAcessoResultado } from '../types/api';
 import { formatarValor } from '../utils/formatadores';
 import { AlternadorPriorizacaoIvsh } from '../components/vazios-de-acesso/AlternadorPriorizacaoIvsh';
@@ -45,6 +45,7 @@ export function PaginaVaziosDeAcesso() {
   const [resultado, setResultado] = useState<ListarVaziosDeAcessoResultado | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
+  const [baixando, setBaixando] = useState(false);
 
   useEffect(() => {
     let ativo = true;
@@ -80,6 +81,28 @@ export function PaginaVaziosDeAcesso() {
     // aplicado (mesmo que desabilitado na UI) quando o critério volta a ser IVS.
     if (!ligado) setClassificacaoIvsh('');
     setPagina(1);
+  }
+
+  /**
+   * Baixa em CSV o ranking COMPLETO (todos os municípios do quadrante, não
+   * só a página atual de 50) com os mesmos filtros já aplicados na tela —
+   * mesmo padrão de download já usado no Dashboard Público (RF-047).
+   */
+  async function aoClicarBaixarCsv() {
+    setBaixando(true);
+    setErro(null);
+    try {
+      await exportarVaziosDeAcesso({
+        quadrante: 'vazio_de_acesso',
+        ordenarPor: ivshLigado ? 'ivsh' : 'ivs',
+        ...(uf ? { uf } : {}),
+        ...(classificacaoIvsh ? { classificacaoIvsh } : {}),
+      });
+    } catch (causa: unknown) {
+      setErro(causa instanceof Error ? causa.message : 'Falha ao baixar o CSV.');
+    } finally {
+      setBaixando(false);
+    }
   }
 
   const totalPaginas = resultado?.paginacao.totalPaginas ?? 1;
@@ -163,6 +186,15 @@ export function PaginaVaziosDeAcesso() {
         </div>
 
         <AlternadorPriorizacaoIvsh ligado={ivshLigado} aoAlternar={aoAlternarIvsh} />
+
+        <button
+          type="button"
+          onClick={aoClicarBaixarCsv}
+          disabled={baixando}
+          className="rounded border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+        >
+          {baixando ? 'Gerando CSV…' : 'Baixar ranking completo (CSV)'}
+        </button>
       </div>
 
       {carregando && <p className="mt-6 text-sm text-slate-500">Carregando ranking…</p>}
