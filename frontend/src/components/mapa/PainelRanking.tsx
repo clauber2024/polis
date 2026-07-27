@@ -2,14 +2,17 @@ import { useMemo, useState } from 'react';
 import type { MunicipioComIndicadores } from '../../types/api';
 import { formatarValor } from '../../utils/formatadores';
 import type { IndicadorMapa } from '../../utils/indicadores';
+import { RankingItem } from '../ranking/RankingItem';
 
 /**
  * Painel de ranking estadual (RF-030 a RF-036, parcial):
  * - RF-030: lista SÓ municípios da UF selecionada;
  * - RF-031: ordenado do maior para o menor valor do indicador da camada ativa;
  * - RF-032: posição, nome, valor em destaque (cor da rampa do indicador),
- *   barra horizontal (normalizada min–max dentro da UF) e badge "Vazio de
- *   Acesso" quando aplicável;
+ *   barra horizontal (proporção do maior valor da UF, via RankingItem — ver
+ *   components/ranking/RankingItem.tsx, extraído em 27/07/2026 para
+ *   reaproveitar em outros rankings de valor único) com marcador da mediana
+ *   NACIONAL do indicador ativo, e badge "Vazio de Acesso" quando aplicável;
  * - RF-033: filtro rápido por nome DENTRO do painel (preserva a posição real
  *   no ranking — filtrar não renumera);
  * - RF-034 PARCIAL: seletor crescente/decrescente implementado; "ranking por
@@ -49,8 +52,16 @@ interface ItemRanking {
   posicao: number;
   municipio: MunicipioComIndicadores;
   valor: number;
-  /** 0–1, normalizado min–max dentro da UF (largura da barra, RF-032). */
-  proporcao: number;
+}
+
+/** Mediana simples — só para o marcador de referência nacional do RankingItem, não é metodologia (essa é sempre do backend, ver classificação de Vazios de Acesso). */
+function mediana(valores: number[]): number | null {
+  if (valores.length === 0) return null;
+  const ordenados = [...valores].sort((a, b) => a - b);
+  const meio = Math.floor(ordenados.length / 2);
+  return ordenados.length % 2 === 0
+    ? (ordenados[meio - 1] + ordenados[meio]) / 2
+    : ordenados[meio];
 }
 
 export function PainelRanking({
@@ -72,8 +83,21 @@ export function PainelRanking({
     return [...porUf.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   }, [municipios]);
 
-  const { itens, totalSemDado } = useMemo(() => {
-    if (!uf) return { itens: [] as ItemRanking[], totalSemDado: 0 };
+  // Mediana NACIONAL do indicador ativo (não da UF) — calculada sobre o
+  // GeoJSON já carregado por inteiro, mesma fonte de dado do ranking, só que
+  // sem o filtro de UF. É um cálculo de apresentação (marcador de
+  // referência no RankingItem), não uma classificação — não confundir com
+  // as medianas nacionais que definem Vazio de Acesso, essas sempre vêm do
+  // backend.
+  const medianaNacional = useMemo(() => {
+    const valores = municipios
+      .map((m) => m[indicador.id])
+      .filter((valor): valor is number => typeof valor === 'number');
+    return mediana(valores);
+  }, [municipios, indicador.id]);
+
+  const { itens, totalSemDado, maxRanking } = useMemo(() => {
+    if (!uf) return { itens: [] as ItemRanking[], totalSemDado: 0, maxRanking: 0 };
 
     const daUf = municipios.filter((m) => m.uf === uf);
     const comValor = daUf
@@ -86,18 +110,15 @@ export function PainelRanking({
     comValor.sort((a, b) => (a.valor - b.valor) * fator);
 
     const valores = comValor.map((par) => par.valor);
-    const minimo = Math.min(...valores);
-    const maximo = Math.max(...valores);
-    const amplitude = maximo - minimo;
 
     return {
       itens: comValor.map((par, i) => ({
         posicao: i + 1,
         municipio: par.municipio,
         valor: par.valor,
-        proporcao: amplitude > 0 ? (par.valor - minimo) / amplitude : 1,
       })),
       totalSemDado: daUf.length - comValor.length,
+      maxRanking: valores.length > 0 ? Math.max(...valores) : 0,
     };
   }, [municipios, uf, indicador.id, ordem]);
 
@@ -181,44 +202,23 @@ export function PainelRanking({
           {itensVisiveis.map((item) => {
             const ehVazio = codigosVazios?.has(item.municipio.codigoIbge) ?? false;
             return (
-              <li key={item.municipio.codigoIbge} className="px-2 py-1">
+              <li key={item.municipio.codigoIbge}>
                 <button
                   type="button"
                   onClick={() => aoSelecionarMunicipio(item.municipio.codigoIbge)}
-                  className={`block w-full rounded-lg border px-2.5 py-2 text-left transition-all ${
-                    ehVazio
-                      ? 'border-red-200/80 bg-red-50/60 hover:bg-red-50/90'
-                      : 'border-stone-100/80 bg-white/40 hover:border-stone-200 hover:bg-white/70'
-                  }`}
+                  className="block w-full text-left"
                 >
-                  <div className="flex items-baseline gap-2 text-sm">
-                    <span className="w-8 shrink-0 text-right font-mono font-semibold text-stone-400">
-                      {item.posicao}º
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-stone-800">
-                      {item.municipio.nome}
-                    </span>
-                    <span
-                      className="shrink-0 font-mono font-bold whitespace-nowrap"
-                      style={{ color: corDestaque }}
-                    >
-                      {formatarValor(item.valor, indicador.formato)}
-                    </span>
-                  </div>
-                  <div className="mt-1.5 ml-10 h-1.5 overflow-hidden rounded-full bg-stone-200/60">
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{
-                        width: `${Math.max(2, item.proporcao * 100)}%`,
-                        backgroundColor: corDestaque,
-                      }}
-                    />
-                  </div>
-                  {ehVazio && (
-                    <span className="mt-1.5 ml-10 inline-block rounded-sm bg-red-100/90 px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-wide text-red-800 uppercase">
-                      Vazio de Acesso
-                    </span>
-                  )}
+                  <RankingItem
+                    posicao={item.posicao}
+                    nomeMunicipio={item.municipio.nome}
+                    valor={item.valor}
+                    valorFormatado={formatarValor(item.valor, indicador.formato)}
+                    unidade={indicador.unidade}
+                    medianaNacional={medianaNacional}
+                    maxRanking={maxRanking}
+                    ehVazioDeAcesso={ehVazio}
+                    cor={corDestaque}
+                  />
                 </button>
               </li>
             );
