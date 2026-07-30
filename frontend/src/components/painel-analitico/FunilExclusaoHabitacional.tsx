@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { KeyboardEvent } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 import type { VaziosDeAcessoCompleto } from '../../services/vaziosDeAcesso.service';
 import { COR_QUADRANTE } from './GraficoQuadrantes';
 
@@ -112,6 +112,15 @@ function altura(b: Banda): number {
   return b.y1 - b.y0;
 }
 
+/** Curva de Bézier cúbica entre o centro vertical de duas bandas — mesma forma usada por
+ * todos os fluxos do funil, independente de coluna. */
+function caminho(x0: number, bandaOrigem: Banda, x1: number, bandaDestino: Banda): string {
+  const y0 = centro(bandaOrigem);
+  const y1 = centro(bandaDestino);
+  const xMeio = (x0 + x1) / 2;
+  return `M${x0},${y0} C${xMeio},${y0} ${xMeio},${y1} ${x1},${y1}`;
+}
+
 /** Quebra um rótulo em várias linhas por palavra inteira — nunca corta no meio de uma palavra, nunca depende de medir pixel de fonte. */
 function quebrarRotulo(texto: string, maxCaracteres: number): string[] {
   const palavras = texto.split(' ');
@@ -156,6 +165,79 @@ function handlersSegmento(aoClicarSegmento: (filtro: FiltroFunil) => void, filtr
       if (evento.key === 'Enter' || evento.key === ' ') aoClicarSegmento(filtro);
     },
   };
+}
+
+/** Faixas finas (poucos municípios) ficam praticamente impossíveis de clicar — um
+ * `<path fill="none">` só responde a clique em cima do próprio traço, e o traço visível
+ * pode ter só 1-2px de largura. Piso independente da largura real do fluxo, nunca exibido. */
+const LARGURA_MINIMA_CLICAVEL = 16;
+/** Só desenha o rótulo "N mun." quando a faixa tem altura suficiente pro texto não estourar
+ * as bordas nem colidir com as faixas vizinhas. */
+const ALTURA_MINIMA_ROTULO_FLUXO = 22;
+
+interface LinkFunilProps {
+  x0: number;
+  x1: number;
+  bandaOrigem: Banda;
+  bandaDestino: Banda;
+  cor: string;
+  opacidade: number;
+  valor: number;
+  ariaLabel: string;
+  filtro: FiltroFunil;
+  aoClicarSegmento: (filtro: FiltroFunil) => void;
+  tituloCompleto?: string;
+  children?: ReactNode;
+}
+
+/** Um fluxo do funil: traço visível proporcional ao valor real + área de clique invisível
+ * mais larga (nunca exibida) + rótulo do total de municípios, quando a faixa é alta o
+ * bastante pra caber o texto sem sobrepor nada. */
+function LinkFunil({
+  x0,
+  x1,
+  bandaOrigem,
+  bandaDestino,
+  cor,
+  opacidade,
+  valor,
+  ariaLabel,
+  filtro,
+  aoClicarSegmento,
+  tituloCompleto,
+  children,
+}: LinkFunilProps) {
+  const d = caminho(x0, bandaOrigem, x1, bandaDestino);
+  const larguraVisivel = Math.max(altura(bandaOrigem), 0);
+  const xMeio = (x0 + x1) / 2;
+  const yMeio = (centro(bandaOrigem) + centro(bandaDestino)) / 2;
+
+  return (
+    <g
+      role="button"
+      tabIndex={0}
+      className="cursor-pointer outline-none"
+      aria-label={ariaLabel}
+      {...handlersSegmento(aoClicarSegmento, filtro)}
+    >
+      <path d={d} fill="none" stroke="transparent" strokeWidth={Math.max(larguraVisivel, LARGURA_MINIMA_CLICAVEL)} />
+      <path d={d} fill="none" stroke={cor} strokeOpacity={opacidade} strokeWidth={larguraVisivel}>
+        {tituloCompleto && <title>{tituloCompleto}</title>}
+      </path>
+      {children}
+      {larguraVisivel >= ALTURA_MINIMA_ROTULO_FLUXO && (
+        <text
+          x={xMeio}
+          y={yMeio}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          className="fill-stone-900 pointer-events-none text-[10px] font-black drop-shadow-sm"
+        >
+          {valor.toLocaleString('pt-BR')} mun.
+        </text>
+      )}
+    </g>
+  );
 }
 
 export function FunilExclusaoHabitacional({
@@ -226,13 +308,6 @@ export function FunilExclusaoHabitacional({
   const banda_4_de1: Banda = { y0: no4.y0, y1: no4.y0 + n1b * escala };
   const banda_4_de2: Banda = { y0: banda_4_de1.y1, y1: no4.y1 };
 
-  function caminho(x0: number, bandaOrigem: Banda, x1: number, bandaDestino: Banda) {
-    const y0 = centro(bandaOrigem);
-    const y1 = centro(bandaDestino);
-    const xMeio = (x0 + x1) / 2;
-    return `M${x0},${y0} C${xMeio},${y0} ${xMeio},${y1} ${x1},${y1}`;
-  }
-
   const percentualSemFinanciamentoAltaVulnerabilidade = n1 > 0 ? (n1a / n1) * 100 : 0;
 
   return (
@@ -253,59 +328,48 @@ export function FunilExclusaoHabitacional({
             pela combinação exata vulnerabilidade×financiamento que ele representa).
             Cor vermelha só no caminho crítico; largura sempre proporcional ao valor
             real, nunca engrossada artificialmente. */}
-        <g
-          role="button"
-          tabIndex={0}
-          className="cursor-pointer outline-none"
-          aria-label="Filtrar: alta vulnerabilidade habitacional"
-          {...handlersSegmento(aoClicarSegmento, { vulnerabilidade: 'alta', financiamento: null })}
-        >
-          <path
-            d={caminho(COL0_X + LARGURA_NO, banda_0_1, COL1_X, no1)}
-            fill="none"
-            stroke={COR_ALTA_VULNERABILIDADE}
-            strokeOpacity={filtrosIguais(filtroAtivo, { vulnerabilidade: 'alta', financiamento: null }) ? 0.5 : 0.28}
-            strokeWidth={Math.max(altura(banda_0_1), 0)}
-          />
-        </g>
-        <g
-          role="button"
-          tabIndex={0}
-          className="cursor-pointer outline-none"
-          aria-label="Filtrar: vulnerabilidade habitacional moderada ou baixa"
-          {...handlersSegmento(aoClicarSegmento, { vulnerabilidade: 'moderada', financiamento: null })}
-        >
-          <path
-            d={caminho(COL0_X + LARGURA_NO, banda_0_2, COL1_X, no2)}
-            fill="none"
-            stroke={COR_LINK_NEUTRO}
-            strokeOpacity={filtrosIguais(filtroAtivo, { vulnerabilidade: 'moderada', financiamento: null }) ? 0.75 : 0.45}
-            strokeWidth={Math.max(altura(banda_0_2), 0)}
-          />
-        </g>
+        <LinkFunil
+          x0={COL0_X + LARGURA_NO}
+          x1={COL1_X}
+          bandaOrigem={banda_0_1}
+          bandaDestino={no1}
+          cor={COR_ALTA_VULNERABILIDADE}
+          opacidade={filtrosIguais(filtroAtivo, { vulnerabilidade: 'alta', financiamento: null }) ? 0.5 : 0.28}
+          valor={n1}
+          ariaLabel="Filtrar: alta vulnerabilidade habitacional"
+          filtro={{ vulnerabilidade: 'alta', financiamento: null }}
+          aoClicarSegmento={aoClicarSegmento}
+        />
+        <LinkFunil
+          x0={COL0_X + LARGURA_NO}
+          x1={COL1_X}
+          bandaOrigem={banda_0_2}
+          bandaDestino={no2}
+          cor={COR_LINK_NEUTRO}
+          opacidade={filtrosIguais(filtroAtivo, { vulnerabilidade: 'moderada', financiamento: null }) ? 0.75 : 0.45}
+          valor={n2}
+          ariaLabel="Filtrar: vulnerabilidade habitacional moderada ou baixa"
+          filtro={{ vulnerabilidade: 'moderada', financiamento: null }}
+          aoClicarSegmento={aoClicarSegmento}
+        />
         {/* Caminho crítico (alta vulnerabilidade → sem financiamento) — contraste
             máximo (30/07/2026, feedback do usuário): opacidade alta e sólida no
             vermelho institucional, contra os demais fluxos em stone-300 discreto
             (a versão anterior tinha o crítico MENOS opaco que os neutros, invertido
             do que fazia sentido). */}
-        <g
-          role="button"
-          tabIndex={0}
-          className="cursor-pointer outline-none"
-          aria-label="Filtrar: alta vulnerabilidade e sem contrato de financiamento — caminho crítico"
-          {...handlersSegmento(aoClicarSegmento, { vulnerabilidade: 'alta', financiamento: 'sem' })}
+        <LinkFunil
+          x0={COL1_X + LARGURA_NO}
+          x1={COL2_X}
+          bandaOrigem={banda_1_3}
+          bandaDestino={banda_3_de1}
+          cor={COR_QUADRANTE.vazio_de_acesso}
+          opacidade={0.75}
+          valor={n1a}
+          ariaLabel="Filtrar: alta vulnerabilidade e sem contrato de financiamento — caminho crítico"
+          filtro={{ vulnerabilidade: 'alta', financiamento: 'sem' }}
+          aoClicarSegmento={aoClicarSegmento}
+          tituloCompleto={`Caminho crítico: alta vulnerabilidade habitacional → sem financiamento (${n1a.toLocaleString('pt-BR')} municípios, ${formatoPercentual.format(percentualSemFinanciamentoAltaVulnerabilidade)}% dos de alta vulnerabilidade) — clique para filtrar`}
         >
-          <path
-            d={caminho(COL1_X + LARGURA_NO, banda_1_3, COL2_X, banda_3_de1)}
-            fill="none"
-            stroke={COR_QUADRANTE.vazio_de_acesso}
-            strokeOpacity={0.75}
-            strokeWidth={Math.max(altura(banda_1_3), 0)}
-          >
-            <title>
-              {`Caminho crítico: alta vulnerabilidade habitacional → sem financiamento (${n1a.toLocaleString('pt-BR')} municípios, ${formatoPercentual.format(percentualSemFinanciamentoAltaVulnerabilidade)}% dos de alta vulnerabilidade) — clique para filtrar`}
-            </title>
-          </path>
           {/* Filete "escoando" por cima do caminho crítico — <animate> nativo do
               SVG (SMIL), não depende de nenhum bundler/CSS-in-JS. Puramente
               decorativo: não desenhado quando o usuário pediu menos movimento
@@ -330,52 +394,43 @@ export function FunilExclusaoHabitacional({
               />
             </path>
           )}
-        </g>
-        <g
-          role="button"
-          tabIndex={0}
-          className="cursor-pointer outline-none"
-          aria-label="Filtrar: alta vulnerabilidade e com contrato de financiamento"
-          {...handlersSegmento(aoClicarSegmento, { vulnerabilidade: 'alta', financiamento: 'com' })}
-        >
-          <path
-            d={caminho(COL1_X + LARGURA_NO, banda_1_4, COL2_X, banda_4_de1)}
-            fill="none"
-            stroke={COR_LINK_NEUTRO}
-            strokeOpacity={filtrosIguais(filtroAtivo, { vulnerabilidade: 'alta', financiamento: 'com' }) ? 0.75 : 0.45}
-            strokeWidth={Math.max(altura(banda_1_4), 0)}
-          />
-        </g>
-        <g
-          role="button"
-          tabIndex={0}
-          className="cursor-pointer outline-none"
-          aria-label="Filtrar: vulnerabilidade moderada/baixa e sem contrato de financiamento"
-          {...handlersSegmento(aoClicarSegmento, { vulnerabilidade: 'moderada', financiamento: 'sem' })}
-        >
-          <path
-            d={caminho(COL1_X + LARGURA_NO, banda_2_3, COL2_X, banda_3_de2)}
-            fill="none"
-            stroke={COR_LINK_NEUTRO}
-            strokeOpacity={filtrosIguais(filtroAtivo, { vulnerabilidade: 'moderada', financiamento: 'sem' }) ? 0.75 : 0.45}
-            strokeWidth={Math.max(altura(banda_2_3), 0)}
-          />
-        </g>
-        <g
-          role="button"
-          tabIndex={0}
-          className="cursor-pointer outline-none"
-          aria-label="Filtrar: vulnerabilidade moderada/baixa e com contrato de financiamento"
-          {...handlersSegmento(aoClicarSegmento, { vulnerabilidade: 'moderada', financiamento: 'com' })}
-        >
-          <path
-            d={caminho(COL1_X + LARGURA_NO, banda_2_4, COL2_X, banda_4_de2)}
-            fill="none"
-            stroke={COR_LINK_NEUTRO}
-            strokeOpacity={filtrosIguais(filtroAtivo, { vulnerabilidade: 'moderada', financiamento: 'com' }) ? 0.75 : 0.45}
-            strokeWidth={Math.max(altura(banda_2_4), 0)}
-          />
-        </g>
+        </LinkFunil>
+        <LinkFunil
+          x0={COL1_X + LARGURA_NO}
+          x1={COL2_X}
+          bandaOrigem={banda_1_4}
+          bandaDestino={banda_4_de1}
+          cor={COR_LINK_NEUTRO}
+          opacidade={filtrosIguais(filtroAtivo, { vulnerabilidade: 'alta', financiamento: 'com' }) ? 0.75 : 0.45}
+          valor={n1b}
+          ariaLabel="Filtrar: alta vulnerabilidade e com contrato de financiamento"
+          filtro={{ vulnerabilidade: 'alta', financiamento: 'com' }}
+          aoClicarSegmento={aoClicarSegmento}
+        />
+        <LinkFunil
+          x0={COL1_X + LARGURA_NO}
+          x1={COL2_X}
+          bandaOrigem={banda_2_3}
+          bandaDestino={banda_3_de2}
+          cor={COR_LINK_NEUTRO}
+          opacidade={filtrosIguais(filtroAtivo, { vulnerabilidade: 'moderada', financiamento: 'sem' }) ? 0.75 : 0.45}
+          valor={n2a}
+          ariaLabel="Filtrar: vulnerabilidade moderada/baixa e sem contrato de financiamento"
+          filtro={{ vulnerabilidade: 'moderada', financiamento: 'sem' }}
+          aoClicarSegmento={aoClicarSegmento}
+        />
+        <LinkFunil
+          x0={COL1_X + LARGURA_NO}
+          x1={COL2_X}
+          bandaOrigem={banda_2_4}
+          bandaDestino={banda_4_de2}
+          cor={COR_LINK_NEUTRO}
+          opacidade={filtrosIguais(filtroAtivo, { vulnerabilidade: 'moderada', financiamento: 'com' }) ? 0.75 : 0.45}
+          valor={n2b}
+          ariaLabel="Filtrar: vulnerabilidade moderada/baixa e com contrato de financiamento"
+          filtro={{ vulnerabilidade: 'moderada', financiamento: 'com' }}
+          aoClicarSegmento={aoClicarSegmento}
+        />
 
         {/* Nós — clicáveis. O nó raiz limpa o filtro (representa a população
             inteira, "voltar pra visão geral"); os demais definem só o eixo que
