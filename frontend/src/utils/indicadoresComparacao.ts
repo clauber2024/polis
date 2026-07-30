@@ -28,8 +28,6 @@ export interface IndicadorComparavel {
   formato: FormatoIndicador;
   sentido: 'positivo' | 'negativo';
   descricao?: string;
-  /** Cor das barras deste indicador no gráfico (RF-050). */
-  cor: string;
 }
 
 export const INDICADORES_COMPARAVEIS: IndicadorComparavel[] = [
@@ -39,7 +37,6 @@ export const INDICADORES_COMPARAVEIS: IndicadorComparavel[] = [
     unidade: 'kW/1.000 hab',
     formato: 'numero',
     sentido: 'positivo',
-    cor: '#1d4ed8',
   },
   {
     id: 'rendaMediaDomiciliar',
@@ -47,7 +44,6 @@ export const INDICADORES_COMPARAVEIS: IndicadorComparavel[] = [
     unidade: null,
     formato: 'moeda',
     sentido: 'positivo',
-    cor: '#15803d',
   },
   {
     id: 'percentualPobrezaCadunico',
@@ -58,7 +54,6 @@ export const INDICADORES_COMPARAVEIS: IndicadorComparavel[] = [
     descricao:
       'Percentual das famílias cadastradas no CadÚnico classificadas em pobreza ou ' +
       'extrema pobreza — não é percentual da população do município.',
-    cor: '#b91c1c',
   },
   {
     id: 'ivs',
@@ -66,7 +61,6 @@ export const INDICADORES_COMPARAVEIS: IndicadorComparavel[] = [
     unidade: null,
     formato: 'numero',
     sentido: 'negativo',
-    cor: '#7f1d1d',
   },
   {
     id: 'irradiacaoMediaKwhM2Dia',
@@ -77,6 +71,5 @@ export const INDICADORES_COMPARAVEIS: IndicadorComparavel[] = [
     descricao:
       'Média climatológica de longo prazo (satélite, 1999–2015), não um ano específico. ' +
       'Fonte: Atlas Brasileiro de Energia Solar 2017, LABREN/CCST/INPE.',
-    cor: '#d97706',
   },
 ];

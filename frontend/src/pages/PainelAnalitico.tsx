@@ -370,6 +370,13 @@ export function PainelAnalitico() {
   // ver docstring de GraficoQuadrantes.tsx.
   const [abaLaboratorio, setAbaLaboratorio] = useState<'executiva' | 'exploratoria'>('executiva');
 
+  // Filtro por UF na Visão Executiva (30/07/2026, segunda resposta do
+  // usuário sobre o drill-down do Treemap): clicar num estado no
+  // TreemapProporcaoNacional filtra RankingPrioridadeExecutivo, ambos
+  // filhos deste componente — por isso o estado vive aqui, não em nenhum
+  // dos dois. '' = sem filtro (visão nacional).
+  const [ufFiltroExecutivo, setUfFiltroExecutivo] = useState('');
+
   function carregarQuadrantesNacionais() {
     if (quadrantesNacionais || carregandoQuadrantes) return;
     setCarregandoQuadrantes(true);
@@ -493,7 +500,25 @@ export function PainelAnalitico() {
 
         {quadrantesNacionais && abaLaboratorio === 'executiva' && (
           <div className="mt-4 rounded-xl bg-white p-4 ring-1 ring-stone-200">
-            <RankingPrioridadeExecutivo dados={quadrantesNacionais} />
+            <h3 className="text-sm font-black tracking-tight text-stone-900">
+              Peso da exclusão, não o território
+            </h3>
+            <div className="mt-3">
+              <TreemapProporcaoNacional
+                dados={quadrantesNacionais}
+                aoClicarEstado={setUfFiltroExecutivo}
+              />
+            </div>
+          </div>
+        )}
+
+        {quadrantesNacionais && abaLaboratorio === 'executiva' && (
+          <div className="mt-4 rounded-xl bg-white p-4 ring-1 ring-stone-200">
+            <RankingPrioridadeExecutivo
+              dados={quadrantesNacionais}
+              ufFiltro={ufFiltroExecutivo}
+              aoLimparFiltro={() => setUfFiltroExecutivo('')}
+            />
           </div>
         )}
 
@@ -504,17 +529,6 @@ export function PainelAnalitico() {
             </h3>
             <div className="mt-3">
               <FunilExclusaoHabitacional dados={quadrantesNacionais} />
-            </div>
-          </div>
-        )}
-
-        {quadrantesNacionais && abaLaboratorio === 'executiva' && (
-          <div className="mt-4 rounded-xl bg-white p-4 ring-1 ring-stone-200">
-            <h3 className="text-sm font-black tracking-tight text-stone-900">
-              Peso da exclusão, não o território
-            </h3>
-            <div className="mt-3">
-              <TreemapProporcaoNacional dados={quadrantesNacionais} />
             </div>
           </div>
         )}
@@ -566,13 +580,13 @@ export function PainelAnalitico() {
       </section>
 
       {!podeComparar && (
-        <p className="mt-6 text-sm text-slate-500">
+        <p className="mt-6 text-sm text-stone-500">
           Selecione pelo menos {MINIMO_MUNICIPIOS} municípios acima para ver a comparação.
         </p>
       )}
 
       {podeComparar && carregando && (
-        <p className="mt-6 text-sm text-slate-500">Comparando…</p>
+        <p className="mt-6 text-sm text-stone-500">Comparando…</p>
       )}
 
       {podeComparar && erro && !carregando && (
@@ -587,13 +601,13 @@ export function PainelAnalitico() {
             </p>
           )}
 
-          <section className="mt-6">
-            <div className="flex items-center justify-between">
+          <section className="mt-6 rounded-2xl bg-white/70 p-8 shadow-lg shadow-stone-200/50 ring-1 ring-stone-900/5 backdrop-blur-xl">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                <h2 className="text-lg font-black tracking-tight text-stone-900">
                   Tabela comparativa
                 </h2>
-                <p className="text-xs text-slate-400">
+                <p className="mt-1 text-sm text-stone-500">
                   Colunas em itálico são médias de referência — nacional sempre; a regional e a
                   estadual só aparecem quando todos os municípios comparados são da mesma região ou
                   do mesmo estado, respectivamente.
@@ -604,7 +618,7 @@ export function PainelAnalitico() {
                   type="button"
                   onClick={() => aoExportar('csv')}
                   disabled={exportando !== null}
-                  className="rounded border border-slate-300 px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  className="rounded-lg border border-stone-300 bg-white/70 px-2.5 py-1 text-xs font-semibold text-stone-700 backdrop-blur-sm hover:bg-white disabled:opacity-50"
                 >
                   {exportando === 'csv' ? 'Exportando…' : 'Exportar CSV'}
                 </button>
@@ -612,20 +626,20 @@ export function PainelAnalitico() {
                   type="button"
                   onClick={() => aoExportar('xlsx')}
                   disabled={exportando !== null}
-                  className="rounded border border-slate-300 px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  className="rounded-lg border border-stone-300 bg-white/70 px-2.5 py-1 text-xs font-semibold text-stone-700 backdrop-blur-sm hover:bg-white disabled:opacity-50"
                 >
                   {exportando === 'xlsx' ? 'Exportando…' : 'Exportar XLSX'}
                 </button>
               </div>
             </div>
-            {erroExportacao && <p className="mt-1 text-xs text-red-600">{erroExportacao}</p>}
+            {erroExportacao && <p className="mt-2 text-xs text-red-600">{erroExportacao}</p>}
             {erroClassificacao && (
-              <p className="mt-1 text-xs text-amber-600">
+              <p className="mt-2 text-xs text-amber-600">
                 Classificação de Vazios de Acesso indisponível: {erroClassificacao}
               </p>
             )}
             {temSemClassificacao && (
-              <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-amber-200/60 bg-amber-50/70 px-3 py-2 text-xs text-amber-800 backdrop-blur-sm">
                 <span>
                   {codigosSemClassificacao.length} município(s) selecionado(s) não têm dado
                   suficiente (MMGD residencial ou irradiação) para classificação de Vazio de Acesso.
@@ -633,13 +647,13 @@ export function PainelAnalitico() {
                 <button
                   type="button"
                   onClick={removerSemClassificacao}
-                  className="rounded border border-amber-300 bg-white px-2 py-1 font-medium text-amber-800 hover:bg-amber-100"
+                  className="rounded-lg border border-amber-300 bg-white px-2 py-1 font-medium text-amber-800 hover:bg-amber-100"
                 >
                   Remover da comparação
                 </button>
               </div>
             )}
-            <div className="mt-2">
+            <div className="mt-4">
               <TabelaComparacao
                 municipios={resultado}
                 indicadores={indicadoresSelecionados}
@@ -650,11 +664,11 @@ export function PainelAnalitico() {
             </div>
           </section>
 
-          <section className="mt-6">
-            <h2 className="font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+          <section className="mt-6 rounded-2xl bg-white/70 p-8 shadow-lg shadow-stone-200/50 ring-1 ring-stone-900/5 backdrop-blur-xl">
+            <h2 className="text-lg font-black tracking-tight text-stone-900">
               Gráfico comparativo
             </h2>
-            <div className="mt-2">
+            <div className="mt-4">
               <GraficoComparacao
                 municipios={resultado}
                 indicadores={indicadoresSelecionados}
@@ -663,11 +677,11 @@ export function PainelAnalitico() {
             </div>
           </section>
 
-          <section className="mt-6 rounded border border-slate-200 bg-white p-6 shadow-2xs">
-            <h2 className="font-mono text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+          <section className="mt-6 rounded-2xl bg-white/70 p-8 shadow-lg shadow-stone-200/50 ring-1 ring-stone-900/5 backdrop-blur-xl">
+            <h2 className="text-lg font-black tracking-tight text-stone-900">
               Visão multidimensional (radar)
             </h2>
-            <div className="mt-3">
+            <div className="mt-4">
               <GraficoRadar municipios={resultado} indicadores={indicadoresSelecionados} />
             </div>
           </section>

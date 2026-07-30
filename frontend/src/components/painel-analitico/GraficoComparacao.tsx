@@ -2,6 +2,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -11,6 +12,7 @@ import {
 import type { MunicipioComIndicadores } from '../../types/api';
 import type { IndicadorComparavel } from '../../utils/indicadoresComparacao';
 import { formatarValor } from '../../utils/formatadores';
+import { corMunicipio } from '../../utils/paletaMunicipios';
 import type { ColunaMedia } from './TabelaComparacao';
 
 /**
@@ -18,9 +20,19 @@ import type { ColunaMedia } from './TabelaComparacao';
  * indicador (small multiples), não um único gráfico com todos os
  * indicadores juntos — os indicadores selecionados têm unidades muito
  * diferentes entre si (R$, %, kWh/m²·dia, kW/1.000 hab), então uma escala
- * única distorceria a leitura. Município no eixo X (rótulo curto: nome), cor
- * fixa por indicador (INDICADORES_COMPARAVEIS[].cor) para consistência com a
- * tabela ao lado.
+ * única distorceria a leitura.
+ *
+ * Cor FIXA POR MUNICÍPIO, não por indicador (30/07/2026, correção de feedback
+ * do usuário: "Regra de Ouro da Comparação" — quando o gráfico compara
+ * territórios, a cor pertence ao território, sempre a mesma em qualquer
+ * gráfico da tela. Antes, cada barra usava `indicador.cor` — todas as barras
+ * de um mesmo indicador saíam da mesma cor, sem relação com a cor daquele
+ * município no radar ao lado, o que confundia quem olhava as duas
+ * visualizações juntas). Cada barra usa `corMunicipio(índice)` — MESMA
+ * paleta e MESMO índice que GraficoRadar.tsx e TabelaComparacao.tsx, ordem
+ * de `municipios` idêntica em todo lugar (vem de `resultado` em
+ * PainelAnalitico.tsx). `indicador.cor` foi removido do catálogo
+ * (indicadoresComparacao.ts) — não tinha mais nenhum uso depois desta troca.
  *
  * Linhas de referência (feedback do usuário): mesmas médias mostradas como
  * colunas na TabelaComparacao (`colunasMedia`), aqui como `ReferenceLine`
@@ -29,9 +41,7 @@ import type { ColunaMedia } from './TabelaComparacao';
  *
  * DUAS CORREÇÕES de feedback do usuário (10/07/2026):
  * 1. Contraste: a paleta anterior (slate/teal/fuchsia) ficava apagada contra
- *    as barras e a grade — trocada por cores escuras e bem saturadas,
- *    escolhidas para não colidir com nenhuma cor de indicador
- *    (INDICADORES_COMPARAVEIS: azul, verde, vermelho, vermelho-escuro, âmbar).
+ *    as barras e a grade — trocada por cores escuras e bem saturadas.
  * 2. Sobreposição: quando as médias são parecidas, as linhas ficam próximas
  *    E os rótulos inline (`label` do ReferenceLine) colidiam entre si. Em vez
  *    de tentar empilhar rótulos (que colidem de novo se as 3 médias forem
@@ -54,9 +64,22 @@ interface GraficoComparacaoProps {
 export function GraficoComparacao({ municipios, indicadores, colunasMedia }: GraficoComparacaoProps) {
   return (
     <div>
+      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl border border-stone-200/60 bg-white/60 px-3.5 py-2.5 text-xs text-stone-600 shadow-sm backdrop-blur-md">
+        <span className="font-bold text-stone-500">Municípios:</span>
+        {municipios.map((municipio, indice) => (
+          <span key={municipio.codigoIbge} className="flex items-center gap-1.5">
+            <span
+              className="inline-block h-2.5 w-2.5 rounded-sm"
+              style={{ backgroundColor: corMunicipio(indice) }}
+            />
+            {municipio.nome} <span className="text-stone-400">{municipio.uf}</span>
+          </span>
+        ))}
+      </div>
+
       {colunasMedia.length > 0 && (
-        <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-          <span className="font-medium text-slate-500">Linhas de referência:</span>
+        <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-stone-200/60 bg-white/60 px-3.5 py-2.5 text-xs text-stone-600 shadow-sm backdrop-blur-md">
+          <span className="font-bold text-stone-500">Linhas de referência:</span>
           {colunasMedia.map((coluna) => {
             const estilo = ESTILO_MEDIA[coluna.chave] ?? { cor: '#94a3b8', dash: '3 3' };
             return (
@@ -90,16 +113,19 @@ export function GraficoComparacao({ municipios, indicadores, colunasMedia }: Gra
           });
 
           return (
-            <div key={indicador.id} className="rounded-lg border border-slate-200 p-3">
-              <p className="mb-2 text-sm font-semibold text-slate-700">
+            <div
+              key={indicador.id}
+              className="rounded-xl border border-stone-200/60 bg-white/60 p-4 shadow-sm backdrop-blur-md"
+            >
+              <p className="mb-2 text-sm font-bold text-stone-700">
                 {indicador.rotulo}
                 {indicador.unidade && (
-                  <span className="ml-1 font-normal text-slate-400">({indicador.unidade})</span>
+                  <span className="ml-1 font-normal text-stone-400">({indicador.unidade})</span>
                 )}
               </p>
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={dados} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" vertical={false} />
                   <XAxis
                     dataKey="nome"
                     tick={{ fontSize: 11 }}
@@ -110,11 +136,17 @@ export function GraficoComparacao({ municipios, indicadores, colunasMedia }: Gra
                   />
                   <YAxis tick={{ fontSize: 11 }} />
                   <Tooltip
+                    cursor={{ fill: 'rgba(231, 229, 228, 0.4)' }}
+                    contentStyle={{ borderRadius: '10px', border: '1px solid #e7e5e4', fontWeight: 600 }}
                     formatter={(valor) =>
                       formatarValor(typeof valor === 'number' ? valor : null, indicador.formato)
                     }
                   />
-                  <Bar dataKey="valor" fill={indicador.cor} radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="valor" radius={[3, 3, 0, 0]}>
+                    {municipios.map((municipio, indice) => (
+                      <Cell key={municipio.codigoIbge} fill={corMunicipio(indice)} />
+                    ))}
+                  </Bar>
                   {colunasMedia.map((coluna) => {
                     const valor = coluna.medias?.[indicador.id];
                     if (typeof valor !== 'number') return null;

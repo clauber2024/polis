@@ -83,10 +83,9 @@ export function gerarDiagnosticos(
     const classificacao = classificacoes?.get(municipio.codigoIbge);
     if (classificacao?.quadrante === 'vazio_de_acesso') {
       interpretacoes.push(
-        `${municipio.nome} (${municipio.uf}) é classificado pelo backend como ` +
+        `${municipio.nome} (${municipio.uf}) está classificado como ` +
           `${classificacao.quadranteRotulo ?? 'Vazio de Acesso'} — alto potencial solar e alta ` +
-          'vulnerabilidade social combinados com baixa adoção de MMGD residencial ' +
-          '(ver metodologia em ARQUITETURA.md).',
+          'vulnerabilidade social combinados com baixa adoção de MMGD residencial.',
       );
     }
   }

@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import type { VaziosDeAcessoCompleto } from '../../services/vaziosDeAcesso.service';
 import type { Quadrante } from '../../types/api';
 import { ROTULO_FALLBACK } from './GraficoQuadrantes';
@@ -16,22 +15,34 @@ import { ROTULO_FALLBACK } from './GraficoQuadrantes';
  * bloco final é sempre o peso real sobre o total). NÃO Recharts nem
  * lucide-react (mesma decisão já registrada em GraficoQuadrantes.tsx).
  *
- * Aninhamento por UF (30/07/2026, mesma sessão — pedido do usuário): a
- * coluna de Vazios de Acesso ganhou um segundo nível — cada região é
- * subdividida pelos seus estados, empilhados dentro do mesmo espaço
- * vertical da região (reaproveita `empilhar` recursivamente, preservando a
- * mesma invariante de área). Os blocos de UF não têm preenchimento
- * "container" de região por baixo — a coesão visual da região vem só da
- * paleta compartilhada (crítico = vermelho forte, alerta = vermelho claro)
- * e de linhas brancas translúcidas mais finas que as da coluna "outros".
+ * Hierarquia de 3 níveis (30/07/2026, pedido explícito do usuário — revisão
+ * do aninhamento por UF da mesma sessão): Nível 1 = Quadrante (a própria
+ * divisão em 2 colunas: Vazios de Acesso à esquerda, os 3 demais à
+ * direita), Nível 2 = Região (dentro da coluna de Vazios, cada região vira
+ * um bloco com CONTORNO BRANCO GROSSO — `variante: 'regiao'` abaixo — e o
+ * nome estampado no canto superior, reaproveitando a MESMA geometria já
+ * calculada para posicionar os estados, não uma segunda passada), Nível 3 =
+ * Estado (fatias finas dentro de cada região, separadas por linhas brancas
+ * translúcidas mais finas que o contorno da região — hierarquia visual
+ * clara: contorno grosso = fronteira de região, linha fina = fronteira de
+ * estado). **Decisão do usuário**: no lado direito (quadrantes "outros",
+ * neutros), os Níveis 2 e 3 são DELIBERADAMENTE silenciados — não é uma
+ * limitação técnica, é a mesma contagem real por região/UF que dá para
+ * calcular ali também, só que esses quadrantes não são alvo de política
+ * pública e abrir a mesma granularidade lá poluiria a tela sem ganho.
  *
- * Drill-down (decisão de UX, 30/07/2026): clicar num bloco de UF navega
- * para `/mapa?uf=<sigla>` — reaproveita 100% a mecânica já existente de
- * "clicar num estado no mapa" (RF-027/028, PaginaMapa.tsx), NÃO abre uma
- * listagem nova: o Ranking estadual (aba já existente no mapa) já É a
- * "listagem de ação focada só no estado" que faria sentido aqui. Blocos de
- * quadrante "outros" (coluna direita) não navegam — não representam um
- * recorte territorial único.
+ * Drill-down (decisão de UX, 30/07/2026 — SEGUNDA resposta do usuário,
+ * substitui a primeira): clicar num bloco de UF (Nível 3) chama
+ * `aoClicarEstado(uf)`, que o pai (PainelAnalitico.tsx) usa para FILTRAR
+ * RankingPrioridadeExecutivo na mesma tela, sem navegar para fora — mantém
+ * o usuário no contexto macro em vez de saltar direto para o mapa (essa foi
+ * a primeira resposta, já implementada e depois substituída; o deep-link
+ * `/mapa?uf=` continua existindo em PaginaMapa.tsx, só não é mais o gatilho
+ * deste clique — RankingPrioridadeExecutivo oferece um link explícito para
+ * quem quiser a exploração espacial a partir da lista já filtrada). Blocos
+ * de região (Nível 2, só contorno) e de quadrante "outros" (Nível 1 da
+ * coluna direita) não são clicáveis — região agrega vários estados, e
+ * "outros" não é o foco da política.
  *
  * Dados: contagem real de `dados.municipios` por região × UF (dentro de
  * Vazio de Acesso) e por quadrante (fora dele) — nenhum valor fabricado.
@@ -43,6 +54,8 @@ import { ROTULO_FALLBACK } from './GraficoQuadrantes';
 
 interface TreemapProporcaoNacionalProps {
   dados: VaziosDeAcessoCompleto;
+  /** Chamado ao clicar num bloco de estado (Nível 3) — o pai decide o que fazer (hoje: filtra RankingPrioridadeExecutivo). */
+  aoClicarEstado: (uf: string) => void;
 }
 
 const LARGURA = 760;
@@ -71,7 +84,7 @@ interface BlocoTreemap {
   cor: string;
   corTexto: string;
   legenda: string;
-  variante: 'coluna' | 'uf';
+  variante: 'coluna' | 'uf' | 'regiao';
   uf?: string;
 }
 
@@ -100,9 +113,7 @@ function empilhar(
   });
 }
 
-export function TreemapProporcaoNacional({ dados }: TreemapProporcaoNacionalProps) {
-  const navigate = useNavigate();
-
+export function TreemapProporcaoNacional({ dados, aoClicarEstado }: TreemapProporcaoNacionalProps) {
   const { retangulos, totalVazios, totalGeral } = useMemo(() => {
     const vaziosPorRegiaoUf = new Map<string, Map<string, number>>();
     const outrosPorQuadrante = new Map<Quadrante, number>();
@@ -167,6 +178,16 @@ export function TreemapProporcaoNacional({ dados }: TreemapProporcaoNacionalProp
       return empilhar(ufsOrdenadas, 0, larguraVazios, regiaoRect.y, regiaoRect.height, regiaoRect.valor);
     });
 
+    // Nível 2 — contorno + rótulo de região, por CIMA das fatias de estado
+    // (mesma geometria de regioesComGeometria, só reetiquetada para o
+    // renderer desenhar como moldura, não como preenchimento).
+    const contornosRegiao: RetanguloTreemap[] = regioesComGeometria.map((r) => ({
+      ...r,
+      id: `contorno-${r.id}`,
+      legenda: `${formatoPercentual.format((r.valor / totalVazios) * 100)}% da exclusão nacional`,
+      variante: 'regiao' as const,
+    }));
+
     const blocosOutros: BlocoTreemap[] = QUADRANTES_OUTROS.filter((q) => (outrosPorQuadrante.get(q) ?? 0) > 0)
       .sort((a, b) => (outrosPorQuadrante.get(b) ?? 0) - (outrosPorQuadrante.get(a) ?? 0))
       .map((quadrante, indice) => {
@@ -182,8 +203,13 @@ export function TreemapProporcaoNacional({ dados }: TreemapProporcaoNacionalProp
         };
       });
 
+    // Ordem importa: contornosRegiao depois de retangulosUf para desenhar a
+    // moldura de região POR CIMA do preenchimento dos estados (SVG empilha
+    // por ordem de aparição — mesma lógica de camadas já usada no mapa,
+    // CAMADA_ESTADO_DESTACADO acima do choropleth).
     const retangulos = [
       ...retangulosUf,
+      ...contornosRegiao,
       ...empilhar(blocosOutros, larguraVazios, larguraOutros, 0, ALTURA, totalOutros),
     ];
 
@@ -200,7 +226,8 @@ export function TreemapProporcaoNacional({ dados }: TreemapProporcaoNacionalProp
         Cada bloco vale sua proporção real de municípios, não seu tamanho no mapa — a coluna
         vermelha ({formatoPercentual.format((totalVazios / totalGeral) * 100)}% do total
         classificado) é o peso nacional de Vazio de Acesso, aberta por região e por estado; o cinza
-        é o resto do país, só para dar escala. Clique num estado para abrir o ranking dele no mapa.
+        é o resto do país, só para dar escala. Clique num estado para filtrar a lista de prioridade
+        abaixo.
       </p>
 
       <svg
@@ -210,6 +237,41 @@ export function TreemapProporcaoNacional({ dados }: TreemapProporcaoNacionalProp
         className="w-full bg-white"
       >
         {retangulos.map((r) => {
+          // Nível 2 (contorno de região) — moldura por cima das fatias de
+          // estado, sem preenchimento próprio e sem clique (região agrega
+          // vários estados, não é um recorte de ação único).
+          if (r.variante === 'regiao') {
+            const mostrarRotulo = r.width > 60 && r.height > 24;
+            return (
+              <g key={r.id}>
+                <rect
+                  x={r.x}
+                  y={r.y}
+                  width={Math.max(r.width, 0)}
+                  height={Math.max(r.height, 0)}
+                  fill="none"
+                  stroke="#ffffff"
+                  strokeWidth={3}
+                >
+                  <title>{`Região ${r.rotulo}: ${r.valor.toLocaleString('pt-BR')} municípios em Vazio de Acesso — ${r.legenda}`}</title>
+                </rect>
+                {mostrarRotulo && (
+                  <text
+                    x={r.x + 8}
+                    y={r.y + 16}
+                    fontSize={10}
+                    fontWeight={800}
+                    letterSpacing={1}
+                    fill="rgba(255,255,255,0.95)"
+                    style={{ textTransform: 'uppercase' }}
+                  >
+                    {r.rotulo}
+                  </text>
+                )}
+              </g>
+            );
+          }
+
           const ehUf = r.variante === 'uf';
           const larguraMinima = ehUf ? LARGURA_MIN_TEXTO_UF : LARGURA_MIN_TEXTO;
           const alturaMinima = ehUf ? ALTURA_MIN_TEXTO_UF : ALTURA_MIN_TEXTO;
@@ -220,11 +282,11 @@ export function TreemapProporcaoNacional({ dados }: TreemapProporcaoNacionalProp
               role={ehUf ? 'button' : undefined}
               tabIndex={ehUf ? 0 : undefined}
               className={ehUf ? 'cursor-pointer outline-none' : undefined}
-              onClick={ehUf && r.uf ? () => navigate(`/mapa?uf=${r.uf}`) : undefined}
+              onClick={ehUf && r.uf ? () => aoClicarEstado(r.uf as string) : undefined}
               onKeyDown={
                 ehUf && r.uf
                   ? (evento) => {
-                      if (evento.key === 'Enter' || evento.key === ' ') navigate(`/mapa?uf=${r.uf}`);
+                      if (evento.key === 'Enter' || evento.key === ' ') aoClicarEstado(r.uf as string);
                     }
                   : undefined
               }

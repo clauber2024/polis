@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { VaziosDeAcessoCompleto } from '../../services/vaziosDeAcesso.service';
 import { COR_QUADRANTE } from './GraficoQuadrantes';
 
@@ -33,14 +33,31 @@ interface FunilExclusaoHabitacionalProps {
   dados: VaziosDeAcessoCompleto;
 }
 
-const LARGURA = 760;
+/**
+ * Layout (30/07/2026, correção de bug real reportado pelo usuário: rótulos
+ * da coluna 2 cortados na borda direita do viewBox). Causa: o preenchimento
+ * `overflow: hidden` que o próprio SVG raiz aplica por padrão faz qualquer
+ * texto que ultrapasse `LARGURA` desaparecer, sem aviso — não é a mesma
+ * classe de bug de `margin` do Recharts (este componente não usa Recharts,
+ * ver docstring do arquivo), mas o efeito relatado ("corta o texto") é o
+ * mesmo: faltava espaço reservado à direita de cada nó. Duas correções
+ * juntas, para não depender de estimativa exata de largura de fonte: (1)
+ * LARGURA subiu de 760 para 900 e as colunas foram espaçadas para sobrar
+ * ~280px de rótulo depois do último nó (equivalente ao "margin right" que
+ * faria sentido numa lib de gráfico); (2) rótulos longos quebram em várias
+ * linhas via `quebrarRotulo` (abaixo) em vez de depender só da largura —
+ * blindagem contra qualquer rótulo futuro mais comprido que os de hoje.
+ */
+const LARGURA = 900;
 const ALTURA = 440;
 const MARGEM_VERT = 16;
 const GAP_VERTICAL = 28;
 const LARGURA_NO = 10;
 const COL0_X = 6;
-const COL1_X = 300;
+const COL1_X = 280;
 const COL2_X = 600;
+/** Quebra defensiva — qualquer rótulo mais longo que isso some para a próxima linha, não é cortado pelo viewBox. */
+const MAX_CARACTERES_POR_LINHA = 34;
 
 const COR_ALTA_VULNERABILIDADE = '#991b1b';
 const COR_MODERADA = '#a8a29e';
@@ -63,7 +80,39 @@ function altura(b: Banda): number {
   return b.y1 - b.y0;
 }
 
+/** Quebra um rótulo em várias linhas por palavra inteira — nunca corta no meio de uma palavra, nunca depende de medir pixel de fonte. */
+function quebrarRotulo(texto: string, maxCaracteres: number): string[] {
+  const palavras = texto.split(' ');
+  const linhas: string[] = [];
+  let linhaAtual = '';
+  for (const palavra of palavras) {
+    const tentativa = linhaAtual ? `${linhaAtual} ${palavra}` : palavra;
+    if (tentativa.length > maxCaracteres && linhaAtual) {
+      linhas.push(linhaAtual);
+      linhaAtual = palavra;
+    } else {
+      linhaAtual = tentativa;
+    }
+  }
+  if (linhaAtual) linhas.push(linhaAtual);
+  return linhas;
+}
+
+/** `prefers-reduced-motion` lido uma vez no cliente — evita renderizar o `<animate>` do filete crítico para quem pediu menos movimento. */
+function usarReducaoDeMovimento(): boolean {
+  const [reduzido, setReduzido] = useState(false);
+  useEffect(() => {
+    const consulta = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setReduzido(consulta.matches);
+    const ouvir = (evento: MediaQueryListEvent) => setReduzido(evento.matches);
+    consulta.addEventListener('change', ouvir);
+    return () => consulta.removeEventListener('change', ouvir);
+  }, []);
+  return reduzido;
+}
+
 export function FunilExclusaoHabitacional({ dados }: FunilExclusaoHabitacionalProps) {
+  const reduzirMovimento = usarReducaoDeMovimento();
   const calculo = useMemo(() => {
     const vazios = dados.municipios.filter((m) => m.quadrante === 'vazio_de_acesso');
     const totalVazios = vazios.length;
@@ -137,22 +186,6 @@ export function FunilExclusaoHabitacional({ dados }: FunilExclusaoHabitacionalPr
 
   return (
     <div className="space-y-3">
-      {/* Filete "escoando" do caminho crítico — CSS puro, sem lib de animação. */}
-      <style>{`
-        @keyframes funilFluxoCritico {
-          0% { stroke-dashoffset: 36; }
-          100% { stroke-dashoffset: 0; }
-        }
-        .funil-fluxo-critico {
-          animation: funilFluxoCritico 1.2s linear infinite;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .funil-fluxo-critico {
-            animation: none;
-          }
-        }
-      `}</style>
-
       <p className="max-w-2xl text-xs leading-relaxed text-stone-500">
         Dos {totalVazios.toLocaleString('pt-BR')} municípios em Vazio de Acesso, veja onde a
         exclusão escoa: quantos têm alta vulnerabilidade habitacional (IVSH) e, entre esses,
@@ -186,9 +219,7 @@ export function FunilExclusaoHabitacional({ dados }: FunilExclusaoHabitacionalPr
             máximo (30/07/2026, feedback do usuário): opacidade alta e sólida no
             vermelho institucional, contra os demais fluxos em stone-300 discreto
             (a versão anterior tinha o crítico MENOS opaco que os neutros, invertido
-            do que fazia sentido). Filete pontilhado por cima "escoando" da esquerda
-            para a direita via CSS puro — decorativo, não altera a largura real (que
-            continua sempre proporcional ao valor). */}
+            do que fazia sentido). */}
         <path
           d={caminho(COL1_X + LARGURA_NO, banda_1_3, COL2_X, banda_3_de1)}
           fill="none"
@@ -200,17 +231,33 @@ export function FunilExclusaoHabitacional({ dados }: FunilExclusaoHabitacionalPr
             {`Caminho crítico: alta vulnerabilidade habitacional → sem financiamento (${n1a.toLocaleString('pt-BR')} municípios, ${formatoPercentual.format(percentualSemFinanciamentoAltaVulnerabilidade)}% dos de alta vulnerabilidade)`}
           </title>
         </path>
-        <path
-          d={caminho(COL1_X + LARGURA_NO, banda_1_3, COL2_X, banda_3_de1)}
-          fill="none"
-          stroke="#fca5a5"
-          strokeWidth={Math.min(4, Math.max(altura(banda_1_3), 0))}
-          strokeDasharray="12 24"
-          strokeLinecap="round"
-          className="funil-fluxo-critico"
-          opacity={0.85}
-          aria-hidden="true"
-        />
+        {/* Filete "escoando" por cima do caminho crítico — troca de animação CSS
+            (`@keyframes` num `<style>` injetado) para `<animate>` nativo do SVG
+            (30/07/2026, feedback do usuário: a animação CSS não rodou na
+            validação). SMIL não depende de nenhum bundler/CSS-in-JS processar
+            nada — o navegador anima o atributo direto. Puramente decorativo:
+            não desenhado quando o usuário pediu menos movimento, e nunca altera
+            a largura real da faixa (que continua sempre proporcional ao valor). */}
+        {!reduzirMovimento && (
+          <path
+            d={caminho(COL1_X + LARGURA_NO, banda_1_3, COL2_X, banda_3_de1)}
+            fill="none"
+            stroke="#fca5a5"
+            strokeWidth={Math.min(4, Math.max(altura(banda_1_3), 0))}
+            strokeDasharray="12 24"
+            strokeLinecap="round"
+            opacity={0.85}
+            aria-hidden="true"
+          >
+            <animate
+              attributeName="stroke-dashoffset"
+              from="36"
+              to="0"
+              dur="1.2s"
+              repeatCount="indefinite"
+            />
+          </path>
+        )}
         <path
           d={caminho(COL1_X + LARGURA_NO, banda_1_4, COL2_X, banda_4_de1)}
           fill="none"
@@ -259,25 +306,35 @@ interface NoSankeyProps {
   valor: number;
 }
 
+const ALTURA_LINHA_ROTULO = 13;
+
 function NoSankey({ x, banda, cor, rotulo, valor }: NoSankeyProps) {
   const alturaNo = Math.max(altura(banda), 0);
+  const linhasRotulo = quebrarRotulo(rotulo, MAX_CARACTERES_POR_LINHA);
+  const alturaBlocoTexto = (linhasRotulo.length + 1) * ALTURA_LINHA_ROTULO;
+  const yPrimeiraLinha = banda.y0 + alturaNo / 2 - alturaBlocoTexto / 2 + ALTURA_LINHA_ROTULO * 0.8;
+  const xTexto = x + LARGURA_NO + 10;
+
   return (
     <g>
       <rect x={x} y={banda.y0} width={LARGURA_NO} height={alturaNo} fill={cor} rx={2}>
         <title>{`${rotulo}: ${valor.toLocaleString('pt-BR')} municípios`}</title>
       </rect>
+      {linhasRotulo.map((linha, indice) => (
+        <text
+          key={linha}
+          x={xTexto}
+          y={yPrimeiraLinha + indice * ALTURA_LINHA_ROTULO}
+          fontSize={11}
+          fontWeight={800}
+          fill="#1c1917"
+        >
+          {linha}
+        </text>
+      ))}
       <text
-        x={x + LARGURA_NO + 10}
-        y={banda.y0 + alturaNo / 2 - 6}
-        fontSize={11}
-        fontWeight={800}
-        fill="#1c1917"
-      >
-        {rotulo}
-      </text>
-      <text
-        x={x + LARGURA_NO + 10}
-        y={banda.y0 + alturaNo / 2 + 9}
+        x={xTexto}
+        y={yPrimeiraLinha + linhasRotulo.length * ALTURA_LINHA_ROTULO}
         fontSize={10}
         fontWeight={700}
         fill="#78716c"

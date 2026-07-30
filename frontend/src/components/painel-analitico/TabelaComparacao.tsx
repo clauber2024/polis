@@ -2,6 +2,7 @@ import type { MunicipioClassificado, MunicipioComIndicadores } from '../../types
 import type { IndicadorComparavel } from '../../utils/indicadoresComparacao';
 import { formatarValor } from '../../utils/formatadores';
 import { ESTILO_QUADRANTE, ROTULO_CURTO_QUADRANTE } from '../../utils/quadrantes';
+import { corMunicipio } from '../../utils/paletaMunicipios';
 
 /**
  * Tabela do Painel Analítico (RF-050): linhas = indicadores selecionados,
@@ -19,6 +20,16 @@ import { ESTILO_QUADRANTE, ROTULO_CURTO_QUADRANTE } from '../../utils/quadrantes
  * recalculada aqui; `null` = ainda carregando; uma entrada com
  * `quadrante: null` = município genuinamente sem dado (mostra "Sem dado",
  * não "Não").
+ *
+ * Swatch de cor por município no cabeçalho (30/07/2026, "Regra de Ouro da
+ * Comparação"): mesma paleta/índice de GraficoComparacao.tsx e
+ * GraficoRadar.tsx — o quadradinho ao lado do nome deixa explícito que
+ * aquela cor identifica ESTE município em qualquer gráfico da tela, sem
+ * precisar abrir o radar para descobrir. A tabela em si continua com fundo
+ * sólido (não glassmorphism) DE PROPÓSITO — é dado denso, tabular, em
+ * potencialmente 10 colunas × N linhas, e um fundo desfocado atrás de texto
+ * pequeno prejudicaria a leitura; o cartão glass que envolve a tabela
+ * (PainelAnalitico.tsx) já dá a mesma linguagem visual por fora.
  */
 export interface ColunaMedia {
   chave: string;
@@ -43,21 +54,27 @@ export function TabelaComparacao({
   colunasMedia,
 }: TabelaComparacaoProps) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200">
+    <div className="overflow-x-auto rounded-xl border border-stone-200/70">
       <table className="w-full min-w-max text-sm">
         <thead>
-          <tr className="bg-slate-50 text-left text-slate-600">
-            <th className="sticky left-0 bg-slate-50 px-3 py-2 font-semibold">Indicador</th>
-            {municipios.map((municipio) => (
-              <th key={municipio.codigoIbge} className="px-3 py-2 font-semibold whitespace-nowrap">
-                {municipio.nome}
-                <span className="ml-1 font-normal text-slate-400">{municipio.uf}</span>
+          <tr className="bg-stone-50 text-left text-stone-600">
+            <th className="sticky left-0 bg-stone-50 px-3 py-2 font-bold">Indicador</th>
+            {municipios.map((municipio, indice) => (
+              <th key={municipio.codigoIbge} className="px-3 py-2 font-bold whitespace-nowrap">
+                <span className="inline-flex items-center gap-1.5">
+                  <span
+                    className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm"
+                    style={{ backgroundColor: corMunicipio(indice) }}
+                  />
+                  {municipio.nome}
+                  <span className="font-normal text-stone-400">{municipio.uf}</span>
+                </span>
               </th>
             ))}
             {colunasMedia.map((coluna) => (
               <th
                 key={coluna.chave}
-                className="bg-slate-100 px-3 py-2 font-semibold whitespace-nowrap text-slate-500 italic"
+                className="bg-stone-100 px-3 py-2 font-bold whitespace-nowrap text-stone-500 italic"
               >
                 {coluna.rotulo}
               </th>
@@ -65,8 +82,8 @@ export function TabelaComparacao({
           </tr>
         </thead>
         <tbody>
-          <tr className="border-t border-slate-100 bg-violet-50/40">
-            <th scope="row" className="sticky left-0 bg-violet-50 px-3 py-2 text-left font-medium text-slate-700">
+          <tr className="border-t border-stone-100 bg-violet-50/40">
+            <th scope="row" className="sticky left-0 bg-violet-50 px-3 py-2 text-left font-semibold text-stone-700">
               Classificação (Vazios de Acesso)
             </th>
             {municipios.map((municipio) => {
@@ -74,7 +91,7 @@ export function TabelaComparacao({
               return (
                 <td key={municipio.codigoIbge} className="px-3 py-2 whitespace-nowrap">
                   {classificacoes === null && carregandoClassificacao ? (
-                    <span className="text-xs text-slate-400">carregando…</span>
+                    <span className="text-xs text-stone-400">carregando…</span>
                   ) : classificacao?.quadrante ? (
                     <span
                       title={classificacao.quadranteRotulo ?? undefined}
@@ -85,7 +102,7 @@ export function TabelaComparacao({
                   ) : (
                     <span
                       title="Município excluído da classificação por falta de MMGD residencial ou irradiação solar — não significa que não é Vazio de Acesso, significa que não há dado suficiente para classificar."
-                      className="text-xs text-slate-400 italic"
+                      className="text-xs text-stone-400 italic"
                     >
                       Sem dado
                     </span>
@@ -94,26 +111,26 @@ export function TabelaComparacao({
               );
             })}
             {colunasMedia.map((coluna) => (
-              <td key={coluna.chave} className="bg-slate-50 px-3 py-2 text-center text-slate-300">
+              <td key={coluna.chave} className="bg-stone-50 px-3 py-2 text-center text-stone-300">
                 —
               </td>
             ))}
           </tr>
           {indicadores.map((indicador) => (
-            <tr key={indicador.id} className="border-t border-slate-100">
+            <tr key={indicador.id} className="border-t border-stone-100">
               <th
                 scope="row"
-                className="sticky left-0 bg-white px-3 py-2 text-left font-medium text-slate-700"
+                className="sticky left-0 bg-white px-3 py-2 text-left font-semibold text-stone-700"
               >
                 {indicador.rotulo}
                 {indicador.unidade && (
-                  <span className="ml-1 font-normal text-slate-400">({indicador.unidade})</span>
+                  <span className="ml-1 font-normal text-stone-400">({indicador.unidade})</span>
                 )}
               </th>
               {municipios.map((municipio) => {
                 const valor = municipio[indicador.id];
                 return (
-                  <td key={municipio.codigoIbge} className="px-3 py-2 whitespace-nowrap text-slate-800">
+                  <td key={municipio.codigoIbge} className="px-3 py-2 whitespace-nowrap text-stone-800">
                     {formatarValor(typeof valor === 'number' ? valor : null, indicador.formato)}
                   </td>
                 );
@@ -123,7 +140,7 @@ export function TabelaComparacao({
                 return (
                   <td
                     key={coluna.chave}
-                    className="bg-slate-50 px-3 py-2 whitespace-nowrap text-slate-500 italic"
+                    className="bg-stone-50 px-3 py-2 whitespace-nowrap text-stone-500 italic"
                   >
                     {coluna.medias === null
                       ? 'carregando…'
