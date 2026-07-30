@@ -4,6 +4,7 @@ import type { VaziosDeAcessoCompleto } from '../../services/vaziosDeAcesso.servi
 import type { MunicipioClassificado } from '../../types/api';
 import { formatarValor } from '../../utils/formatadores';
 import { RankingItem } from '../ranking/RankingItem';
+import { ModalDetalhamentoVazios } from './ModalDetalhamentoVazios';
 
 /** Tom neutro suave para a barra — mantém o vermelho reservado ao ícone/badge, ver docstring do arquivo. */
 const COR_BARRA_NEUTRA = '#d6d3d1';
@@ -44,13 +45,17 @@ const COR_BARRA_NEUTRA = '#d6d3d1';
  * neutro suave (RankingItem é componente compartilhado com outras cores em
  * PainelRanking do mapa; não alterado).
  *
- * "Carregar Top 50": os ~5.500 municípios já estão inteiros na memória
- * (mesmo `dados` do GraficoRegional, carregado uma vez via botão "Carregar
- * diagnóstico") — expandir é só um slice local, não uma nova requisição.
+ * "Carregar Top 50 municípios" (30/07/2026, reformulado — taxonomia
+ * institucional do menu): não expande mais a lista NESTA tela — abre
+ * ModalDetalhamentoVazios, o drill-down territorial completo (paginação
+ * server-side, filtro por UF/classificação IVSH, exportação CSV), a mesma
+ * tela que antes vivia numa aba própria "Vazios de Acesso" do menu
+ * principal (removida — ver App.tsx). Top 5 sempre fixo aqui; o "Carregar
+ * mais" virou "abrir o detalhamento", não "mostrar mais linhas na mesma
+ * lista".
  */
 
 const TOPO_INICIAL = 5;
-const TOPO_EXPANDIDO = 50;
 
 interface RankingPrioridadeExecutivoProps {
   dados: VaziosDeAcessoCompleto;
@@ -107,7 +112,7 @@ function mediana(valores: number[]): number | null {
 }
 
 export function RankingPrioridadeExecutivo({ dados, ufFiltro, aoLimparFiltro }: RankingPrioridadeExecutivoProps) {
-  const [expandido, setExpandido] = useState(false);
+  const [modalAberto, setModalAberto] = useState(false);
 
   const comIvsh = dados.municipios.filter(
     (m): m is MunicipioClassificado & { ivsh: number } =>
@@ -125,9 +130,7 @@ export function RankingPrioridadeExecutivo({ dados, ufFiltro, aoLimparFiltro }: 
     dados.municipios.map((m) => m.ivsh).filter((v): v is number => v !== null),
   );
   const maxIvsh = ordenados.length > 0 ? ordenados[0].ivsh : 0;
-
-  const limite = expandido ? TOPO_EXPANDIDO : TOPO_INICIAL;
-  const visiveis = ordenados.slice(0, limite);
+  const visiveis = ordenados.slice(0, TOPO_INICIAL);
 
   return (
     <div>
@@ -158,7 +161,7 @@ export function RankingPrioridadeExecutivo({ dados, ufFiltro, aoLimparFiltro }: 
       <h3 className="text-sm font-black tracking-tight text-stone-900">
         {ufFiltro
           ? `${ordenados.length.toLocaleString('pt-BR')} município(s) em ${ufFiltro}`
-          : `Top ${Math.min(limite, ordenados.length)}: dupla exclusão`}
+          : `Top ${Math.min(TOPO_INICIAL, ordenados.length)}: dupla exclusão`}
       </h3>
       <p className="mt-1 mb-3 text-xs leading-relaxed text-stone-500">
         {ufFiltro
@@ -199,16 +202,20 @@ export function RankingPrioridadeExecutivo({ dados, ufFiltro, aoLimparFiltro }: 
             ))}
           </ol>
 
-          {!expandido && ordenados.length > TOPO_INICIAL && (
+          {ordenados.length > TOPO_INICIAL && (
             <button
               type="button"
-              onClick={() => setExpandido(true)}
+              onClick={() => setModalAberto(true)}
               className="mt-3 w-full rounded-lg border border-dashed border-stone-300 py-2.5 text-xs font-bold tracking-widest text-stone-500 uppercase transition-colors hover:border-stone-400 hover:bg-stone-50 hover:text-stone-700"
             >
-              Carregar Top {Math.min(TOPO_EXPANDIDO, ordenados.length)} municípios
+              Carregar Top {Math.min(50, ordenados.length)} municípios
             </button>
           )}
         </>
+      )}
+
+      {modalAberto && (
+        <ModalDetalhamentoVazios ufInicial={ufFiltro} aoFechar={() => setModalAberto(false)} />
       )}
     </div>
   );

@@ -501,7 +501,7 @@ export function PaginaLanding() {
             icone={<IconeBarras className="h-6 w-6" strokeWidth={2.5} />}
             pergunta="Onde o sol sobra e a energia limpa não chega?"
             resposta="O Gráfico de Quadrantes cruza irradiação solar com adoção residencial de energia solar e revela os vazios de acesso."
-            linkPara="/painel-analitico"
+            linkPara="/dossie-executivo"
             linkTexto="Explorar Quadrantes"
           />
           <CardExplicativo

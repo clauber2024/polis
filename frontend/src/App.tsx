@@ -51,19 +51,16 @@ function LayoutApp() {
         </Link>
         <nav className="flex h-full items-center gap-4 text-xs font-semibold">
           <NavLink to="/mapa" className={classeAba}>
-            Explorador WebGIS
+            Mapa Interativo
           </NavLink>
-          <NavLink to="/painel-analitico" className={classeAba}>
-            Painel Analítico
+          <NavLink to="/dossie-executivo" className={classeAba}>
+            Dossiê Executivo
           </NavLink>
-          <NavLink to="/vazios-de-acesso" className={classeAba}>
-            Vazios de Acesso
+          <NavLink to="/visao-setorial" className={classeAba}>
+            Visão Setorial
           </NavLink>
-          <NavLink to="/ranking-distribuidoras" className={classeAba}>
-            Distribuidoras
-          </NavLink>
-          <NavLink to="/status-dados" className={classeAba}>
-            Dados
+          <NavLink to="/base-de-evidencias" className={classeAba}>
+            Base de Evidências
           </NavLink>
           {sessao && (
             <NavLink
@@ -138,7 +135,7 @@ function LayoutApp() {
 /**
  * Rotas do Atlas. "/" é a landing institucional pública (RF-001 a RF-008,
  * 10/07/2026) — antes desta sessão "/" ia direto para o mapa; o mapa migrou
- * para "/mapa" (RF-015/016/017/055/056), que junto com "/painel-analitico"
+ * para "/mapa" (RF-015/016/017/055/056), que junto com "/dossie-executivo"
  * (RF-049/050/052), "/login" (RF-009/013/014) e os painéis Colaborador
  * (RF-059 a RF-067)/Admin (RF-070 a RF-077) vivem sob LayoutApp (header
  * interno com nav/busca/sessão). Ver CLAUDE.md "Estado Real do Projeto".
@@ -148,6 +145,20 @@ function LayoutApp() {
  * parâmetro (voa até o município e abre o painel) e o remove da URL. Isso
  * desacopla header e página, e dá deep-link de graça
  * (ex.: /mapa?municipio=3550308).
+ *
+ * Taxonomia institucional do menu (30/07/2026, decisão do usuário): o header
+ * deixou de nomear TELAS por resultado ("Vazios de Acesso", "Ranking") e
+ * passou a nomear LENTES de análise — evita o tom de denúncia e escala
+ * melhor quando novas metodologias entrarem. "/painel-analitico" virou
+ * "/dossie-executivo" (rota E rótulo mudaram); "/ranking-distribuidoras"
+ * virou "/visao-setorial"; "/status-dados" virou "/base-de-evidencias".
+ * "/vazios-de-acesso" SAIU do menu, mas a rota continua existindo (não foi
+ * deletada) — chegam nela a lente habitacional da landing (PaginaLanding,
+ * CardExplicativo "Ligar a lente habitacional") e o link do TourAchados; a
+ * mesma tela virou também um MODAL, aberto de dentro do Dossiê Executivo
+ * (RankingPrioridadeExecutivo → "Carregar Top 50" → ModalDetalhamentoVazios),
+ * sem duplicar lógica — ambos os pontos de entrada renderizam o mesmo
+ * DetalhamentoTerritorialVazios (components/vazios-de-acesso/).
  */
 export function App() {
   return (
@@ -155,10 +166,10 @@ export function App() {
       <Route path="/" element={<PaginaLanding />} />
       <Route element={<LayoutApp />}>
         <Route path="/mapa" element={<PaginaMapa />} />
-        <Route path="/painel-analitico" element={<PainelAnalitico />} />
-        <Route path="/ranking-distribuidoras" element={<PaginaRankingDistribuidoras />} />
+        <Route path="/dossie-executivo" element={<PainelAnalitico />} />
+        <Route path="/visao-setorial" element={<PaginaRankingDistribuidoras />} />
         <Route path="/vazios-de-acesso" element={<PaginaVaziosDeAcesso />} />
-        <Route path="/status-dados" element={<PaginaStatusDados />} />
+        <Route path="/base-de-evidencias" element={<PaginaStatusDados />} />
         <Route path="/login" element={<PaginaLogin />} />
         <Route
           path="/colaborador"

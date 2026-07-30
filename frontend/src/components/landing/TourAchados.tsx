@@ -344,7 +344,7 @@ export function TourAchados({
             Explorar o mapa
           </Link>
           <Link
-            to="/painel-analitico"
+            to="/dossie-executivo"
             className="rounded-lg border border-stone-600 px-4 py-2 text-center text-xs font-bold text-white transition-colors hover:bg-stone-800"
           >
             Gráfico de Quadrantes
@@ -353,7 +353,7 @@ export function TourAchados({
             to="/vazios-de-acesso"
             className="rounded-lg border border-stone-600 px-4 py-2 text-center text-xs font-bold text-white transition-colors hover:bg-stone-800"
           >
-            Ranking de Vazios de Acesso
+            Detalhamento de Vazios de Acesso
           </Link>
         </div>
       </div>
