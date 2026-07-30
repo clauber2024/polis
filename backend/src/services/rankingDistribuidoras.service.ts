@@ -204,8 +204,9 @@ export interface DistribuidoraRanking {
 /** Resumo nacional para os cards de manchete (30/07/2026) - todos os campos são derivados de dado real, nunca fabricados. */
 export interface ResumoNacionalFriccao {
   mediaNacionalPctForaDoPrazo: number;
-  benchmarkMelhorDesempenho: { distribuidora: string; pctForaDoPrazo: number };
-  piorDesempenho: { distribuidora: string; pctForaDoPrazo: number };
+  /** `empatados` = quantas distribuidoras compartilham exatamente esse valor extremo — 1 = sem empate. */
+  benchmarkMelhorDesempenho: { distribuidora: string; pctForaDoPrazo: number; empatados: number };
+  piorDesempenho: { distribuidora: string; pctForaDoPrazo: number; empatados: number };
   /** null quando o benchmark tem 0% fora do prazo (divisão por zero) - nesse caso use os campos em pontos percentuais. */
   multiplicadorPiorSobreBenchmark: number | null;
   /** % dos pedidos fora do prazo nacionais (entre distribuidoras com prazo confiável) que pertencem às 5 primeiras posições do ranking. */
@@ -331,14 +332,29 @@ export async function calcularRankingDistribuidoras(): Promise<RankingDistribuid
     const pior = comPrazo.reduce((piorAtual, b) => (b.pctForaDoPrazo > piorAtual.pctForaDoPrazo ? b : piorAtual));
     benchmarkPctForaDoPrazo = benchmark.pctForaDoPrazo;
 
+    // Empates no valor extremo (30/07/2026, checado ao vivo contra o deploy em
+    // produção após pergunta do usuário sobre um benchmark de 0%: 3
+    // distribuidoras diferentes empatam em 0% fora do prazo no dado real).
+    // `.reduce` escolhe UMA arbitrariamente (a primeira, na ordem alfabética
+    // do SELECT) sem avisar que existe empate — nomear só ela como "A
+    // referência do setor" seria enganoso. `empatados` deixa isso explícito
+    // pro texto de manchete, sem esconder a existência do empate.
+    const empatadosNoBenchmark = comPrazo.filter((b) => b.pctForaDoPrazo === benchmark.pctForaDoPrazo).length;
+    const empatadosNoPior = comPrazo.filter((b) => b.pctForaDoPrazo === pior.pctForaDoPrazo).length;
+
     if (mediaNacionalPctForaDoPrazo !== null) {
       resumoNacional = {
         mediaNacionalPctForaDoPrazo,
         benchmarkMelhorDesempenho: {
           distribuidora: benchmark.linha.distribuidora,
           pctForaDoPrazo: benchmark.pctForaDoPrazo,
+          empatados: empatadosNoBenchmark,
         },
-        piorDesempenho: { distribuidora: pior.linha.distribuidora, pctForaDoPrazo: pior.pctForaDoPrazo },
+        piorDesempenho: {
+          distribuidora: pior.linha.distribuidora,
+          pctForaDoPrazo: pior.pctForaDoPrazo,
+          empatados: empatadosNoPior,
+        },
         multiplicadorPiorSobreBenchmark:
           benchmark.pctForaDoPrazo > 0 ? pior.pctForaDoPrazo / benchmark.pctForaDoPrazo : null,
         percentualDosPedidosForaDoPrazoNoTop5: null, // preenchido no passo 4, depois do ranking ordenado existir

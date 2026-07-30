@@ -528,8 +528,9 @@ export interface DistribuidoraRanking {
 /** Espelho de ResumoNacionalFriccao (GET /api/ranking-distribuidoras) — dados reais para os cards de manchete. */
 export interface ResumoNacionalFriccao {
   mediaNacionalPctForaDoPrazo: number;
-  benchmarkMelhorDesempenho: { distribuidora: string; pctForaDoPrazo: number };
-  piorDesempenho: { distribuidora: string; pctForaDoPrazo: number };
+  /** `empatados` = quantas distribuidoras compartilham exatamente esse valor extremo — 1 = sem empate. */
+  benchmarkMelhorDesempenho: { distribuidora: string; pctForaDoPrazo: number; empatados: number };
+  piorDesempenho: { distribuidora: string; pctForaDoPrazo: number; empatados: number };
   /** null quando o benchmark tem 0% fora do prazo (divisão por zero) — use os campos em pontos percentuais nesse caso. */
   multiplicadorPiorSobreBenchmark: number | null;
   percentualDosPedidosForaDoPrazoNoTop5: number | null;
