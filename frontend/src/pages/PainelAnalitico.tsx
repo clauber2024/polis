@@ -18,6 +18,10 @@ import {
   type VaziosDeAcessoCompleto,
 } from '../services/vaziosDeAcesso.service';
 import { GraficoQuadrantes } from '../components/painel-analitico/GraficoQuadrantes';
+import { GraficoRegional } from '../components/painel-analitico/GraficoRegional';
+import { RankingPrioridadeExecutivo } from '../components/painel-analitico/RankingPrioridadeExecutivo';
+import { FunilExclusaoHabitacional } from '../components/painel-analitico/FunilExclusaoHabitacional';
+import { TreemapProporcaoNacional } from '../components/painel-analitico/TreemapProporcaoNacional';
 import type {
   MediasMunicipios,
   MunicipioClassificado,
@@ -350,6 +354,13 @@ export function PainelAnalitico() {
   const [carregandoQuadrantes, setCarregandoQuadrantes] = useState(false);
   const [erroQuadrantes, setErroQuadrantes] = useState<string | null>(null);
 
+  // Visão Executiva (default) x Visão Exploratória (30/07/2026, decisão do
+  // usuário): a Executiva (GraficoRegional, agregado por região) responde
+  // "onde priorizar" em segundos; a Exploratória (GraficoQuadrantes, scatter
+  // de eixos livres) é o laboratório técnico, rebaixado a aba secundária —
+  // ver docstring de GraficoQuadrantes.tsx.
+  const [abaLaboratorio, setAbaLaboratorio] = useState<'executiva' | 'exploratoria'>('executiva');
+
   function carregarQuadrantesNacionais() {
     if (quadrantesNacionais || carregandoQuadrantes) return;
     setCarregandoQuadrantes(true);
@@ -403,26 +414,50 @@ export function PainelAnalitico() {
           analítico da tela (feedback do usuário, 27/07/2026 — antes ficava
           rebaixado a uma caixa secundária no fim da página). */}
       <section className="mt-6 rounded-2xl bg-white/70 p-8 shadow-lg shadow-stone-200/50 ring-1 ring-stone-900/5 backdrop-blur-xl">
-        <h2 className="text-lg font-black tracking-tight text-stone-900">
-          Laboratório multidimensional
-        </h2>
+        <h2 className="text-lg font-black tracking-tight text-stone-900">Onde priorizar</h2>
         <p className="mt-1 max-w-2xl text-sm text-stone-500">
-          Cruze qualquer par entre 7 indicadores dos ~5,5 mil municípios do país. O padrão é a
-          Matriz oficial de Vazios de Acesso (irradiação solar × adoção residencial de MMGD per
-          capita, medianas nacionais) — mude os eixos abaixo para explorar outros cruzamentos
-          (ex.: renda × tarifa, IVSH × potencial solar); a cor de cada ponto continua sendo sempre
-          a classificação oficial.
+          Composição de Vazios de Acesso nos ~5,5 mil municípios do país, por região — a Visão
+          Executiva responde "onde priorizar" sem exigir nenhuma escolha. Quem quiser cruzar
+          indicadores livremente (ex.: renda × tarifa, IVSH × potencial solar) encontra o
+          laboratório técnico na aba Visão Exploratória.
         </p>
+
+        {quadrantesNacionais && (
+          <div className="mt-6 flex gap-1 rounded-lg bg-stone-100 p-1">
+            <button
+              type="button"
+              onClick={() => setAbaLaboratorio('executiva')}
+              className={`flex-1 rounded-md py-2 text-xs font-bold transition-all ${
+                abaLaboratorio === 'executiva'
+                  ? 'bg-white text-stone-900 shadow-sm'
+                  : 'text-stone-500 hover:text-stone-800'
+              }`}
+            >
+              Visão Executiva
+            </button>
+            <button
+              type="button"
+              onClick={() => setAbaLaboratorio('exploratoria')}
+              className={`flex-1 rounded-md py-2 text-xs font-bold transition-all ${
+                abaLaboratorio === 'exploratoria'
+                  ? 'bg-white text-stone-900 shadow-sm'
+                  : 'text-stone-500 hover:text-stone-800'
+              }`}
+            >
+              Visão Exploratória
+            </button>
+          </div>
+        )}
 
         {!quadrantesNacionais && (
           <div className="mt-6 flex flex-col items-center justify-center rounded-xl border border-dashed border-stone-300 bg-stone-50/50 p-10 text-center">
             <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-stone-200">
               <IconeGrafico className="h-5 w-5 text-stone-400" />
             </div>
-            <h3 className="mb-1 text-sm font-bold text-stone-900">Laboratório pronto para carregar</h3>
+            <h3 className="mb-1 text-sm font-bold text-stone-900">Diagnóstico pronto para carregar</h3>
             <p className="mb-6 max-w-md text-xs font-medium text-stone-500">
-              Carrega os ~5.500 municípios do país com a classificação oficial de Vazio de Acesso —
-              depois é só escolher os eixos que quiser cruzar. Pode levar alguns segundos.
+              Carrega os ~5.500 municípios do país com a classificação oficial de Vazio de Acesso.
+              Pode levar alguns segundos.
             </p>
             <button
               type="button"
@@ -431,15 +466,47 @@ export function PainelAnalitico() {
               className="group relative inline-flex items-center gap-2 rounded-lg bg-red-700 px-6 py-3 font-bold text-white shadow-sm transition-all hover:bg-red-800 focus:ring-2 focus:ring-red-700 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
             >
               <IconePlay className="h-4 w-4 fill-white transition-transform group-hover:scale-110" />
-              {carregandoQuadrantes ? 'Carregando…' : 'Carregar laboratório'}
+              {carregandoQuadrantes ? 'Carregando…' : 'Carregar diagnóstico'}
             </button>
             {erroQuadrantes && <p className="mt-3 text-xs text-red-600">{erroQuadrantes}</p>}
           </div>
         )}
 
         {quadrantesNacionais && (
-          <div className="mt-6 rounded-xl bg-white p-4 ring-1 ring-stone-200">
-            <GraficoQuadrantes dados={quadrantesNacionais} />
+          <div className="mt-4 rounded-xl bg-white p-4 ring-1 ring-stone-200">
+            {abaLaboratorio === 'executiva' ? (
+              <GraficoRegional dados={quadrantesNacionais} />
+            ) : (
+              <GraficoQuadrantes dados={quadrantesNacionais} />
+            )}
+          </div>
+        )}
+
+        {quadrantesNacionais && abaLaboratorio === 'executiva' && (
+          <div className="mt-4 rounded-xl bg-white p-4 ring-1 ring-stone-200">
+            <RankingPrioridadeExecutivo dados={quadrantesNacionais} />
+          </div>
+        )}
+
+        {quadrantesNacionais && abaLaboratorio === 'executiva' && (
+          <div className="mt-4 rounded-xl bg-white p-4 ring-1 ring-stone-200">
+            <h3 className="text-sm font-black tracking-tight text-stone-900">
+              Onde a exclusão escoa
+            </h3>
+            <div className="mt-3">
+              <FunilExclusaoHabitacional dados={quadrantesNacionais} />
+            </div>
+          </div>
+        )}
+
+        {quadrantesNacionais && abaLaboratorio === 'executiva' && (
+          <div className="mt-4 rounded-xl bg-white p-4 ring-1 ring-stone-200">
+            <h3 className="text-sm font-black tracking-tight text-stone-900">
+              Peso da exclusão, não o território
+            </h3>
+            <div className="mt-3">
+              <TreemapProporcaoNacional dados={quadrantesNacionais} />
+            </div>
           </div>
         )}
       </section>

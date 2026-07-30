@@ -52,6 +52,15 @@ function IconeAlerta({ className }: { className?: string }) {
  *
  * SVG próprio, sem lib de gráfico (mesma decisão de GraficoComparacao/
  * GraficoRadar: o stack atual resolve).
+ *
+ * Nível 2 (30/07/2026, decisão do usuário): com ~5.570 pontos, o overplotting
+ * torna a leitura executiva difícil em qualquer par de eixos — por isso este
+ * componente foi rebaixado a aba secundária "Visão Exploratória" em
+ * PainelAnalitico.tsx, voltada a leitura técnica/cruzamento livre. A aba
+ * default "Visão Executiva" (GraficoRegional.tsx, Nível 1: agregação por
+ * região) responde à pergunta rápida "onde priorizar" sem exigir escolha de
+ * eixos. COR_QUADRANTE/ROTULO_FALLBACK/TODOS_QUADRANTES exportados daqui
+ * para os dois componentes nunca divergirem de paleta/rótulo.
  */
 
 type IdEixo =
@@ -139,7 +148,7 @@ const MARGEM = { topo: 28, direita: 20, base: 52, esquerda: 64 };
  * Painel Analítico precisa valer aqui também. Antes era roxo, sem relação
  * com o resto da paleta semântica.
  */
-const COR_QUADRANTE: Record<Quadrante, string> = {
+export const COR_QUADRANTE: Record<Quadrante, string> = {
   vazio_de_acesso: '#b91c1c',
   acesso_pleno: '#059669',
   adocao_acima_do_potencial: '#0284c7',
@@ -163,7 +172,7 @@ const ESTILO_PONTO: Record<Quadrante, { r: number; opacity: number }> = {
 };
 
 /** Fallback de rótulo — o rótulo real vem de quadranteRotulo (backend). */
-const ROTULO_FALLBACK: Record<Quadrante, string> = {
+export const ROTULO_FALLBACK: Record<Quadrante, string> = {
   vazio_de_acesso: 'Vazio de Acesso',
   acesso_pleno: 'Acesso pleno',
   adocao_acima_do_potencial: 'Adoção acima do potencial',
@@ -198,7 +207,7 @@ function percentil(valoresOrdenados: number[], p: number): number {
   return valoresOrdenados[indice];
 }
 
-const TODOS_QUADRANTES: Quadrante[] = [
+export const TODOS_QUADRANTES: Quadrante[] = [
   'vazio_de_acesso',
   'acesso_pleno',
   'adocao_acima_do_potencial',
