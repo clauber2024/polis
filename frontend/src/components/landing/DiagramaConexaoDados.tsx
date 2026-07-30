@@ -119,8 +119,8 @@ const INDICADORES: IndicadorComposto[] = [
   },
   {
     id: 'ranking_distribuidoras',
-    nome: 'Matriz de Desempenho Setorial',
-    descricao: 'Fricção de conexão de MMGD x IVSH, por concessionária',
+    nome: 'Ranking de Fricção e Atrasos (MMGD)',
+    descricao: 'Conexão e prazo ANEEL, por concessionária',
     origens: ['qualidade_fornecimento', 'mmgd'],
     cor: 'chumbo',
   },

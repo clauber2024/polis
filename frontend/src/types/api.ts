@@ -485,10 +485,13 @@ export interface ListarVaziosDeAcessoResultado {
 
 /**
  * Espelho de DistribuidoraRanking (GET /api/ranking-distribuidoras). Ver
- * docs/DECISOES.md, ADR "Ranking público de distribuidoras", para as 3
- * decisões de exibição que moldam este contrato: segregação visual
- * (rankingPrincipal x distribuidorasComDadosIncompletos, nunca a mesma
- * posição ordinal), IVS ponderado por população, nota metodológica fixa.
+ * docstring de rankingDistribuidoras.service.ts (backend) para a metodologia
+ * completa: segregação visual (rankingPrincipal x
+ * distribuidorasComDadosIncompletos, nunca a mesma posição ordinal),
+ * ranking ordenado do PIOR pro melhor (posição 1 = maior fricção), e a
+ * mudança de escopo de 30/07/2026 — a posição usa exclusivamente eixoTecnico
+ * (desempenho regulatório operacional), o IVSH (eixoJustica) é só dado de
+ * contexto e não entra na pontuação.
  */
 export interface DistribuidoraRanking {
   distribuidora: string;
@@ -501,14 +504,35 @@ export interface DistribuidoraRanking {
   prazoConfiavel: boolean;
   /** NULL quando prazoConfiavel = false — NUNCA ler como "0% no prazo". */
   pctDentroDoPrazo: number | null;
+  /** 100 - pctDentroDoPrazo, só quando prazoConfiavel — métrica de falha usada no ranking. */
+  pctForaDoPrazo: number | null;
   nMunicipiosAtendidos: number | null;
   nMunicipiosComIvsh: number | null;
   ivshMedioPonderadoPorPopulacao: number | null;
+  /** Índice Sintético de Fricção — critério que define a posição no ranking. */
   eixoTecnico: number | null;
+  /** IVSH — dado de contexto, NÃO usado na posição do ranking. */
   eixoJustica: number | null;
+  /** Mantido por completude — NÃO usado na posição do ranking. */
   scoreComposto: number | null;
   scoreApenasTecnico: boolean;
+  /** dist.pctForaDoPrazo - média nacional ponderada por volume, em pontos percentuais. Positivo = pior que a média. */
+  desvioPctForaDoPrazoPontosPercentuais: number | null;
+  /** O mesmo desvio, como % relativo à média nacional (ex.: 45 = "45% acima da média"). */
+  desvioPctForaDoPrazoRelativoPercentual: number | null;
+  /** dist.pctForaDoPrazo - benchmark (melhor distribuidora do país), sempre >= 0. */
+  distanciaDoBenchmarkPontosPercentuais: number | null;
   motivosDadosIncompletos: string[];
+}
+
+/** Espelho de ResumoNacionalFriccao (GET /api/ranking-distribuidoras) — dados reais para os cards de manchete. */
+export interface ResumoNacionalFriccao {
+  mediaNacionalPctForaDoPrazo: number;
+  benchmarkMelhorDesempenho: { distribuidora: string; pctForaDoPrazo: number };
+  piorDesempenho: { distribuidora: string; pctForaDoPrazo: number };
+  /** null quando o benchmark tem 0% fora do prazo (divisão por zero) — use os campos em pontos percentuais nesse caso. */
+  multiplicadorPiorSobreBenchmark: number | null;
+  percentualDosPedidosForaDoPrazoNoTop5: number | null;
 }
 
 /** Espelho de RankingDistribuidorasResultado (GET /api/ranking-distribuidoras). */
@@ -522,6 +546,7 @@ export interface RankingDistribuidorasResultado {
   notaMetodologicaJustica: string;
   notaMetodologicaDadosIncompletos: string;
   totalDistribuidoras: number;
+  resumoNacional: ResumoNacionalFriccao | null;
   rankingPrincipal: DistribuidoraRanking[];
   distribuidorasComDadosIncompletos: DistribuidoraRanking[];
 }

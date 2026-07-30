@@ -1,46 +1,60 @@
 /**
- * SERVICE: Ranking público de distribuidoras por desempenho em conexão de
- * MMGD + justiça energética
+ * SERVICE: Ranking de Fricção e Atrasos na Conexão Solar (MMGD)
  * ============================================================================
  * Reimplementação, no backend Node/Express, da metodologia validada em
  * `backend/src/etl/analises/construir_ranking_distribuidoras_conexao_mmgd.py`
- * (PROTÓTIPO DE VALIDAÇÃO — ver ARQUITETURA.md, "Ideia de produto: ranking
- * público de distribuidoras") e nas 3 decisões de exibição/metodologia
- * registradas em `docs/DECISOES.md`, ADR "Ranking público de distribuidoras
- * — exibição, ponderação e nota metodológica" (10/07/2026).
+ * (PROTÓTIPO DE VALIDAÇÃO) e nas 3 decisões de exibição/metodologia
+ * registradas no histórico de decisões técnicas do projeto (10/07/2026).
  *
- * EIXO TÉCNICO: lido diretamente de `desempenho_conexao_distribuidoras`
- * (persistido por `backend/src/etl/loaders/extrair_desempenho_conexao_mmgd.py`
- * — resumo nacional por distribuidora, com `sig_agente_indqual` já resolvido
- * pelo crosswalk). NUNCA trata `pct_dentro_do_prazo IS NULL` (quando
- * `prazo_confiavel = false`) como "0% no prazo" — ver ARQUITETURA.md,
- * "ACHADO CRITICO PARA ESTE PRODUTO".
+ * EIXO TÉCNICO (ÍNDICE SINTÉTICO DE FRICÇÃO): lido diretamente de
+ * `desempenho_conexao_distribuidoras` (persistido por
+ * `backend/src/etl/loaders/extrair_desempenho_conexao_mmgd.py` — resumo
+ * nacional por distribuidora, com `sig_agente_indqual` já resolvido pelo
+ * crosswalk). NUNCA trata `pct_dentro_do_prazo IS NULL` (quando
+ * `prazo_confiavel = false`) como "0% no prazo" — é ausência de dado, não
+ * desempenho ruim.
  *
- * EIXO JUSTIÇA ENERGÉTICA: IVSH médio dos municípios atendidos pela
- * distribuidora, PONDERADO POR POPULAÇÃO ESTIMADA (decisão do ADR, item 2 —
- * antes era média simples no protótipo). Município com área de concessão
- * dividida (mais de uma distribuidora no schema INDQUAL) fica de fora —
- * atribuição ambígua, mesmo critério já usado no protótipo
- * (`investigar_distribuidora_regioes_problema.py`, prefixo "MULTIPLA(...)").
- * População estimada = densidade populacional x área (mesmo método já usado
- * em `vaziosDeAcesso.service.ts` e no RF-005 — o Atlas não guarda população
- * absoluta).
+ * EIXO JUSTIÇA (IVSH): IVSH médio dos municípios atendidos pela distribuidora,
+ * ponderado por população estimada. Município com área de concessão dividida
+ * (mais de uma distribuidora no schema INDQUAL) fica de fora — atribuição
+ * ambígua. Ainda calculado e devolvido pela API (dado de contexto), mas
+ * DESDE 30/07/2026 não determina mais a posição no ranking público — ver
+ * "MUDANÇA DE ESCOPO" abaixo.
  *
- * CORREÇÃO DE ESCOPO (30/07/2026, pedido do usuário — reposicionamento da
- * página de "Ranking de distribuidoras" para "Matriz de Desempenho Setorial"):
- * o eixo de justiça passou de IVS para IVSH (`vw_ivsh_consolidado`, migration
- * 0028) — o IVS geral (`vw_ivs_consolidado`) exclui moradia de propósito (ver
- * docstring da migration 0028), então não capturava vulnerabilidade
- * habitacional na leitura de "onde a fricção de conexão dói mais". IVSH já é
- * uma view materializada e validada (5.573 municípios, ver Estado Real do
- * Projeto em CLAUDE.md) — troca de fonte, não invenção de indicador novo.
+ * MUDANÇA DE ESCOPO (30/07/2026, pedido explícito do usuário — pivô de
+ * posicionamento de produto, reversão da tentativa anterior no mesmo dia de
+ * suavizar o tom para "Matriz de Desempenho Setorial"): a página volta a ser
+ * um ranking de accountability/pressão pública ("Ranking de Fricção e
+ * Atrasos na Conexão Solar"), com posição ordinal explícita e destaque para
+ * as piores distribuidoras. Para blindar contra contestação jurídica
+ * (justificativa do próprio usuário), o critério de posição passou a ser
+ * ESTRITAMENTE o desempenho regulatório operacional (eixoTecnico: conexão +
+ * prazo ANEEL) — o IVSH deixou de ser usado na posição/pontuação para que
+ * nenhuma distribuidora possa alegar que a vulnerabilidade socioeconômica da
+ * sua área de concessão "explica" um mau desempenho técnico. Consequência
+ * direta: o critério de entrada no `rankingPrincipal` também mudou — antes
+ * exigia os dois eixos disponíveis, agora exige só `prazoConfiavel` (só isso
+ * é necessário pra comparar "% fora do prazo" de forma justa).
  *
- * SEGREGAÇÃO VISUAL (ADR, item 1): distribuidoras com os dois eixos
- * disponíveis E prazo confiável entram em `rankingPrincipal` (ordenado por
- * score composto, menor = melhor). As demais (sem par no INDQUAL, ou com
- * `prazo_confiavel = false`) entram em `distribuidorasComDadosIncompletos`,
- * cada uma com `motivosDadosIncompletos` explícito — nunca competem pela
- * mesma posição ordinal do ranking principal.
+ * SEGREGAÇÃO (mantida, só o critério mudou): distribuidoras com prazo
+ * confiável entram em `rankingPrincipal`, ORDENADO DO PIOR PARA O MELHOR
+ * (posição 1 = maior fricção — é um ranking de accountability, não uma
+ * lista neutra). As demais (sem dado confiável de prazo) entram em
+ * `distribuidorasComDadosIncompletos`, cada uma com `motivosDadosIncompletos`
+ * explícito — nunca competem pela mesma posição ordinal do ranking
+ * principal, mesma lógica que protege contra contestação jurídica de dado
+ * incompleto sendo usado contra uma distribuidora.
+ *
+ * COMPARATIVOS (mesma sessão, pedido complementar do usuário — "métricas de
+ * desvio comparativo"): `resumoNacional` e os campos de desvio por
+ * distribuidora usam SEMPRE `% fora do prazo` (100 - pctDentroDoPrazo) como
+ * base, só entre distribuidoras com prazo confiável (mesmo motivo de nunca
+ * deixar dado ausente contaminar um agregado nacional). A média nacional é
+ * PONDERADA POR VOLUME de pedidos (não é média simples entre distribuidoras)
+ * — uma distribuidora com poucos pedidos não pesa igual a uma com milhares.
+ * O multiplicador "pior / benchmark" fica `null` quando o benchmark é
+ * exatamente 0% fora do prazo (divisão por zero) — nesse caso só os campos
+ * em pontos percentuais continuam válidos.
  * ============================================================================
  */
 
@@ -68,11 +82,11 @@ const LIMIAR_AMOSTRA_PEQUENA = 1000;
 /**
  * Município -> distribuidora vem do schema INDQUAL (qualidade_conjuntos /
  * qualidade_conjunto_municipio, ver backend/src/etl/schema_qualidade.sql),
- * juntado com IVS + população estimada (vw_indicadores_sociais_consolidado +
- * municipios.area_km2, mesma CTE de vaziosDeAcesso.service.ts). Ponderação
- * por população só entre municípios com IVS calculável (município sem IVS
- * não entra no numerador nem no denominador — não pode puxar a média para
- * um valor arbitrário).
+ * juntado com IVSH + população estimada (vw_ivsh_consolidado +
+ * vw_indicadores_sociais_consolidado + municipios.area_km2, mesma CTE de
+ * vaziosDeAcesso.service.ts). Ponderação por população só entre municípios
+ * com IVSH calculável (município sem IVSH não entra no numerador nem no
+ * denominador — não pode puxar a média para um valor arbitrário).
  */
 async function buscarPainelBruto(): Promise<LinhaBruta[]> {
   const resultado = await db.execute(sql`
@@ -166,33 +180,57 @@ export interface DistribuidoraRanking {
   pctConectado: number;
   prazoConfiavel: boolean;
   pctDentroDoPrazo: number | null;
+  /** 100 - pctDentroDoPrazo, só quando prazoConfiavel - métrica de falha usada no ranking e nos comparativos. */
+  pctForaDoPrazo: number | null;
   nMunicipiosAtendidos: number | null;
   nMunicipiosComIvsh: number | null;
   ivshMedioPonderadoPorPopulacao: number | null;
+  /** Índice Sintético de Fricção - critério que define a posição no ranking (ver docstring do arquivo). */
   eixoTecnico: number | null;
+  /** IVSH - dado de contexto, NÃO usado na posição do ranking desde 30/07/2026. */
   eixoJustica: number | null;
+  /** Mantido por completude - NÃO usado na posição do ranking desde 30/07/2026 (ver eixoTecnico). */
   scoreComposto: number | null;
   scoreApenasTecnico: boolean;
+  /** dist.pctForaDoPrazo - média nacional ponderada por volume, em pontos percentuais. Positivo = pior que a média. */
+  desvioPctForaDoPrazoPontosPercentuais: number | null;
+  /** O mesmo desvio, como % relativo à média nacional (ex.: 45 = "45% acima da média"). */
+  desvioPctForaDoPrazoRelativoPercentual: number | null;
+  /** dist.pctForaDoPrazo - benchmark (melhor distribuidora do país), sempre >= 0. */
+  distanciaDoBenchmarkPontosPercentuais: number | null;
   motivosDadosIncompletos: string[];
 }
 
+/** Resumo nacional para os cards de manchete (30/07/2026) - todos os campos são derivados de dado real, nunca fabricados. */
+export interface ResumoNacionalFriccao {
+  mediaNacionalPctForaDoPrazo: number;
+  benchmarkMelhorDesempenho: { distribuidora: string; pctForaDoPrazo: number };
+  piorDesempenho: { distribuidora: string; pctForaDoPrazo: number };
+  /** null quando o benchmark tem 0% fora do prazo (divisão por zero) - nesse caso use os campos em pontos percentuais. */
+  multiplicadorPiorSobreBenchmark: number | null;
+  /** % dos pedidos fora do prazo nacionais (entre distribuidoras com prazo confiável) que pertencem às 5 primeiras posições do ranking. */
+  percentualDosPedidosForaDoPrazoNoTop5: number | null;
+}
+
+/**
+ * Texto INSTITUCIONAL, exibido diretamente ao usuário final — nunca
+ * referenciar arquivo, caminho de código ou histórico de decisão técnica
+ * aqui (30/07/2026, correção de bug real: uma versão anterior citava
+ * arquivos de documentação literalmente neste texto, vazando artefato de
+ * desenvolvimento para o usuário final).
+ */
 const NOTA_METODOLOGICA_JUSTICA =
-  'O eixo de justiça energética é o IVSH (Índice de Vulnerabilidade Sócio-Habitacional-' +
-  'Energética) médio dos municípios atendidos por cada distribuidora, ponderado por ' +
-  'população estimada. Um índice de fricção ruim aqui pode refletir o perfil ' +
-  'socio-habitacional da região atendida (ex.: estados do Nordeste têm IVSH ' +
-  'estruturalmente mais alto/pior no país), não necessariamente desempenho operacional ' +
-  'isolado da concessionária — isso é especialmente relevante para as subsidiárias do ' +
-  'Grupo Equatorial fora de Goiás (MA, PI, AL, PA), concentradas na metade de maior ' +
-  'fricção: parte disso é vulnerabilidade social regional, não só operação. Ver ' +
-  'ARQUITETURA.md, "Ideia de produto: ranking público de distribuidoras", e ' +
-  'docs/DECISOES.md para o histórico completo desta decisão.';
+  'O IVSH (Índice de Vulnerabilidade Sócio-Habitacional-Energética) médio dos municípios ' +
+  'atendidos por cada concessionária é calculado e disponibilizado como dado de contexto, ' +
+  'mas não influencia a posição no ranking de fricção abaixo. A posição é determinada ' +
+  'exclusivamente pelo desempenho regulatório operacional (taxa de conexão e cumprimento ' +
+  'de prazo da ANEEL) — vulnerabilidade socioeconômica da região atendida não é considerada ' +
+  'justificativa para atraso ou barreira de conexão.';
 
 const NOTA_METODOLOGICA_DADOS_INCOMPLETOS =
-  'Distribuidoras nesta seção têm dado insuficiente para compor o ranking principal: ' +
-  'ou não têm par encontrado no schema de Qualidade de Fornecimento da ANEEL (sem eixo ' +
-  'de justiça energética), ou o campo de prazo regulatório (DatLim) está praticamente ' +
-  'ausente na fonte (sem eixo de prazo confiável). NUNCA leia a ausência de ' +
+  'Distribuidoras nesta seção têm o campo de prazo regulatório (DatLim) praticamente ' +
+  'ausente na fonte ANEEL — não podem ser comparadas de forma justa em "% fora do prazo" e, ' +
+  'por isso, não competem pela mesma posição do ranking principal. NUNCA leia a ausência de ' +
   'pctDentroDoPrazo como "0% no prazo" — é um vazio de dado, não desempenho ruim.';
 
 export interface RankingDistribuidorasResultado {
@@ -205,8 +243,24 @@ export interface RankingDistribuidorasResultado {
   notaMetodologicaJustica: string;
   notaMetodologicaDadosIncompletos: string;
   totalDistribuidoras: number;
+  /** null só quando não há nenhuma distribuidora com prazo confiável (caso degenerado, nunca visto na prática). */
+  resumoNacional: ResumoNacionalFriccao | null;
   rankingPrincipal: DistribuidoraRanking[];
   distribuidorasComDadosIncompletos: DistribuidoraRanking[];
+}
+
+interface BaseCalculada {
+  linha: LinhaBruta;
+  eixoTecnico: number | null;
+  eixoJustica: number | null;
+  scoreComposto: number | null;
+  scoreApenasTecnico: boolean;
+  pctForaDoPrazo: number | null;
+  motivosDadosIncompletos: string[];
+}
+
+interface BaseComPrazo extends BaseCalculada {
+  pctForaDoPrazo: number;
 }
 
 export async function calcularRankingDistribuidoras(): Promise<RankingDistribuidorasResultado> {
@@ -220,13 +274,14 @@ export async function calcularRankingDistribuidoras(): Promise<RankingDistribuid
   );
   const eixoPrazoNorm = normalizarMinMax(basePrazo);
 
-  const distribuidoras: DistribuidoraRanking[] = linhas.map((linha, i) => {
+  // Passo 1: eixos + pctForaDoPrazo por distribuidora. Os campos de desvio
+  // comparativo (média nacional, benchmark) dependem deste array inteiro já
+  // calculado, então entram só no passo 3.
+  const base: BaseCalculada[] = linhas.map((linha, i) => {
     const conectadoNorm = eixoConectadoNorm[i];
     const prazoNorm = eixoPrazoNorm[i];
 
-    const componentesTecnico = [conectadoNorm, prazoNorm].filter(
-      (v): v is number => v !== null,
-    );
+    const componentesTecnico = [conectadoNorm, prazoNorm].filter((v): v is number => v !== null);
     const eixoTecnico =
       componentesTecnico.length > 0
         ? componentesTecnico.reduce((a, b) => a + b, 0) / componentesTecnico.length
@@ -235,27 +290,75 @@ export async function calcularRankingDistribuidoras(): Promise<RankingDistribuid
     const eixoJustica = linha.ivshMedioPonderadoPorPopulacao;
     const scoreApenasTecnico = eixoJustica === null;
 
-    const componentesScore = [eixoTecnico, eixoJustica].filter(
-      (v): v is number => v !== null,
-    );
+    const componentesScore = [eixoTecnico, eixoJustica].filter((v): v is number => v !== null);
     const scoreComposto =
       componentesScore.length > 0
         ? componentesScore.reduce((a, b) => a + b, 0) / componentesScore.length
         : null;
 
+    const pctForaDoPrazo =
+      linha.prazoConfiavel && linha.pctDentroDoPrazo !== null ? 100 - linha.pctDentroDoPrazo : null;
+
     const motivosDadosIncompletos: string[] = [];
     if (!linha.prazoConfiavel) {
       motivosDadosIncompletos.push(
-        'Prazo regulatório (DatLim) praticamente ausente na fonte ANEEL para esta distribuidora — eixo técnico usa só a taxa de conexão.',
+        'Prazo regulatório (DatLim) praticamente ausente na fonte ANEEL para esta distribuidora — sem dado confiável de atraso de conexão.',
       );
     }
-    if (scoreApenasTecnico) {
-      motivosDadosIncompletos.push(
-        linha.sigAgenteIndqual === null
-          ? 'Sem par encontrado no schema de Qualidade de Fornecimento (INDQUAL) — sem eixo de justiça energética.'
-          : 'Par encontrado no INDQUAL, mas nenhum município atendido tem IVS calculável — sem eixo de justiça energética.',
-      );
+
+    return { linha, eixoTecnico, eixoJustica, scoreComposto, scoreApenasTecnico, pctForaDoPrazo, motivosDadosIncompletos };
+  });
+
+  // Passo 2: média nacional (ponderada por volume de pedidos) e benchmark de
+  // melhor desempenho — só entre distribuidoras com prazo confiável, mesmo
+  // critério já usado para não deixar dado ausente contaminar um agregado.
+  const comPrazo: BaseComPrazo[] = base.filter(
+    (b): b is BaseComPrazo => b.linha.prazoConfiavel && b.pctForaDoPrazo !== null,
+  );
+
+  let mediaNacionalPctForaDoPrazo: number | null = null;
+  let benchmarkPctForaDoPrazo: number | null = null;
+  let resumoNacional: ResumoNacionalFriccao | null = null;
+
+  if (comPrazo.length > 0) {
+    const totalPedidos = comPrazo.reduce((soma, b) => soma + b.linha.nPedidos, 0);
+    mediaNacionalPctForaDoPrazo =
+      totalPedidos > 0
+        ? comPrazo.reduce((soma, b) => soma + b.linha.nPedidos * b.pctForaDoPrazo, 0) / totalPedidos
+        : null;
+
+    const benchmark = comPrazo.reduce((melhor, b) => (b.pctForaDoPrazo < melhor.pctForaDoPrazo ? b : melhor));
+    const pior = comPrazo.reduce((piorAtual, b) => (b.pctForaDoPrazo > piorAtual.pctForaDoPrazo ? b : piorAtual));
+    benchmarkPctForaDoPrazo = benchmark.pctForaDoPrazo;
+
+    if (mediaNacionalPctForaDoPrazo !== null) {
+      resumoNacional = {
+        mediaNacionalPctForaDoPrazo,
+        benchmarkMelhorDesempenho: {
+          distribuidora: benchmark.linha.distribuidora,
+          pctForaDoPrazo: benchmark.pctForaDoPrazo,
+        },
+        piorDesempenho: { distribuidora: pior.linha.distribuidora, pctForaDoPrazo: pior.pctForaDoPrazo },
+        multiplicadorPiorSobreBenchmark:
+          benchmark.pctForaDoPrazo > 0 ? pior.pctForaDoPrazo / benchmark.pctForaDoPrazo : null,
+        percentualDosPedidosForaDoPrazoNoTop5: null, // preenchido no passo 4, depois do ranking ordenado existir
+      };
     }
+  }
+
+  // Passo 3: campos de desvio por distribuidora, agora que média/benchmark existem.
+  const distribuidoras: DistribuidoraRanking[] = base.map((b) => {
+    const { linha } = b;
+    const desvioPontosPercentuais =
+      b.pctForaDoPrazo !== null && mediaNacionalPctForaDoPrazo !== null
+        ? b.pctForaDoPrazo - mediaNacionalPctForaDoPrazo
+        : null;
+    const desvioRelativo =
+      desvioPontosPercentuais !== null && mediaNacionalPctForaDoPrazo !== null && mediaNacionalPctForaDoPrazo > 0
+        ? (desvioPontosPercentuais / mediaNacionalPctForaDoPrazo) * 100
+        : null;
+    const distanciaBenchmark =
+      b.pctForaDoPrazo !== null && benchmarkPctForaDoPrazo !== null ? b.pctForaDoPrazo - benchmarkPctForaDoPrazo : null;
 
     return {
       distribuidora: linha.distribuidora,
@@ -267,41 +370,62 @@ export async function calcularRankingDistribuidoras(): Promise<RankingDistribuid
       pctConectado: linha.pctConectado,
       prazoConfiavel: linha.prazoConfiavel,
       pctDentroDoPrazo: linha.pctDentroDoPrazo,
+      pctForaDoPrazo: b.pctForaDoPrazo,
       nMunicipiosAtendidos: linha.nMunicipiosAtendidos,
       nMunicipiosComIvsh: linha.nMunicipiosComIvsh,
       ivshMedioPonderadoPorPopulacao: linha.ivshMedioPonderadoPorPopulacao,
-      eixoTecnico,
-      eixoJustica,
-      scoreComposto,
-      scoreApenasTecnico,
-      motivosDadosIncompletos,
+      eixoTecnico: b.eixoTecnico,
+      eixoJustica: b.eixoJustica,
+      scoreComposto: b.scoreComposto,
+      scoreApenasTecnico: b.scoreApenasTecnico,
+      desvioPctForaDoPrazoPontosPercentuais: desvioPontosPercentuais,
+      desvioPctForaDoPrazoRelativoPercentual: desvioRelativo,
+      distanciaDoBenchmarkPontosPercentuais: distanciaBenchmark,
+      motivosDadosIncompletos: b.motivosDadosIncompletos,
     };
   });
 
-  // Segregação visual (ADR item 1): só entra no ranking principal quem tem
-  // os dois eixos E prazo confiável - nunca compete pela mesma posição
-  // ordinal de quem tem dado incompleto.
+  // Segregação (30/07/2026, correção de escopo - accountability): único
+  // critério de entrada no ranking principal agora é ter prazo confiável -
+  // é o único requisito pra comparar "% fora do prazo" de forma justa, já
+  // que o IVSH não participa mais da posição. Ordenado do PIOR pro melhor
+  // (posição 1 = maior fricção) - ranking de accountability, não lista neutra.
   const rankingPrincipal = distribuidoras
-    .filter((d) => d.prazoConfiavel && !d.scoreApenasTecnico)
-    .sort((a, b) => (a.scoreComposto ?? Infinity) - (b.scoreComposto ?? Infinity));
+    .filter((d) => d.prazoConfiavel)
+    .sort((a, b) => (b.eixoTecnico ?? -Infinity) - (a.eixoTecnico ?? -Infinity));
 
   const distribuidorasComDadosIncompletos = distribuidoras
-    .filter((d) => !d.prazoConfiavel || d.scoreApenasTecnico)
+    .filter((d) => !d.prazoConfiavel)
     .sort((a, b) => (a.eixoTecnico ?? Infinity) - (b.eixoTecnico ?? Infinity));
+
+  // Passo 4: quanto os 5 primeiros do ranking (já ordenado) concentram do
+  // total nacional de pedidos fora do prazo - calculado sobre a MESMA ordem
+  // exibida na tela, não uma ordenação paralela por pctForaDoPrazo bruto.
+  if (resumoNacional) {
+    const top5 = rankingPrincipal.slice(0, 5);
+    const somaForaDoPrazoTop5 = top5.reduce(
+      (soma, d) => soma + (d.pctForaDoPrazo !== null ? (d.nPedidos * d.pctForaDoPrazo) / 100 : 0),
+      0,
+    );
+    const somaForaDoPrazoTotal = comPrazo.reduce((soma, b) => soma + (b.linha.nPedidos * b.pctForaDoPrazo) / 100, 0);
+    resumoNacional.percentualDosPedidosForaDoPrazoNoTop5 =
+      somaForaDoPrazoTotal > 0 ? (somaForaDoPrazoTop5 / somaForaDoPrazoTotal) * 100 : null;
+  }
 
   return {
     metodologia: {
       eixoTecnico:
-        'Média de (1 - % conectado) e (1 - % dentro do prazo), normalizados min-max entre distribuidoras (0 = melhor, 1 = pior). Distribuidoras sem prazo confiável usam só a taxa de conexão.',
+        'Índice Sintético de Fricção: média de (1 - % conectado) e (1 - % dentro do prazo), normalizados min-max entre distribuidoras (0 = melhor, 1 = pior/mais fricção). É o critério que define a posição no ranking. Distribuidoras sem prazo confiável não entram no ranking principal (ver distribuidorasComDadosIncompletos).',
       eixoJustica:
-        'IVSH médio dos municípios atendidos, ponderado por população estimada (densidade x área) — 0 = melhor, 1 = pior, mesma escala do IVSH Consolidado (IVS + precariedade habitacional + insegurança da posse).',
+        'IVSH médio dos municípios atendidos, ponderado por população estimada — mantido na API como dado de contexto socioeconômico, mas NÃO utilizado na posição deste ranking.',
       composicaoScore:
-        'Média simples dos dois eixos, só quando ambos disponíveis (scoreApenasTecnico marca quando falta o eixo de justiça).',
+        'scoreComposto (média de eixoTecnico e eixoJustica) é mantido na API por completude, mas não determina a posição no ranking — a posição usa exclusivamente eixoTecnico.',
       limiarAmostraPequena: LIMIAR_AMOSTRA_PEQUENA,
     },
     notaMetodologicaJustica: NOTA_METODOLOGICA_JUSTICA,
     notaMetodologicaDadosIncompletos: NOTA_METODOLOGICA_DADOS_INCOMPLETOS,
     totalDistribuidoras: distribuidoras.length,
+    resumoNacional,
     rankingPrincipal,
     distribuidorasComDadosIncompletos,
   };
