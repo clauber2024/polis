@@ -13,7 +13,8 @@ import { PainelRanking } from '../components/mapa/PainelRanking';
 import { SeletorIndicador } from '../components/mapa/SeletorIndicador';
 import { buscarGeoJsonNacional } from '../services/municipios.service';
 import { buscarEstadosGeoJson } from '../services/estados.service';
-import type { EstadosGeoJson } from '../types/api';
+import { buscarMediasMunicipios } from '../services/comparacao.service';
+import type { EstadosGeoJson, MediasMunicipios } from '../types/api';
 import {
   buscarTodosVaziosDeAcesso,
   type VaziosDeAcessoCompleto,
@@ -120,6 +121,12 @@ export function PaginaMapa() {
   const [vazios, setVazios] = useState<VaziosDeAcessoCompleto | null>(null);
   const [carregandoVazios, setCarregandoVazios] = useState(false);
   const [erroVazios, setErroVazios] = useState<string | null>(null);
+  // Médias nacionais de referência (auditoria de UX/UI, 30/07/2026) — mesmo
+  // endpoint/contrato já usado pelo Painel Analítico (RF-049/050), reaproveitado
+  // aqui só para contextualizar a Ficha do Município (IndicadorComparativo).
+  // Fetch lazy, mesmo padrão/gatilho de garantirVaziosCarregados abaixo.
+  const [mediasNacionais, setMediasNacionais] = useState<MediasMunicipios | null>(null);
+  const [carregandoMediasNacionais, setCarregandoMediasNacionais] = useState(false);
 
   const [municipioSelecionado, setMunicipioSelecionado] =
     useState<MunicipioComIndicadores | null>(null);
@@ -235,6 +242,22 @@ export function PaginaMapa() {
   useEffect(() => {
     if (municipioSelecionado) garantirVaziosCarregados();
   }, [municipioSelecionado]);
+
+  // Mesmo gatilho acima, mas para as médias nacionais do IndicadorComparativo
+  // (fetch independente — não faz parte da classificação de Vazios de
+  // Acesso). `if (mediasNacionais || carregandoMediasNacionais) return`
+  // garante idempotência, mesmo padrão de garantirVaziosCarregados.
+  useEffect(() => {
+    if (!municipioSelecionado || mediasNacionais || carregandoMediasNacionais) return;
+    setCarregandoMediasNacionais(true);
+    buscarMediasMunicipios()
+      .then(setMediasNacionais)
+      .catch(() => {
+        // Falha aqui não bloqueia o painel — os indicadores só voltam a
+        // exibir o valor bruto, sem o termômetro de comparação.
+      })
+      .finally(() => setCarregandoMediasNacionais(false));
+  }, [municipioSelecionado, mediasNacionais, carregandoMediasNacionais]);
 
   const quebras = useMemo(() => {
     if (!dados) return [];
@@ -681,6 +704,7 @@ export function PaginaMapa() {
                 ?.alertaDeficitCredito ?? false
             }
             periodoReferenciaLenteDeficitCredito={vazios?.periodoReferenciaLenteDeficitCredito ?? null}
+            mediasNacionais={mediasNacionais?.medias ?? null}
           />
         </div>
       )}

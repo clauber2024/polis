@@ -1,11 +1,17 @@
 import { useEffect, useState } from 'react';
-import type { MunicipioComIndicadores, SetorCensitario, SetoresCensitariosResultado } from '../../types/api';
+import type {
+  MediasMunicipios,
+  MunicipioComIndicadores,
+  SetorCensitario,
+  SetoresCensitariosResultado,
+} from '../../types/api';
 import { baixarRelatorioTerritorio, buscarSetoresCensitarios } from '../../services/municipios.service';
 import { formatarValor, type FormatoIndicador } from '../../utils/formatadores';
 import { NOTAS_MUNICIPIO, notaAusencia, type CampoNumerico } from '../../utils/notasAusencia';
 import { CartaoDescompassoMorfologico } from './CartaoDescompassoMorfologico';
 import { CartaoVazioDeAcesso } from './CartaoVazioDeAcesso';
 import { CartaoDeficitCredito } from './CartaoDeficitCredito';
+import { IndicadorComparativo, type SemanticaIndicador } from './IndicadorComparativo';
 
 interface PainelMunicipioProps {
   municipio: MunicipioComIndicadores;
@@ -23,6 +29,15 @@ interface PainelMunicipioProps {
     mmgdMaisRecente: string | null;
     casaBrasilSolar: string | null;
   } | null;
+  /**
+   * Médias nacionais de referência (GET /api/municipios/medias, sem filtro —
+   * mesmo endpoint já usado pelo Painel Analítico, RF-049/050) — auditoria de
+   * UX/UI de 30/07/2026: contextualiza os indicadores da ficha contra o país,
+   * via IndicadorComparativo. `null` enquanto não carregou (lazy, dispara
+   * junto com garantirVaziosCarregados ao selecionar um município) — os
+   * indicadores voltam a exibir só o valor bruto até então.
+   */
+  mediasNacionais: MediasMunicipios['medias'] | null;
 }
 
 /**
@@ -86,6 +101,17 @@ interface LinhaIndicador {
   descricao?: string;
   /** Marca o indicador-âncora da seção — ganha cartão próprio de 2 colunas em vez de célula do grid. No máximo um por grupo. */
   destaque?: boolean;
+  /**
+   * Presente = indicador elegível para o termômetro de comparação nacional
+   * (IndicadorComparativo) — omitido para valores absolutos (potência total,
+   * contratos, área, população) onde comparar contra a média nacional sem
+   * normalização per capita seria enganoso (mesmo raciocínio já registrado em
+   * `contratosReformaCasaBrasilSolarPer10000Hab`, municipios.service.ts
+   * backend). Sem média nacional disponível na API (`percentualCadunico`,
+   * `numeroUcsComMmgd` etc.), o indicador também cai no valor bruto de
+   * sempre — nunca se fabrica uma média que a API não devolve.
+   */
+  semantica?: SemanticaIndicador;
 }
 
 /**
@@ -106,6 +132,7 @@ export function PainelMunicipio({
   limiarPrecariedadeHabitacionalAlta,
   alertaDeficitCredito,
   periodoReferenciaLenteDeficitCredito,
+  mediasNacionais,
 }: PainelMunicipioProps) {
   // RF-058: geração do relatório-resumo em PDF do território selecionado.
   const [gerandoRelatorio, setGerandoRelatorio] = useState(false);
@@ -157,6 +184,7 @@ export function PainelMunicipio({
           rotulo: 'Irradiação média',
           formato: 'numero',
           unidade: 'kWh/m²·dia',
+          semantica: 'neutro',
           descricao:
             'Média climatológica 1999–2015 (Atlas Solar 2017, LABREN/CCST/INPE), não um ano específico.',
         },
@@ -166,6 +194,7 @@ export function PainelMunicipio({
           formato: 'numero',
           unidade: 'kW/1.000 hab',
           destaque: true,
+          semantica: 'maiorMelhor',
         },
         {
           campo: 'potenciaInstaladaKw',
@@ -185,21 +214,28 @@ export function PainelMunicipio({
           rotulo: 'Tarifa residencial (TUSD+TE)',
           formato: 'numero',
           unidade: 'R$/kWh',
+          semantica: 'menorMelhor',
         },
       ],
     },
     {
       titulo: 'Indicadores sociais',
       linhas: [
-        { campo: 'ivs', rotulo: 'IVS', formato: 'numero', destaque: true },
+        { campo: 'ivs', rotulo: 'IVS', formato: 'numero', destaque: true, semantica: 'menorMelhor' },
         {
           campo: 'ivsh',
           rotulo: 'IVSH (sócio-habitacional)',
           formato: 'numero',
+          semantica: 'menorMelhor',
           descricao:
             'Média entre IVS, precariedade física da moradia (cortiços, paredes inadequadas, favelas) e insegurança da posse da terra — inclui a dimensão de moradia que o IVS consolidado exclui de propósito. Fundamenta os alertas de Descompasso Morfológico.',
         },
-        { campo: 'rendaMediaDomiciliar', rotulo: 'Renda média domiciliar', formato: 'moeda' },
+        {
+          campo: 'rendaMediaDomiciliar',
+          rotulo: 'Renda média domiciliar',
+          formato: 'moeda',
+          semantica: 'maiorMelhor',
+        },
         {
           campo: 'percentualCadunico',
           rotulo: 'População no CadÚnico',
@@ -211,6 +247,7 @@ export function PainelMunicipio({
           campo: 'percentualPobrezaCadunico',
           rotulo: 'Pobreza entre famílias do CadÚnico',
           formato: 'percentual',
+          semantica: 'menorMelhor',
           descricao:
             '% das famílias cadastradas no CadÚnico em pobreza ou extrema pobreza — não é % da população do município.',
         },
@@ -218,13 +255,20 @@ export function PainelMunicipio({
           campo: 'percentualTarifaSocial',
           rotulo: 'Tarifa social (TSEE)',
           formato: 'percentual',
+          semantica: 'neutro',
         },
-        { campo: 'taxaAlfabetizacao', rotulo: 'Alfabetização', formato: 'percentual' },
+        {
+          campo: 'taxaAlfabetizacao',
+          rotulo: 'Alfabetização',
+          formato: 'percentual',
+          semantica: 'maiorMelhor',
+        },
         {
           campo: 'taxaMortalidadeInfantil',
           rotulo: 'Mortalidade infantil',
           formato: 'numero',
           unidade: '/1.000 nascidos vivos',
+          semantica: 'menorMelhor',
         },
       ],
     },
@@ -269,12 +313,27 @@ export function PainelMunicipio({
   const notaMunicipio = NOTAS_MUNICIPIO[municipio.codigoIbge];
 
   /**
+   * Um indicador só usa o termômetro de comparação (IndicadorComparativo)
+   * quando tem semântica definida E valor do município E média nacional
+   * disponíveis — sem isso, cai no valor bruto de sempre (nunca fabrica uma
+   * média que a API não devolveu ainda, ex.: antes do fetch lazy terminar).
+   */
+  function usaComparativo(linha: LinhaIndicador): boolean {
+    const valor = municipio[linha.campo];
+    const media = mediasNacionais?.[linha.campo] ?? null;
+    return linha.semantica !== undefined && valor !== null && typeof media === 'number';
+  }
+
+  /**
    * Notas metodológicas e de ausência da seção, reunidas numa "gaveta" única
    * no rodapé em vez de intercaladas linha a linha — o KPI não pode competir
-   * visualmente com a nota que o explica.
+   * visualmente com a nota que o explica. Indicadores que já mostram a nota
+   * no tooltip do termômetro (IndicadorComparativo) saem daqui, para não
+   * duplicar a mesma explicação em dois lugares da tela.
    */
   function notasDaSecao(grupo: { linhas: LinhaIndicador[] }) {
     return grupo.linhas
+      .filter((linha) => !usaComparativo(linha))
       .map((linha) => {
         const valor = municipio[linha.campo];
         const nota = valor === null ? notaAusencia(linha.campo, municipio) : null;
@@ -356,6 +415,23 @@ export function PainelMunicipio({
                 {grupo.linhas.map((linha) => {
                   const valor = municipio[linha.campo];
                   const semDado = valor === null;
+                  const mediaNacional = mediasNacionais?.[linha.campo] ?? null;
+
+                  if (linha.semantica && valor !== null && typeof mediaNacional === 'number') {
+                    return (
+                      <IndicadorComparativo
+                        key={linha.rotulo}
+                        rotulo={linha.rotulo}
+                        valor={valor}
+                        formato={linha.formato}
+                        unidade={linha.unidade}
+                        mediaNacional={mediaNacional}
+                        semantica={linha.semantica}
+                        notaTecnica={linha.descricao}
+                        destaque={linha.destaque}
+                      />
+                    );
+                  }
 
                   if (linha.destaque) {
                     return (
