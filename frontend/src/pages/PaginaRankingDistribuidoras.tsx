@@ -63,12 +63,6 @@ export function PaginaRankingDistribuidoras() {
     [dados],
   );
 
-  // Terço pior calculado sobre a posição REAL no ranking nacional completo
-  // (nunca recalculado dentro do subconjunto filtrado por região) — evita
-  // que filtrar por região "esconda" uma distribuidora ruim só porque as
-  // vizinhas da mesma região são igualmente ruins.
-  const limiarTercoRuim = Math.ceil(rankingComPosicao.length / 3);
-
   const regioesDisponiveis = useMemo(() => {
     const todas = dados ? [...dados.rankingPrincipal, ...dados.distribuidorasComDadosIncompletos] : [];
     return Array.from(new Set(todas.map((item) => item.regiaoPrincipal))).sort();
@@ -100,18 +94,13 @@ export function PaginaRankingDistribuidoras() {
         <>
           {dados.resumoNacional && <CardAlertaNacional resumo={dados.resumoNacional} />}
 
-          {/* Metodologia — resumo curto, sempre visível (não em tooltip). */}
-          <div className="mt-6 rounded-2xl bg-white/70 p-6 shadow-lg shadow-stone-200/50 ring-1 ring-stone-900/5 backdrop-blur-xl">
-            <p className="text-[10px] font-black tracking-widest text-stone-400 uppercase">Metodologia</p>
-            <p className="mt-2 text-xs text-stone-600">
-              <strong className="font-bold text-stone-800">Índice Sintético de Fricção:</strong>{' '}
-              {dados.metodologia.eixoTecnico}
-            </p>
-            <p className="mt-1.5 text-xs text-stone-600">
-              <strong className="font-bold text-stone-800">O que fica de fora de propósito:</strong>{' '}
-              {dados.notaMetodologicaJustica}
-            </p>
-          </div>
+          {/* Metodologia — versão curta e direta (30/07/2026, pedido do usuário:
+              o bloco anterior, com 2 parágrafos densos, poluía o topo da tela). */}
+          <p className="mt-6 text-xs leading-relaxed text-stone-500">
+            <strong className="font-bold text-stone-700">Índice de Fricção</strong> = taxa de conexão +
+            cumprimento de prazo da ANEEL, normalizados entre distribuidoras. Fatores socioeconômicos da
+            região atendida não entram nesta pontuação.
+          </p>
 
           {/* Filtro rápido */}
           <div className="mt-6 flex flex-wrap items-end gap-3 rounded-2xl bg-white/70 p-4 shadow-lg shadow-stone-200/50 ring-1 ring-stone-900/5 backdrop-blur-xl">
@@ -157,7 +146,6 @@ export function PaginaRankingDistribuidoras() {
           >
             <TabelaRanking
               itens={rankingFiltrado}
-              limiarTercoRuim={limiarTercoRuim}
               resumoNacional={dados.resumoNacional}
               linhaExpandida={linhaExpandida}
               aoAlternarExpansao={(distribuidora) =>
@@ -187,12 +175,6 @@ function formatarMultiplicador(valor: number): string {
   return `${valor.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}x`;
 }
 
-function formatarDesvioRelativo(valor: number | null): string {
-  if (valor === null) return 'sem dado';
-  const arredondado = Math.round(valor);
-  return `${arredondado >= 0 ? '+' : ''}${arredondado}%`;
-}
-
 function CardAlertaNacional({ resumo }: { resumo: ResumoNacionalFriccao }) {
   const frases: string[] = [];
 
@@ -202,10 +184,18 @@ function CardAlertaNacional({ resumo }: { resumo: ResumoNacionalFriccao }) {
     );
   }
 
+  // Empate no valor extremo (30/07/2026, achado real: 3 distribuidoras diferentes
+  // empatam em 0% fora do prazo no dado de produção) — citar só uma como "A
+  // referência" sem avisar do empate seria enganoso, ver docstring do backend.
+  const referenciaBenchmark =
+    resumo.benchmarkMelhorDesempenho.empatados > 1
+      ? `${resumo.benchmarkMelhorDesempenho.distribuidora}, empatada com mais ${resumo.benchmarkMelhorDesempenho.empatados - 1} distribuidora${resumo.benchmarkMelhorDesempenho.empatados > 2 ? 's' : ''}`
+      : resumo.benchmarkMelhorDesempenho.distribuidora;
+
   frases.push(
     resumo.multiplicadorPiorSobreBenchmark !== null
-      ? `A pior concessionária do ranking (${resumo.piorDesempenho.distribuidora}) acumula um índice de atraso ${formatarMultiplicador(resumo.multiplicadorPiorSobreBenchmark)} maior que a referência em eficiência do setor (${resumo.benchmarkMelhorDesempenho.distribuidora}, ${formatarValor(resumo.benchmarkMelhorDesempenho.pctForaDoPrazo, 'percentual')} fora do prazo).`
-      : `A pior concessionária do ranking (${resumo.piorDesempenho.distribuidora}) tem ${formatarValor(resumo.piorDesempenho.pctForaDoPrazo, 'percentual')} dos pedidos fora do prazo regulatório, contra 0% da referência em eficiência do setor (${resumo.benchmarkMelhorDesempenho.distribuidora}).`,
+      ? `A pior concessionária do ranking (${resumo.piorDesempenho.distribuidora}) acumula um índice de atraso ${formatarMultiplicador(resumo.multiplicadorPiorSobreBenchmark)} maior que a referência em eficiência do setor (${referenciaBenchmark}, ${formatarValor(resumo.benchmarkMelhorDesempenho.pctForaDoPrazo, 'percentual')} fora do prazo).`
+      : `A pior concessionária do ranking (${resumo.piorDesempenho.distribuidora}) tem ${formatarValor(resumo.piorDesempenho.pctForaDoPrazo, 'percentual')} dos pedidos fora do prazo regulatório, contra 0% da referência em eficiência do setor (${referenciaBenchmark}).`,
   );
 
   return (
@@ -288,68 +278,46 @@ function SecaoRanking({ titulo, contagem, subtitulo, children }: SecaoRankingPro
   );
 }
 
+/** Fixo, não proporcional (30/07/2026, pedido do usuário: "sutil indicação de cor na linha
+ * do 1º ao 3º lugar", não mais um terço calculado sobre o tamanho da lista). */
+const POSICOES_EM_DESTAQUE = 3;
+
 interface TabelaRankingProps {
   itens: ItemComPosicao[];
-  limiarTercoRuim: number;
   resumoNacional: ResumoNacionalFriccao | null;
   linhaExpandida: string | null;
   aoAlternarExpansao: (distribuidora: string) => void;
 }
 
-function TabelaRanking({ itens, limiarTercoRuim, resumoNacional, linhaExpandida, aoAlternarExpansao }: TabelaRankingProps) {
+/**
+ * Reduzida a 5 colunas essenciais (30/07/2026, pedido do usuário — "limpeza radical de
+ * design": os selos "Crítico" e as mini-barras de desvio/benchmark dentro das células
+ * espremiam o layout e cortavam texto). O comparativo com média nacional/benchmark
+ * continua disponível — só migrou inteiro para o drill-down ao clicar na linha
+ * (`ComparativoBarras`), em vez de duas colunas fixas sempre visíveis.
+ */
+function TabelaRanking({ itens, resumoNacional, linhaExpandida, aoAlternarExpansao }: TabelaRankingProps) {
   if (itens.length === 0) {
     return <p className="mt-3 text-sm text-stone-500">Nenhuma concessionária com o filtro atual.</p>;
   }
 
-  const maiorDistanciaBenchmark = Math.max(
-    ...itens.map((item) => item.distanciaDoBenchmarkPontosPercentuais ?? 0),
-    0.01,
-  );
-
   return (
     <>
       <div className="mt-4 overflow-x-auto rounded-xl ring-1 ring-stone-200/60">
-        <table className="w-full min-w-[1080px] text-left text-sm">
+        <table className="w-full min-w-[720px] text-left text-sm">
           <thead>
-            <tr className="bg-stone-50/80 text-[9px] font-black tracking-widest text-stone-400 uppercase">
-              <th className="px-3 py-2" colSpan={1}>
-                Ranking
-              </th>
-              <th className="border-l border-stone-200/60 px-3 py-2" colSpan={2}>
-                Identificação
-              </th>
-              <th className="border-l border-stone-200/60 px-3 py-2" colSpan={1}>
-                Volume
-              </th>
-              <th className="border-l border-stone-200/60 px-3 py-2" colSpan={4}>
-                Desempenho regulatório
-              </th>
-              <th className="border-l border-stone-200/60 px-3 py-2" colSpan={1}>
-                Indicador sintético
-              </th>
-            </tr>
-            <tr className="border-t border-stone-200/60 bg-stone-50/80 text-xs font-bold text-stone-600">
-              <th className="px-3 py-2">#</th>
-              <th className="border-l border-stone-200/60 px-3 py-2">Concessionária</th>
-              <th className="px-3 py-2">Região</th>
-              <th className="border-l border-stone-200/60 px-3 py-2 text-right">Pedidos MMGD*</th>
-              <th className="border-l border-stone-200/60 px-3 py-2 text-right">% conectado*</th>
-              <th className="px-3 py-2 text-right">% fora do prazo</th>
-              <th className="px-3 py-2 text-right">Desvio vs. média</th>
-              <th className="px-3 py-2 text-right">Distância do benchmark</th>
-              <th className="border-l border-stone-200/60 px-3 py-2 text-right">Índice de Fricção</th>
+            <tr className="bg-stone-50/80 text-xs font-bold text-stone-600">
+              <th className="px-6 py-4">#</th>
+              <th className="px-6 py-4">Concessionária / Região</th>
+              <th className="px-6 py-4 text-right">Volume de Pedidos (MMGD)</th>
+              <th className="px-6 py-4 text-right">% Fora do Prazo</th>
+              <th className="px-6 py-4 text-right">Índice de Fricção</th>
             </tr>
           </thead>
           <tbody>
             {itens.map((item) => {
-              const critico = item.posicao <= limiarTercoRuim;
+              const critico = item.posicao <= POSICOES_EM_DESTAQUE;
               const expandida = linhaExpandida === item.distribuidora;
-              const distanciaBenchmark = item.distanciaDoBenchmarkPontosPercentuais;
-              const larguraBarraBenchmark =
-                distanciaBenchmark !== null
-                  ? Math.min(100, Math.max(4, (distanciaBenchmark / maiorDistanciaBenchmark) * 100))
-                  : 0;
-              const desvio = item.desvioPctForaDoPrazoRelativoPercentual;
 
               return (
                 <Fragment key={item.distribuidora}>
@@ -361,72 +329,36 @@ function TabelaRanking({ itens, limiarTercoRuim, resumoNacional, linhaExpandida,
                     onKeyDown={(evento: KeyboardEvent<HTMLTableRowElement>) => {
                       if (evento.key === 'Enter' || evento.key === ' ') aoAlternarExpansao(item.distribuidora);
                     }}
-                    className={`cursor-pointer border-t border-stone-100/80 outline-none transition-colors hover:bg-stone-50/80 ${critico ? 'bg-red-50/50' : ''}`}
+                    className={`cursor-pointer border-t border-stone-100/80 outline-none transition-colors hover:bg-stone-50/80 ${critico ? 'bg-red-50/40' : ''}`}
                   >
-                    <td className="px-3 py-2.5">
-                      <span
-                        className={`inline-flex h-6 min-w-6 items-center justify-center rounded-md px-1.5 text-xs font-black ${
-                          critico ? 'bg-red-800 text-white' : 'bg-stone-100 text-stone-600'
-                        }`}
-                      >
-                        {item.posicao}º
-                      </span>
+                    <td className={`px-6 py-4 font-black ${critico ? 'text-red-700' : 'text-stone-500'}`}>
+                      {item.posicao}º
                     </td>
-                    <td className="border-l border-stone-100/80 px-3 py-2.5 font-bold text-stone-900">
-                      <div className="flex flex-wrap items-center gap-1.5">
+                    <td className="px-6 py-4">
+                      <p className="font-bold text-stone-900">
                         {item.distribuidora}
-                        {critico && (
-                          <span className="rounded bg-red-700 px-1.5 py-0.5 text-[9px] font-black tracking-wider text-white uppercase">
-                            Crítico
-                          </span>
-                        )}
                         {item.amostraPequena && (
                           <span
                             title="Menos de 1.000 pedidos — amostra estatisticamente menos robusta."
-                            className="rounded bg-stone-100 px-1 py-0.5 text-[9px] font-bold text-stone-500"
+                            className="ml-1.5 rounded bg-stone-100 px-1 py-0.5 align-middle text-[9px] font-bold text-stone-500"
                           >
                             amostra pequena
                           </span>
                         )}
-                      </div>
+                      </p>
+                      <p className="text-xs text-stone-500 capitalize">{item.regiaoPrincipal}</p>
                     </td>
-                    <td className="px-3 py-2.5 text-stone-600 capitalize">{item.regiaoPrincipal}</td>
-                    <td className="border-l border-stone-100/80 px-3 py-2.5 text-right text-stone-600">
-                      {formatarValor(item.nPedidos, 'inteiro')}
-                    </td>
-                    <td className="border-l border-stone-100/80 px-3 py-2.5 text-right text-stone-600">
-                      {formatarValor(item.pctConectado, 'percentual')}
-                    </td>
-                    <td className="px-3 py-2.5 text-right font-bold text-stone-800">
+                    <td className="px-6 py-4 text-right text-stone-600">{formatarValor(item.nPedidos, 'inteiro')}</td>
+                    <td className="px-6 py-4 text-right font-bold text-stone-800">
                       {formatarValor(item.pctForaDoPrazo, 'percentual')}
                     </td>
-                    <td className={`px-3 py-2.5 text-right font-bold ${desvio !== null && desvio > 0 ? 'text-red-700' : 'text-emerald-700'}`}>
-                      {formatarDesvioRelativo(desvio)}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      {distanciaBenchmark !== null ? (
-                        <div className="flex items-center justify-end gap-2">
-                          <div className="h-1.5 w-16 overflow-hidden rounded-full bg-stone-100">
-                            <div
-                              className="h-full rounded-full bg-red-400"
-                              style={{ width: `${larguraBarraBenchmark}%` }}
-                            />
-                          </div>
-                          <span className="w-14 shrink-0 text-right text-[11px] font-bold text-stone-500">
-                            +{distanciaBenchmark.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} pp
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="block text-right text-stone-400">sem dado</span>
-                      )}
-                    </td>
-                    <td className="border-l border-stone-100/80 px-3 py-2.5 text-right font-black text-red-800">
+                    <td className="px-6 py-4 text-right font-black text-red-800">
                       {formatarValor(item.eixoTecnico, 'numero')}
                     </td>
                   </tr>
                   {expandida && resumoNacional && item.pctForaDoPrazo !== null && (
                     <tr className="border-t border-stone-100/80 bg-stone-50/60">
-                      <td colSpan={9} className="px-6 py-4">
+                      <td colSpan={5} className="px-6 py-4">
                         <ComparativoBarras
                           nomeEmpresa={item.distribuidora}
                           valorEmpresa={item.pctForaDoPrazo}
@@ -442,11 +374,10 @@ function TabelaRanking({ itens, limiarTercoRuim, resumoNacional, linhaExpandida,
         </table>
       </div>
       <p className="mt-2 text-[10px] text-stone-400">
-        Clique numa linha para ver o comparativo de barras (empresa x média nacional x benchmark do
-        setor). * Esta base (fila de conexão ANEEL + INDQUAL) não tem o total de consumidores de cada
-        concessionária nem uma métrica de "% com Solar" isolada de MMGD — os campos exibidos são
-        pedidos de conexão MMGD processados e sua taxa de conclusão, os dados reais disponíveis mais
-        próximos. "pp" = pontos percentuais.
+        Clique numa linha para ver o comparativo com a média nacional e o benchmark do setor
+        (empresa x média x melhor desempenho). Volume de Pedidos é o total de pedidos de conexão
+        MMGD processados — esta base não tem o total de consumidores de cada concessionária nem
+        uma métrica de "% com Solar" isolada de MMGD.
       </p>
     </>
   );
