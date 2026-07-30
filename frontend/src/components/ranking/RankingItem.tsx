@@ -29,6 +29,17 @@ interface RankingItemProps {
   medianaNacional: number | null;
   /** Maior valor da lista atual, para normalizar a barra (0 a 100%). */
   maxRanking: number;
+  /**
+   * Piso da escala da barra (30/07/2026, feedback do usuário: valores muito
+   * próximos entre si — ex. IVSH 0,28 vs 0,27 — ficavam visualmente
+   * idênticos numa escala 0–max). Default 0 preserva o comportamento
+   * original (escala cheia) para PainelRanking.tsx (mapa), que não passa
+   * esta prop. Quem passa um piso > 0 (ex. RankingPrioridadeExecutivo,
+   * calculado a partir do menor valor REAL da lista exibida, nunca um
+   * número fixo) dá "zoom" na variação — a barra passa a ocupar toda a
+   * largura entre `minRanking` e `maxRanking`, não entre 0 e `maxRanking`.
+   */
+  minRanking?: number;
   ehVazioDeAcesso?: boolean;
   /** Cor de destaque da barra (hex) — permite reaproveitar o componente em rankings de indicadores diferentes, cada um com sua cor. */
   cor: string;
@@ -50,15 +61,22 @@ export function RankingItem({
   unidade,
   medianaNacional,
   maxRanking,
+  minRanking = 0,
   ehVazioDeAcesso,
   cor,
   rotuloMediana = 'Brasil',
 }: RankingItemProps) {
-  // maxRanking <= 0 só ocorre com lista vazia/todos os valores em zero —
-  // evita NaN/Infinity na largura da barra (0/0) e no width em %.
-  const larguraBarra = maxRanking > 0 ? Math.min(100, (valor / maxRanking) * 100) : 0;
+  // amplitude <= 0 ocorre com lista vazia/todos os valores iguais — evita
+  // NaN/Infinity na largura da barra. Math.max(0, ...) protege contra
+  // `valor` cair abaixo do piso (ex.: mediana estadual menor que o piso
+  // calculado só sobre os 5 visíveis).
+  const amplitude = maxRanking - minRanking;
+  const larguraBarra =
+    amplitude > 0 ? Math.min(100, Math.max(0, ((valor - minRanking) / amplitude) * 100)) : valor > 0 ? 100 : 0;
   const posicaoMediana =
-    medianaNacional !== null && maxRanking > 0 ? Math.min(100, (medianaNacional / maxRanking) * 100) : null;
+    medianaNacional !== null && amplitude > 0
+      ? Math.min(100, Math.max(0, ((medianaNacional - minRanking) / amplitude) * 100))
+      : null;
 
   return (
     <div className="flex flex-col gap-1.5 border-b border-stone-100 px-2 py-3 transition-colors hover:bg-stone-50/80">
@@ -97,7 +115,7 @@ export function RankingItem({
 
       {medianaNacional !== null && (
         <div className="flex justify-between px-0.5 text-[8px] font-medium text-stone-400">
-          <span>0</span>
+          <span>{minRanking.toLocaleString('pt-BR')}</span>
           <span className="font-bold text-stone-600">
             Mediana {rotuloMediana}: {medianaNacional.toLocaleString('pt-BR')}
           </span>

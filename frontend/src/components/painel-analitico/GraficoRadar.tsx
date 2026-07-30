@@ -94,9 +94,24 @@ export function GraficoRadar({ municipios, indicadores }: GraficoRadarProps) {
                 <span className="font-bold text-stone-400">— {municipio.uf}</span>
               </h3>
 
-              <div className="h-[240px] w-full">
+              <div className="h-[260px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <RadarChart data={dadosMunicipio} outerRadius="65%">
+                  {/*
+                    Clipping corrigido (30/07/2026, bug real — auditoria
+                    visual): sem margem própria, os rótulos de eixo nas
+                    extremidades horizontais (0°/180°) estouravam a borda do
+                    SVG (mesma classe de bug já corrigida no Sankey/Treemap,
+                    aqui nunca tinha sido tratada). Rótulos reais são longos
+                    ("Índice de Vulnerabilidade Social (IVS)",
+                    "Pobreza entre famílias do CadÚnico") — outerRadius
+                    reduzido de 65% para 52% e margem lateral generosa
+                    (50px) para dar espaço ao texto, não só cosmético.
+                  */}
+                  <RadarChart
+                    data={dadosMunicipio}
+                    outerRadius="52%"
+                    margin={{ top: 16, right: 50, bottom: 16, left: 50 }}
+                  >
                     <PolarGrid stroke="#e7e5e4" />
                     <PolarAngleAxis
                       dataKey="indicador"

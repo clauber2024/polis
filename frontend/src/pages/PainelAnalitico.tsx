@@ -20,7 +20,10 @@ import {
 import { GraficoQuadrantes } from '../components/painel-analitico/GraficoQuadrantes';
 import { GraficoRegional } from '../components/painel-analitico/GraficoRegional';
 import { RankingPrioridadeExecutivo } from '../components/painel-analitico/RankingPrioridadeExecutivo';
-import { FunilExclusaoHabitacional } from '../components/painel-analitico/FunilExclusaoHabitacional';
+import {
+  FunilExclusaoHabitacional,
+  FILTRO_FUNIL_VAZIO,
+} from '../components/painel-analitico/FunilExclusaoHabitacional';
 import { TreemapProporcaoNacional } from '../components/painel-analitico/TreemapProporcaoNacional';
 import type {
   MediasMunicipios,
@@ -377,6 +380,12 @@ export function PainelAnalitico() {
   // dos dois. '' = sem filtro (visão nacional).
   const [ufFiltroExecutivo, setUfFiltroExecutivo] = useState('');
 
+  // Filtro de segmento do Funil (30/07/2026, mesma sessão — Funil virou
+  // clicável): SEGUNDO filtro independente sobre RankingPrioridadeExecutivo,
+  // combinado por AND com ufFiltroExecutivo. Mesma razão de viver aqui — os
+  // dois componentes são filhos deste (Funil escreve, Ranking lê).
+  const [filtroFunilExecutivo, setFiltroFunilExecutivo] = useState(FILTRO_FUNIL_VAZIO);
+
   function carregarQuadrantesNacionais() {
     if (quadrantesNacionais || carregandoQuadrantes) return;
     setCarregandoQuadrantes(true);
@@ -514,22 +523,28 @@ export function PainelAnalitico() {
 
         {quadrantesNacionais && abaLaboratorio === 'executiva' && (
           <div className="mt-4 rounded-xl bg-white p-4 ring-1 ring-stone-200">
-            <RankingPrioridadeExecutivo
-              dados={quadrantesNacionais}
-              ufFiltro={ufFiltroExecutivo}
-              aoLimparFiltro={() => setUfFiltroExecutivo('')}
-            />
+            <h3 className="text-sm font-black tracking-tight text-stone-900">
+              Onde a exclusão escoa
+            </h3>
+            <div className="mt-3">
+              <FunilExclusaoHabitacional
+                dados={quadrantesNacionais}
+                aoClicarSegmento={setFiltroFunilExecutivo}
+                filtroAtivo={filtroFunilExecutivo}
+              />
+            </div>
           </div>
         )}
 
         {quadrantesNacionais && abaLaboratorio === 'executiva' && (
           <div className="mt-4 rounded-xl bg-white p-4 ring-1 ring-stone-200">
-            <h3 className="text-sm font-black tracking-tight text-stone-900">
-              Onde a exclusão escoa
-            </h3>
-            <div className="mt-3">
-              <FunilExclusaoHabitacional dados={quadrantesNacionais} />
-            </div>
+            <RankingPrioridadeExecutivo
+              dados={quadrantesNacionais}
+              ufFiltro={ufFiltroExecutivo}
+              aoLimparFiltro={() => setUfFiltroExecutivo('')}
+              filtroFunil={filtroFunilExecutivo}
+              aoLimparFiltroFunil={() => setFiltroFunilExecutivo(FILTRO_FUNIL_VAZIO)}
+            />
           </div>
         )}
       </section>

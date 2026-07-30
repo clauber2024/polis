@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import type { VaziosDeAcessoCompleto } from '../../services/vaziosDeAcesso.service';
 import { COR_QUADRANTE } from './GraficoQuadrantes';
 
@@ -29,8 +30,31 @@ import { COR_QUADRANTE } from './GraficoQuadrantes';
  * contrato de financiamento, não mais.
  */
 
+/**
+ * Filtro de segmento do funil (30/07/2026, pedido do usuário: cliques nos
+ * nós/links devem filtrar RankingPrioridadeExecutivo, mesmo padrão já
+ * usado no clique de estado do Treemap). Dois eixos independentes —
+ * `vulnerabilidade` (classificacaoIvsh alto/muito_alto vs. o resto) e
+ * `financiamento` (alertaDeficitCredito) — combináveis com AND. `null` em
+ * qualquer eixo = "todos" nesse eixo. Clicar num NÓ define só o eixo que
+ * ele representa (limpa o outro); clicar num LINK define os dois de uma
+ * vez (a combinação exata daquele fluxo). Exportado daqui porque este
+ * arquivo é o "dono" da definição dos segmentos — RankingPrioridadeExecutivo
+ * e PainelAnalitico.tsx só consomem o tipo.
+ */
+export interface FiltroFunil {
+  vulnerabilidade: 'alta' | 'moderada' | null;
+  financiamento: 'sem' | 'com' | null;
+}
+
+export const FILTRO_FUNIL_VAZIO: FiltroFunil = { vulnerabilidade: null, financiamento: null };
+
 interface FunilExclusaoHabitacionalProps {
   dados: VaziosDeAcessoCompleto;
+  /** Chamado ao clicar num nó/link — o pai decide o que fazer (hoje: filtra RankingPrioridadeExecutivo). */
+  aoClicarSegmento: (filtro: FiltroFunil) => void;
+  /** Filtro ativo no momento — usado só para destacar visualmente o segmento selecionado. */
+  filtroAtivo: FiltroFunil;
 }
 
 /**
@@ -119,7 +143,26 @@ function usarReducaoDeMovimento(): boolean {
   return reduzido;
 }
 
-export function FunilExclusaoHabitacional({ dados }: FunilExclusaoHabitacionalProps) {
+/** Compara dois filtros por igualdade de valor (não referência) — usado para destacar o segmento ativo. */
+function filtrosIguais(a: FiltroFunil, b: FiltroFunil): boolean {
+  return a.vulnerabilidade === b.vulnerabilidade && a.financiamento === b.financiamento;
+}
+
+/** Handlers de clique/teclado para um segmento clicável (nó ou link) — evita repetir onClick+onKeyDown em cada um dos 11 elementos interativos do funil. */
+function handlersSegmento(aoClicarSegmento: (filtro: FiltroFunil) => void, filtro: FiltroFunil) {
+  return {
+    onClick: () => aoClicarSegmento(filtro),
+    onKeyDown: (evento: KeyboardEvent<SVGGElement>) => {
+      if (evento.key === 'Enter' || evento.key === ' ') aoClicarSegmento(filtro);
+    },
+  };
+}
+
+export function FunilExclusaoHabitacional({
+  dados,
+  aoClicarSegmento,
+  filtroAtivo,
+}: FunilExclusaoHabitacionalProps) {
   const reduzirMovimento = usarReducaoDeMovimento();
   const calculo = useMemo(() => {
     const vazios = dados.municipios.filter((m) => m.quadrante === 'vazio_de_acesso');
@@ -206,95 +249,184 @@ export function FunilExclusaoHabitacional({ dados }: FunilExclusaoHabitacionalPr
         aria-label="Funil de exclusão: Vazios de Acesso, divididos por vulnerabilidade habitacional (IVSH) e por acesso a financiamento do Reforma Casa Brasil Solar"
         className="w-full bg-white"
       >
-        {/* Links — cor vermelha só no caminho crítico (alta vulnerabilidade →
-            sem financiamento); largura sempre proporcional ao valor real, nunca
-            engrossada artificialmente. */}
-        <path
-          d={caminho(COL0_X + LARGURA_NO, banda_0_1, COL1_X, no1)}
-          fill="none"
-          stroke={COR_ALTA_VULNERABILIDADE}
-          strokeOpacity={0.28}
-          strokeWidth={Math.max(altura(banda_0_1), 0)}
-        />
-        <path
-          d={caminho(COL0_X + LARGURA_NO, banda_0_2, COL1_X, no2)}
-          fill="none"
-          stroke={COR_LINK_NEUTRO}
-          strokeOpacity={0.45}
-          strokeWidth={Math.max(altura(banda_0_2), 0)}
-        />
+        {/* Links — clicáveis (30/07/2026: cada fluxo filtra RankingPrioridadeExecutivo
+            pela combinação exata vulnerabilidade×financiamento que ele representa).
+            Cor vermelha só no caminho crítico; largura sempre proporcional ao valor
+            real, nunca engrossada artificialmente. */}
+        <g
+          role="button"
+          tabIndex={0}
+          className="cursor-pointer outline-none"
+          aria-label="Filtrar: alta vulnerabilidade habitacional"
+          {...handlersSegmento(aoClicarSegmento, { vulnerabilidade: 'alta', financiamento: null })}
+        >
+          <path
+            d={caminho(COL0_X + LARGURA_NO, banda_0_1, COL1_X, no1)}
+            fill="none"
+            stroke={COR_ALTA_VULNERABILIDADE}
+            strokeOpacity={filtrosIguais(filtroAtivo, { vulnerabilidade: 'alta', financiamento: null }) ? 0.5 : 0.28}
+            strokeWidth={Math.max(altura(banda_0_1), 0)}
+          />
+        </g>
+        <g
+          role="button"
+          tabIndex={0}
+          className="cursor-pointer outline-none"
+          aria-label="Filtrar: vulnerabilidade habitacional moderada ou baixa"
+          {...handlersSegmento(aoClicarSegmento, { vulnerabilidade: 'moderada', financiamento: null })}
+        >
+          <path
+            d={caminho(COL0_X + LARGURA_NO, banda_0_2, COL1_X, no2)}
+            fill="none"
+            stroke={COR_LINK_NEUTRO}
+            strokeOpacity={filtrosIguais(filtroAtivo, { vulnerabilidade: 'moderada', financiamento: null }) ? 0.75 : 0.45}
+            strokeWidth={Math.max(altura(banda_0_2), 0)}
+          />
+        </g>
         {/* Caminho crítico (alta vulnerabilidade → sem financiamento) — contraste
             máximo (30/07/2026, feedback do usuário): opacidade alta e sólida no
             vermelho institucional, contra os demais fluxos em stone-300 discreto
             (a versão anterior tinha o crítico MENOS opaco que os neutros, invertido
             do que fazia sentido). */}
-        <path
-          d={caminho(COL1_X + LARGURA_NO, banda_1_3, COL2_X, banda_3_de1)}
-          fill="none"
-          stroke={COR_QUADRANTE.vazio_de_acesso}
-          strokeOpacity={0.75}
-          strokeWidth={Math.max(altura(banda_1_3), 0)}
+        <g
+          role="button"
+          tabIndex={0}
+          className="cursor-pointer outline-none"
+          aria-label="Filtrar: alta vulnerabilidade e sem contrato de financiamento — caminho crítico"
+          {...handlersSegmento(aoClicarSegmento, { vulnerabilidade: 'alta', financiamento: 'sem' })}
         >
-          <title>
-            {`Caminho crítico: alta vulnerabilidade habitacional → sem financiamento (${n1a.toLocaleString('pt-BR')} municípios, ${formatoPercentual.format(percentualSemFinanciamentoAltaVulnerabilidade)}% dos de alta vulnerabilidade)`}
-          </title>
-        </path>
-        {/* Filete "escoando" por cima do caminho crítico — troca de animação CSS
-            (`@keyframes` num `<style>` injetado) para `<animate>` nativo do SVG
-            (30/07/2026, feedback do usuário: a animação CSS não rodou na
-            validação). SMIL não depende de nenhum bundler/CSS-in-JS processar
-            nada — o navegador anima o atributo direto. Puramente decorativo:
-            não desenhado quando o usuário pediu menos movimento, e nunca altera
-            a largura real da faixa (que continua sempre proporcional ao valor). */}
-        {!reduzirMovimento && (
           <path
             d={caminho(COL1_X + LARGURA_NO, banda_1_3, COL2_X, banda_3_de1)}
             fill="none"
-            stroke="#fca5a5"
-            strokeWidth={Math.min(4, Math.max(altura(banda_1_3), 0))}
-            strokeDasharray="12 24"
-            strokeLinecap="round"
-            opacity={0.85}
-            aria-hidden="true"
+            stroke={COR_QUADRANTE.vazio_de_acesso}
+            strokeOpacity={0.75}
+            strokeWidth={Math.max(altura(banda_1_3), 0)}
           >
-            <animate
-              attributeName="stroke-dashoffset"
-              from="36"
-              to="0"
-              dur="1.2s"
-              repeatCount="indefinite"
-            />
+            <title>
+              {`Caminho crítico: alta vulnerabilidade habitacional → sem financiamento (${n1a.toLocaleString('pt-BR')} municípios, ${formatoPercentual.format(percentualSemFinanciamentoAltaVulnerabilidade)}% dos de alta vulnerabilidade) — clique para filtrar`}
+            </title>
           </path>
-        )}
-        <path
-          d={caminho(COL1_X + LARGURA_NO, banda_1_4, COL2_X, banda_4_de1)}
-          fill="none"
-          stroke={COR_LINK_NEUTRO}
-          strokeOpacity={0.45}
-          strokeWidth={Math.max(altura(banda_1_4), 0)}
-        />
-        <path
-          d={caminho(COL1_X + LARGURA_NO, banda_2_3, COL2_X, banda_3_de2)}
-          fill="none"
-          stroke={COR_LINK_NEUTRO}
-          strokeOpacity={0.45}
-          strokeWidth={Math.max(altura(banda_2_3), 0)}
-        />
-        <path
-          d={caminho(COL1_X + LARGURA_NO, banda_2_4, COL2_X, banda_4_de2)}
-          fill="none"
-          stroke={COR_LINK_NEUTRO}
-          strokeOpacity={0.45}
-          strokeWidth={Math.max(altura(banda_2_4), 0)}
-        />
+          {/* Filete "escoando" por cima do caminho crítico — <animate> nativo do
+              SVG (SMIL), não depende de nenhum bundler/CSS-in-JS. Puramente
+              decorativo: não desenhado quando o usuário pediu menos movimento
+              (prefers-reduced-motion), e nunca altera a largura real da faixa. */}
+          {!reduzirMovimento && (
+            <path
+              d={caminho(COL1_X + LARGURA_NO, banda_1_3, COL2_X, banda_3_de1)}
+              fill="none"
+              stroke="#fca5a5"
+              strokeWidth={Math.min(4, Math.max(altura(banda_1_3), 0))}
+              strokeDasharray="12 24"
+              strokeLinecap="round"
+              opacity={0.85}
+              aria-hidden="true"
+            >
+              <animate
+                attributeName="stroke-dashoffset"
+                from="36"
+                to="0"
+                dur="1.2s"
+                repeatCount="indefinite"
+              />
+            </path>
+          )}
+        </g>
+        <g
+          role="button"
+          tabIndex={0}
+          className="cursor-pointer outline-none"
+          aria-label="Filtrar: alta vulnerabilidade e com contrato de financiamento"
+          {...handlersSegmento(aoClicarSegmento, { vulnerabilidade: 'alta', financiamento: 'com' })}
+        >
+          <path
+            d={caminho(COL1_X + LARGURA_NO, banda_1_4, COL2_X, banda_4_de1)}
+            fill="none"
+            stroke={COR_LINK_NEUTRO}
+            strokeOpacity={filtrosIguais(filtroAtivo, { vulnerabilidade: 'alta', financiamento: 'com' }) ? 0.75 : 0.45}
+            strokeWidth={Math.max(altura(banda_1_4), 0)}
+          />
+        </g>
+        <g
+          role="button"
+          tabIndex={0}
+          className="cursor-pointer outline-none"
+          aria-label="Filtrar: vulnerabilidade moderada/baixa e sem contrato de financiamento"
+          {...handlersSegmento(aoClicarSegmento, { vulnerabilidade: 'moderada', financiamento: 'sem' })}
+        >
+          <path
+            d={caminho(COL1_X + LARGURA_NO, banda_2_3, COL2_X, banda_3_de2)}
+            fill="none"
+            stroke={COR_LINK_NEUTRO}
+            strokeOpacity={filtrosIguais(filtroAtivo, { vulnerabilidade: 'moderada', financiamento: 'sem' }) ? 0.75 : 0.45}
+            strokeWidth={Math.max(altura(banda_2_3), 0)}
+          />
+        </g>
+        <g
+          role="button"
+          tabIndex={0}
+          className="cursor-pointer outline-none"
+          aria-label="Filtrar: vulnerabilidade moderada/baixa e com contrato de financiamento"
+          {...handlersSegmento(aoClicarSegmento, { vulnerabilidade: 'moderada', financiamento: 'com' })}
+        >
+          <path
+            d={caminho(COL1_X + LARGURA_NO, banda_2_4, COL2_X, banda_4_de2)}
+            fill="none"
+            stroke={COR_LINK_NEUTRO}
+            strokeOpacity={filtrosIguais(filtroAtivo, { vulnerabilidade: 'moderada', financiamento: 'com' }) ? 0.75 : 0.45}
+            strokeWidth={Math.max(altura(banda_2_4), 0)}
+          />
+        </g>
 
-        {/* Nós */}
-        <NoSankey x={COL0_X} banda={no0} cor={COR_QUADRANTE.vazio_de_acesso} rotulo="Vazios de Acesso" valor={totalVazios} />
-        <NoSankey x={COL1_X} banda={no1} cor={COR_ALTA_VULNERABILIDADE} rotulo="Alta vulnerabilidade habitacional (IVSH)" valor={n1} />
-        <NoSankey x={COL1_X} banda={no2} cor={COR_MODERADA} rotulo="Vulnerabilidade habitacional moderada/baixa" valor={n2} />
-        <NoSankey x={COL2_X} banda={no3} cor={COR_SEM_FINANCIAMENTO} rotulo="Sem contrato (Reforma Casa Brasil Solar)" valor={n1a + n2a} />
-        <NoSankey x={COL2_X} banda={no4} cor={COR_COM_FINANCIAMENTO} rotulo="Com contrato (Reforma Casa Brasil Solar)" valor={n1b + n2b} />
+        {/* Nós — clicáveis. O nó raiz limpa o filtro (representa a população
+            inteira, "voltar pra visão geral"); os demais definem só o eixo que
+            representam (o outro eixo some, diferente de clicar num link). */}
+        <NoSankey
+          x={COL0_X}
+          banda={no0}
+          cor={COR_QUADRANTE.vazio_de_acesso}
+          rotulo="Vazios de Acesso"
+          valor={totalVazios}
+          ativo={filtrosIguais(filtroAtivo, FILTRO_FUNIL_VAZIO)}
+          {...handlersSegmento(aoClicarSegmento, FILTRO_FUNIL_VAZIO)}
+        />
+        <NoSankey
+          x={COL1_X}
+          banda={no1}
+          cor={COR_ALTA_VULNERABILIDADE}
+          rotulo="Alta vulnerabilidade habitacional (IVSH)"
+          valor={n1}
+          ativo={filtrosIguais(filtroAtivo, { vulnerabilidade: 'alta', financiamento: null })}
+          {...handlersSegmento(aoClicarSegmento, { vulnerabilidade: 'alta', financiamento: null })}
+        />
+        <NoSankey
+          x={COL1_X}
+          banda={no2}
+          cor={COR_MODERADA}
+          rotulo="Vulnerabilidade habitacional moderada/baixa"
+          valor={n2}
+          ativo={filtrosIguais(filtroAtivo, { vulnerabilidade: 'moderada', financiamento: null })}
+          {...handlersSegmento(aoClicarSegmento, { vulnerabilidade: 'moderada', financiamento: null })}
+        />
+        <NoSankey
+          x={COL2_X}
+          banda={no3}
+          cor={COR_SEM_FINANCIAMENTO}
+          rotulo="Sem contrato (Reforma Casa Brasil Solar)"
+          valor={n1a + n2a}
+          ativo={filtrosIguais(filtroAtivo, { vulnerabilidade: null, financiamento: 'sem' })}
+          {...handlersSegmento(aoClicarSegmento, { vulnerabilidade: null, financiamento: 'sem' })}
+        />
+        <NoSankey
+          x={COL2_X}
+          banda={no4}
+          cor={COR_COM_FINANCIAMENTO}
+          rotulo="Com contrato (Reforma Casa Brasil Solar)"
+          valor={n1b + n2b}
+          ativo={filtrosIguais(filtroAtivo, { vulnerabilidade: null, financiamento: 'com' })}
+          {...handlersSegmento(aoClicarSegmento, { vulnerabilidade: null, financiamento: 'com' })}
+        />
       </svg>
+      <p className="text-[10px] text-stone-400">Clique num bloco ou fluxo para filtrar a lista de prioridade acima.</p>
 
       <p className="text-xs text-stone-400">
         "Sem contrato" usa a lente <code>alertaDeficitCredito</code> já calculada pelo backend —
@@ -312,11 +444,15 @@ interface NoSankeyProps {
   cor: string;
   rotulo: string;
   valor: number;
+  /** Destaca o nó (contorno escuro) quando é exatamente o filtro ativo agora. */
+  ativo?: boolean;
+  onClick?: () => void;
+  onKeyDown?: (evento: KeyboardEvent<SVGGElement>) => void;
 }
 
 const ALTURA_LINHA_ROTULO = 13;
 
-function NoSankey({ x, banda, cor, rotulo, valor }: NoSankeyProps) {
+function NoSankey({ x, banda, cor, rotulo, valor, ativo, onClick, onKeyDown }: NoSankeyProps) {
   const alturaNo = Math.max(altura(banda), 0);
   const linhasRotulo = quebrarRotulo(rotulo, MAX_CARACTERES_POR_LINHA);
   const alturaBlocoTexto = (linhasRotulo.length + 1) * ALTURA_LINHA_ROTULO;
@@ -324,9 +460,25 @@ function NoSankey({ x, banda, cor, rotulo, valor }: NoSankeyProps) {
   const xTexto = x + LARGURA_NO + 10;
 
   return (
-    <g>
-      <rect x={x} y={banda.y0} width={LARGURA_NO} height={alturaNo} fill={cor} rx={2}>
-        <title>{`${rotulo}: ${valor.toLocaleString('pt-BR')} municípios`}</title>
+    <g
+      role="button"
+      tabIndex={0}
+      className="cursor-pointer outline-none"
+      aria-label={`Filtrar: ${rotulo}`}
+      onClick={onClick}
+      onKeyDown={onKeyDown}
+    >
+      <rect
+        x={x}
+        y={banda.y0}
+        width={LARGURA_NO}
+        height={alturaNo}
+        fill={cor}
+        rx={2}
+        stroke={ativo ? '#1c1917' : 'none'}
+        strokeWidth={ativo ? 2 : 0}
+      >
+        <title>{`${rotulo}: ${valor.toLocaleString('pt-BR')} municípios — clique para filtrar`}</title>
       </rect>
       {linhasRotulo.map((linha, indice) => (
         <text

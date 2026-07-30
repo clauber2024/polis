@@ -5,6 +5,7 @@ import type { MunicipioClassificado } from '../../types/api';
 import { formatarValor } from '../../utils/formatadores';
 import { RankingItem } from '../ranking/RankingItem';
 import { ModalDetalhamentoVazios } from './ModalDetalhamentoVazios';
+import type { FiltroFunil } from './FunilExclusaoHabitacional';
 
 /** Tom neutro suave para a barra — mantém o vermelho reservado ao ícone/badge, ver docstring do arquivo. */
 const COR_BARRA_NEUTRA = '#d6d3d1';
@@ -58,6 +59,13 @@ const COR_BARRA_NEUTRA = '#d6d3d1';
  * principal (removida — ver App.tsx). Top 5 sempre fixo aqui; o "Carregar
  * mais" virou "abrir o detalhamento", não "mostrar mais linhas na mesma
  * lista".
+ *
+ * Filtro do Funil (30/07/2026, mesma sessão — FunilExclusaoHabitacional
+ * virou clicável): `filtroFunil` é o SEGUNDO filtro independente aplicado
+ * aqui, combinado com `ufFiltro` por AND (ex.: "Bahia" + "alta
+ * vulnerabilidade + sem contrato" ao mesmo tempo, se os dois estiverem
+ * ativos). Mesma filosofia do UF — filtra a lista na própria tela em vez
+ * de navegar pra outro lugar.
  */
 
 const TOPO_INICIAL = 5;
@@ -66,8 +74,22 @@ interface RankingPrioridadeExecutivoProps {
   dados: VaziosDeAcessoCompleto;
   /** UF selecionada no Treemap ('' = sem filtro, visão nacional) — controlado pelo pai. */
   ufFiltro: string;
-  /** Limpa o filtro (botão "Ver Nacional") — controlado pelo pai, mesmo estado que TreemapProporcaoNacional lê. */
+  /** Limpa o filtro de UF (botão "Ver Nacional") — controlado pelo pai, mesmo estado que TreemapProporcaoNacional lê. */
   aoLimparFiltro: () => void;
+  /** Segmento selecionado no Funil (vulnerabilidade × financiamento) — controlado pelo pai, mesmo estado que FunilExclusaoHabitacional lê/escreve. */
+  filtroFunil: FiltroFunil;
+  /** Limpa o filtro do Funil — controlado pelo pai. */
+  aoLimparFiltroFunil: () => void;
+}
+
+/** Descrição legível do filtro de funil ativo, ou null se nenhum eixo estiver filtrado. */
+function rotuloFiltroFunil(filtro: FiltroFunil): string | null {
+  const partes: string[] = [];
+  if (filtro.vulnerabilidade === 'alta') partes.push('alta vulnerabilidade habitacional');
+  if (filtro.vulnerabilidade === 'moderada') partes.push('vulnerabilidade moderada/baixa');
+  if (filtro.financiamento === 'sem') partes.push('sem contrato de financiamento');
+  if (filtro.financiamento === 'com') partes.push('com contrato de financiamento');
+  return partes.length > 0 ? partes.join(' + ') : null;
 }
 
 function IconeAlertaTriangular({ className }: { className?: string }) {
@@ -116,7 +138,13 @@ function mediana(valores: number[]): number | null {
     : ordenados[meio];
 }
 
-export function RankingPrioridadeExecutivo({ dados, ufFiltro, aoLimparFiltro }: RankingPrioridadeExecutivoProps) {
+export function RankingPrioridadeExecutivo({
+  dados,
+  ufFiltro,
+  aoLimparFiltro,
+  filtroFunil,
+  aoLimparFiltroFunil,
+}: RankingPrioridadeExecutivoProps) {
   const [modalAberto, setModalAberto] = useState(false);
 
   const comIvsh = dados.municipios.filter(
@@ -124,9 +152,16 @@ export function RankingPrioridadeExecutivo({ dados, ufFiltro, aoLimparFiltro }: 
       m.quadrante === 'vazio_de_acesso' && m.ivsh !== null,
   );
   const ordenadosNacional = [...comIvsh].sort((a, b) => b.ivsh - a.ivsh);
-  const ordenados = ufFiltro
-    ? ordenadosNacional.filter((m) => m.uf === ufFiltro)
-    : ordenadosNacional;
+  const ordenados = ordenadosNacional.filter((m) => {
+    if (ufFiltro && m.uf !== ufFiltro) return false;
+    const altaVulnerabilidade = m.classificacaoIvsh === 'muito_alto' || m.classificacaoIvsh === 'alto';
+    if (filtroFunil.vulnerabilidade === 'alta' && !altaVulnerabilidade) return false;
+    if (filtroFunil.vulnerabilidade === 'moderada' && altaVulnerabilidade) return false;
+    if (filtroFunil.financiamento === 'sem' && !m.alertaDeficitCredito) return false;
+    if (filtroFunil.financiamento === 'com' && m.alertaDeficitCredito) return false;
+    return true;
+  });
+  const rotuloFunil = rotuloFiltroFunil(filtroFunil);
 
   // Mediana de apresentação (client-side, sobre os classificados) — não é a
   // metodologia oficial de Vazio de Acesso, que segue sempre do backend
@@ -149,6 +184,17 @@ export function RankingPrioridadeExecutivo({ dados, ufFiltro, aoLimparFiltro }: 
   const rotuloMediana = ufFiltro || 'Brasil';
   const maxIvsh = ordenados.length > 0 ? ordenados[0].ivsh : 0;
   const visiveis = ordenados.slice(0, TOPO_INICIAL);
+
+  // Piso dinâmico da barra (30/07/2026, feedback do usuário: os valores de
+  // IVSH do Top 5 são muito próximos entre si — ex. 0,28 vs 0,27 — e numa
+  // escala 0–max as barras ficavam visualmente idênticas). Derivado do
+  // menor IVSH REAL entre os municípios exibidos agora — NUNCA um piso
+  // fixo tipo 0,20: o Top 5 real pode estar em qualquer faixa da
+  // distribuição de IVSH, um número chutado fabricaria uma escala que não
+  // corresponde ao dado. 5% de folga abaixo do mínimo real para o 5º
+  // colocado nunca renderizar com barra de largura zero (pareceria bug, não
+  // "é o menos pior dos 5 piores").
+  const pisoIvsh = visiveis.length > 0 ? Math.min(...visiveis.map((m) => m.ivsh)) * 0.95 : 0;
 
   return (
     <div>
@@ -176,22 +222,39 @@ export function RankingPrioridadeExecutivo({ dados, ufFiltro, aoLimparFiltro }: 
           </div>
         )}
       </div>
+
+      {rotuloFunil && (
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-stone-50 px-2.5 py-1.5">
+          <span className="text-[10px] font-bold text-stone-600">
+            Segmento do funil: <span className="text-stone-900">{rotuloFunil}</span>
+          </span>
+          <button
+            type="button"
+            onClick={aoLimparFiltroFunil}
+            className="inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-[10px] font-bold text-stone-500 uppercase shadow-sm transition-colors hover:bg-stone-100 hover:text-stone-700"
+          >
+            <IconeX className="h-3 w-3" />
+            Limpar
+          </button>
+        </div>
+      )}
+
       <h3 className="text-sm font-black tracking-tight text-stone-900">
-        {ufFiltro
-          ? `${ordenados.length.toLocaleString('pt-BR')} município(s) em ${ufFiltro}`
+        {ufFiltro || rotuloFunil
+          ? `${ordenados.length.toLocaleString('pt-BR')} município(s) filtrado(s)`
           : `Top ${Math.min(TOPO_INICIAL, ordenados.length)}: dupla exclusão`}
       </h3>
       <p className="mt-1 mb-3 text-xs leading-relaxed text-stone-500">
-        {ufFiltro
-          ? `Filtrado pelo bloco de ${ufFiltro} no treemap acima — municípios em Vazio de Acesso ordenados pelo IVSH dentro do estado.`
+        {ufFiltro || rotuloFunil
+          ? `Filtrado pelo${ufFiltro ? ` bloco de ${ufFiltro} no treemap` : ''}${ufFiltro && rotuloFunil ? ' e pelo' : ''}${rotuloFunil ? ` segmento "${rotuloFunil}" no funil` : ''} acima — municípios em Vazio de Acesso ordenados pelo IVSH.`
           : 'Municípios em Vazio de Acesso (alto potencial solar, baixa adoção residencial) que lideram o IVSH — vulnerabilidade sócio-habitacional-energética.'}{' '}
         Clique num município para abrir a Ficha no mapa.
       </p>
 
       {ordenados.length === 0 && (
         <p className="rounded-xl border border-dashed border-stone-200 p-6 text-center text-sm font-bold text-stone-400">
-          {ufFiltro
-            ? `Nenhum município de ${ufFiltro} está em Vazio de Acesso com IVSH calculado.`
+          {ufFiltro || rotuloFunil
+            ? 'Nenhum município em Vazio de Acesso corresponde a essa combinação de filtros.'
             : 'Nenhum município classificado em Vazio de Acesso tem IVSH calculado.'}
         </p>
       )}
@@ -214,6 +277,7 @@ export function RankingPrioridadeExecutivo({ dados, ufFiltro, aoLimparFiltro }: 
                     medianaNacional={medianaExibida}
                     rotuloMediana={rotuloMediana}
                     maxRanking={maxIvsh}
+                    minRanking={pisoIvsh}
                     cor={COR_BARRA_NEUTRA}
                   />
                 </Link>
