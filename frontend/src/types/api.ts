@@ -502,8 +502,8 @@ export interface DistribuidoraRanking {
   /** NULL quando prazoConfiavel = false — NUNCA ler como "0% no prazo". */
   pctDentroDoPrazo: number | null;
   nMunicipiosAtendidos: number | null;
-  nMunicipiosComIvs: number | null;
-  ivsMedioPonderadoPorPopulacao: number | null;
+  nMunicipiosComIvsh: number | null;
+  ivshMedioPonderadoPorPopulacao: number | null;
   eixoTecnico: number | null;
   eixoJustica: number | null;
   scoreComposto: number | null;

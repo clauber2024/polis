@@ -12,12 +12,14 @@ cruza o dataset de fila de conexão MMGD da ANEEL (nomes de distribuidora livres
 `SigAgenteDistribuicao`) com o schema INDQUAL (`qualidade_conjuntos.sig_agente`,
 nomenclatura própria) via crosswalk manual + automático
 (`backend/src/etl/loaders/extrair_desempenho_conexao_mmgd.py`). Qualquer distribuidora
-sem par no INDQUAL, ou cujos municípios atendidos não têm IVS calculável, cai em
+sem par no INDQUAL, ou cujos municípios atendidos não têm IVSH calculável, cai em
 `distribuidorasComDadosIncompletos`.
 
 **Sintoma:**
-Uma distribuidora aparece com `eixoJustica: null` / `ivsMedioPonderadoPorPopulacao: null`,
-mesmo com `sig_agente_indqual` preenchido. Fácil concluir precipitadamente "é lacuna de
+Uma distribuidora aparece com `eixoJustica: null` / `ivshMedioPonderadoPorPopulacao: null`
+(campo renomeado de `ivsMedioPonderadoPorPopulacao` em 30/07/2026, quando o eixo trocou de
+IVS para IVSH — ver docstring de `rankingDistribuidoras.service.ts`), mesmo com
+`sig_agente_indqual` preenchido. Fácil concluir precipitadamente "é lacuna de
 dado na fonte ANEEL/INDQUAL" (foi a primeira hipótese registrada, ver ARQUITETURA.md,
 "Ideia de produto: ranking público de distribuidoras") sem checar a causa real.
 

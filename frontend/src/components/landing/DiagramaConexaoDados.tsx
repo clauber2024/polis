@@ -119,8 +119,8 @@ const INDICADORES: IndicadorComposto[] = [
   },
   {
     id: 'ranking_distribuidoras',
-    nome: 'Ranking de Distribuidoras',
-    descricao: 'Desempenho de conexão de MMGD por distribuidora',
+    nome: 'Matriz de Desempenho Setorial',
+    descricao: 'Fricção de conexão de MMGD x IVSH, por concessionária',
     origens: ['qualidade_fornecimento', 'mmgd'],
     cor: 'chumbo',
   },

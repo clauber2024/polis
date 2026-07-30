@@ -16,7 +16,7 @@
  * `prazo_confiavel = false`) como "0% no prazo" — ver ARQUITETURA.md,
  * "ACHADO CRITICO PARA ESTE PRODUTO".
  *
- * EIXO JUSTIÇA ENERGÉTICA: IVS médio dos municípios atendidos pela
+ * EIXO JUSTIÇA ENERGÉTICA: IVSH médio dos municípios atendidos pela
  * distribuidora, PONDERADO POR POPULAÇÃO ESTIMADA (decisão do ADR, item 2 —
  * antes era média simples no protótipo). Município com área de concessão
  * dividida (mais de uma distribuidora no schema INDQUAL) fica de fora —
@@ -25,6 +25,15 @@
  * População estimada = densidade populacional x área (mesmo método já usado
  * em `vaziosDeAcesso.service.ts` e no RF-005 — o Atlas não guarda população
  * absoluta).
+ *
+ * CORREÇÃO DE ESCOPO (30/07/2026, pedido do usuário — reposicionamento da
+ * página de "Ranking de distribuidoras" para "Matriz de Desempenho Setorial"):
+ * o eixo de justiça passou de IVS para IVSH (`vw_ivsh_consolidado`, migration
+ * 0028) — o IVS geral (`vw_ivs_consolidado`) exclui moradia de propósito (ver
+ * docstring da migration 0028), então não capturava vulnerabilidade
+ * habitacional na leitura de "onde a fricção de conexão dói mais". IVSH já é
+ * uma view materializada e validada (5.573 municípios, ver Estado Real do
+ * Projeto em CLAUDE.md) — troca de fonte, não invenção de indicador novo.
  *
  * SEGREGAÇÃO VISUAL (ADR, item 1): distribuidoras com os dois eixos
  * disponíveis E prazo confiável entram em `rankingPrincipal` (ordenado por
@@ -49,9 +58,9 @@ interface LinhaBruta {
   prazoConfiavel: boolean;
   pctDentroDoPrazo: number | null;
   nMunicipiosAtendidos: number | null;
-  nMunicipiosComIvs: number | null;
-  populacaoEstimadaComIvs: number | null;
-  ivsMedioPonderadoPorPopulacao: number | null;
+  nMunicipiosComIvsh: number | null;
+  populacaoEstimadaComIvsh: number | null;
+  ivshMedioPonderadoPorPopulacao: number | null;
 }
 
 const LIMIAR_AMOSTRA_PEQUENA = 1000;
@@ -87,27 +96,28 @@ async function buscarPainelBruto(): Promise<LinhaBruta[]> {
     municipio_dados AS (
         SELECT
             mdu.sig_agente,
-            vsc.ivs,
+            ivsh.ivsh,
             vsc.densidade_populacional * m.area_km2 AS populacao_estimada
         FROM municipio_distribuidora_unica mdu
         JOIN municipios m ON m.codigo_ibge = mdu.codigo_ibge
         JOIN unidades_espaciais ue
             ON ue.municipio_pai_codigo_ibge = m.codigo_ibge AND ue.tipo = 'municipio'
         LEFT JOIN vw_indicadores_sociais_consolidado vsc ON vsc.unidade_espacial_id = ue.id
+        LEFT JOIN vw_ivsh_consolidado ivsh ON ivsh.codigo_ibge = mdu.codigo_ibge
     ),
     justica_por_distribuidora AS (
         SELECT
             sig_agente,
             COUNT(*)::int AS n_municipios,
             COUNT(*) FILTER (
-                WHERE ivs IS NOT NULL AND populacao_estimada IS NOT NULL AND populacao_estimada > 0
-            )::int AS n_municipios_com_ivs,
+                WHERE ivsh IS NOT NULL AND populacao_estimada IS NOT NULL AND populacao_estimada > 0
+            )::int AS n_municipios_com_ivsh,
             SUM(populacao_estimada) FILTER (
-                WHERE ivs IS NOT NULL AND populacao_estimada IS NOT NULL AND populacao_estimada > 0
-            ) AS soma_populacao_com_ivs,
-            SUM(ivs * populacao_estimada) FILTER (
-                WHERE ivs IS NOT NULL AND populacao_estimada IS NOT NULL AND populacao_estimada > 0
-            ) AS soma_ivs_x_populacao
+                WHERE ivsh IS NOT NULL AND populacao_estimada IS NOT NULL AND populacao_estimada > 0
+            ) AS soma_populacao_com_ivsh,
+            SUM(ivsh * populacao_estimada) FILTER (
+                WHERE ivsh IS NOT NULL AND populacao_estimada IS NOT NULL AND populacao_estimada > 0
+            ) AS soma_ivsh_x_populacao
         FROM municipio_dados
         GROUP BY sig_agente
     )
@@ -122,11 +132,11 @@ async function buscarPainelBruto(): Promise<LinhaBruta[]> {
         d.prazo_confiavel                AS "prazoConfiavel",
         d.pct_dentro_do_prazo            AS "pctDentroDoPrazo",
         j.n_municipios                   AS "nMunicipiosAtendidos",
-        j.n_municipios_com_ivs           AS "nMunicipiosComIvs",
-        j.soma_populacao_com_ivs         AS "populacaoEstimadaComIvs",
-        CASE WHEN j.soma_populacao_com_ivs > 0
-             THEN j.soma_ivs_x_populacao / j.soma_populacao_com_ivs
-             ELSE NULL END               AS "ivsMedioPonderadoPorPopulacao"
+        j.n_municipios_com_ivsh          AS "nMunicipiosComIvsh",
+        j.soma_populacao_com_ivsh        AS "populacaoEstimadaComIvsh",
+        CASE WHEN j.soma_populacao_com_ivsh > 0
+             THEN j.soma_ivsh_x_populacao / j.soma_populacao_com_ivsh
+             ELSE NULL END               AS "ivshMedioPonderadoPorPopulacao"
     FROM desempenho_conexao_distribuidoras d
     LEFT JOIN justica_por_distribuidora j ON j.sig_agente = d.sig_agente_indqual
     ORDER BY d.distribuidora;
@@ -157,8 +167,8 @@ export interface DistribuidoraRanking {
   prazoConfiavel: boolean;
   pctDentroDoPrazo: number | null;
   nMunicipiosAtendidos: number | null;
-  nMunicipiosComIvs: number | null;
-  ivsMedioPonderadoPorPopulacao: number | null;
+  nMunicipiosComIvsh: number | null;
+  ivshMedioPonderadoPorPopulacao: number | null;
   eixoTecnico: number | null;
   eixoJustica: number | null;
   scoreComposto: number | null;
@@ -167,13 +177,14 @@ export interface DistribuidoraRanking {
 }
 
 const NOTA_METODOLOGICA_JUSTICA =
-  'O eixo de justiça energética é o IVS médio dos municípios atendidos por cada ' +
-  'distribuidora, ponderado por população estimada. Um score composto ruim aqui pode ' +
-  'refletir o perfil social da região atendida (ex.: estados do Nordeste têm IVS ' +
+  'O eixo de justiça energética é o IVSH (Índice de Vulnerabilidade Sócio-Habitacional-' +
+  'Energética) médio dos municípios atendidos por cada distribuidora, ponderado por ' +
+  'população estimada. Um índice de fricção ruim aqui pode refletir o perfil ' +
+  'socio-habitacional da região atendida (ex.: estados do Nordeste têm IVSH ' +
   'estruturalmente mais alto/pior no país), não necessariamente desempenho operacional ' +
-  'isolado da distribuidora — isso é especialmente relevante para as subsidiárias do ' +
-  'Grupo Equatorial fora de Goiás (MA, PI, AL, PA), concentradas na metade pior do ' +
-  'ranking: parte disso é vulnerabilidade social regional, não só operação. Ver ' +
+  'isolado da concessionária — isso é especialmente relevante para as subsidiárias do ' +
+  'Grupo Equatorial fora de Goiás (MA, PI, AL, PA), concentradas na metade de maior ' +
+  'fricção: parte disso é vulnerabilidade social regional, não só operação. Ver ' +
   'ARQUITETURA.md, "Ideia de produto: ranking público de distribuidoras", e ' +
   'docs/DECISOES.md para o histórico completo desta decisão.';
 
@@ -221,7 +232,7 @@ export async function calcularRankingDistribuidoras(): Promise<RankingDistribuid
         ? componentesTecnico.reduce((a, b) => a + b, 0) / componentesTecnico.length
         : null;
 
-    const eixoJustica = linha.ivsMedioPonderadoPorPopulacao;
+    const eixoJustica = linha.ivshMedioPonderadoPorPopulacao;
     const scoreApenasTecnico = eixoJustica === null;
 
     const componentesScore = [eixoTecnico, eixoJustica].filter(
@@ -257,8 +268,8 @@ export async function calcularRankingDistribuidoras(): Promise<RankingDistribuid
       prazoConfiavel: linha.prazoConfiavel,
       pctDentroDoPrazo: linha.pctDentroDoPrazo,
       nMunicipiosAtendidos: linha.nMunicipiosAtendidos,
-      nMunicipiosComIvs: linha.nMunicipiosComIvs,
-      ivsMedioPonderadoPorPopulacao: linha.ivsMedioPonderadoPorPopulacao,
+      nMunicipiosComIvsh: linha.nMunicipiosComIvsh,
+      ivshMedioPonderadoPorPopulacao: linha.ivshMedioPonderadoPorPopulacao,
       eixoTecnico,
       eixoJustica,
       scoreComposto,
@@ -283,7 +294,7 @@ export async function calcularRankingDistribuidoras(): Promise<RankingDistribuid
       eixoTecnico:
         'Média de (1 - % conectado) e (1 - % dentro do prazo), normalizados min-max entre distribuidoras (0 = melhor, 1 = pior). Distribuidoras sem prazo confiável usam só a taxa de conexão.',
       eixoJustica:
-        'IVS médio dos municípios atendidos, ponderado por população estimada (densidade x área) — 0 = melhor, 1 = pior, mesma escala do IVS Consolidado.',
+        'IVSH médio dos municípios atendidos, ponderado por população estimada (densidade x área) — 0 = melhor, 1 = pior, mesma escala do IVSH Consolidado (IVS + precariedade habitacional + insegurança da posse).',
       composicaoScore:
         'Média simples dos dois eixos, só quando ambos disponíveis (scoreApenasTecnico marca quando falta o eixo de justiça).',
       limiarAmostraPequena: LIMIAR_AMOSTRA_PEQUENA,
