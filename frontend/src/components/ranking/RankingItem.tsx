@@ -25,13 +25,21 @@ interface RankingItemProps {
   valorFormatado: string;
   /** Ex: "kW/1.000 hab", "R$/MWh", "kWh/m²·dia" — null quando o indicador não tem unidade (ex: índices 0–1). */
   unidade: string | null;
-  /** Valor de referência nacional para o traço vertical — null quando não há mediana nacional calculável para este indicador/lista. */
+  /** Valor de referência para o traço vertical — null quando não há mediana calculável para este indicador/lista. */
   medianaNacional: number | null;
   /** Maior valor da lista atual, para normalizar a barra (0 a 100%). */
   maxRanking: number;
   ehVazioDeAcesso?: boolean;
   /** Cor de destaque da barra (hex) — permite reaproveitar o componente em rankings de indicadores diferentes, cada um com sua cor. */
   cor: string;
+  /**
+   * Rótulo da referência de `medianaNacional` (30/07/2026: RankingPrioridadeExecutivo
+   * passa "UF" quando a lista está filtrada por estado — a mediana comparada
+   * deixa de ser nacional e vira estadual, então o rótulo precisa refletir
+   * isso, não é só cosmético). Default 'Brasil' preserva o comportamento
+   * original de PainelRanking.tsx (mapa), que nunca passa esta prop.
+   */
+  rotuloMediana?: string;
 }
 
 export function RankingItem({
@@ -44,6 +52,7 @@ export function RankingItem({
   maxRanking,
   ehVazioDeAcesso,
   cor,
+  rotuloMediana = 'Brasil',
 }: RankingItemProps) {
   // maxRanking <= 0 só ocorre com lista vazia/todos os valores em zero —
   // evita NaN/Infinity na largura da barra (0/0) e no width em %.
@@ -81,7 +90,7 @@ export function RankingItem({
           <div
             className="absolute top-0 z-10 h-full w-0.5 bg-stone-900 shadow-[0_0_2px_rgba(255,255,255,0.8)]"
             style={{ left: `${posicaoMediana}%` }}
-            title={`Mediana nacional: ${medianaNacional?.toLocaleString('pt-BR')}${unidade ? ` ${unidade}` : ''}`}
+            title={`Mediana ${rotuloMediana}: ${medianaNacional?.toLocaleString('pt-BR')}${unidade ? ` ${unidade}` : ''}`}
           />
         )}
       </div>
@@ -90,7 +99,7 @@ export function RankingItem({
         <div className="flex justify-between px-0.5 text-[8px] font-medium text-stone-400">
           <span>0</span>
           <span className="font-bold text-stone-600">
-            Mediana Brasil: {medianaNacional.toLocaleString('pt-BR')}
+            Mediana {rotuloMediana}: {medianaNacional.toLocaleString('pt-BR')}
           </span>
           <span>{maxRanking.toLocaleString('pt-BR')}</span>
         </div>

@@ -3,7 +3,11 @@ import { Link } from 'react-router-dom';
 import type { VaziosDeAcessoCompleto } from '../../services/vaziosDeAcesso.service';
 import type { MunicipioClassificado } from '../../types/api';
 import { formatarValor } from '../../utils/formatadores';
+import { RankingItem } from '../ranking/RankingItem';
 import { ModalDetalhamentoVazios } from './ModalDetalhamentoVazios';
+
+/** Tom neutro suave para a barra — mantém o vermelho reservado ao ícone/badge, ver docstring do arquivo. */
+const COR_BARRA_NEUTRA = '#d6d3d1';
 
 /**
  * Ranking Executivo — "por onde começar amanhã de manhã" (30/07/2026,
@@ -15,21 +19,26 @@ import { ModalDetalhamentoVazios } from './ModalDetalhamentoVazios';
  * habitacional já existe como alternador em PaginaVaziosDeAcesso.tsx,
  * AlternadorPriorizacaoIvsh.tsx; aqui ela é fixa, não um toggle).
  *
- * Cards Executivos (30/07/2026, revisão de design — substitui o RankingItem
- * com barra de progresso usado antes): a barra horizontal cinza tentava
- * resolver o "código de barras" de um feedback anterior, mas continuava
- * poluindo a leitura numa lista pensada para escaneamento rápido em
- * reunião. Trocado por um List-Group de cards limpos — posição numerada,
- * nome do município, valor bruto de IVSH e uma seta indicando drill-down —
- * sem nenhum gráfico de barra na linha. RankingItem (components/ranking/
- * RankingItem.tsx) continua existindo e é usado no ranking estadual do
- * mapa (PainelRanking.tsx) — não foi alterado, só parou de ser reaproveitado
- * aqui: os dois contextos têm necessidades diferentes (lá compara o valor
- * contra o maior da UF e a mediana nacional via barra; aqui o objetivo é
- * escaneamento rápido do nome + posição, não comparação visual de
- * magnitude). Clique num município navega para a Ficha no mapa
- * (`/mapa?municipio=<codigoIbge>`), mesmo padrão de drill-down já usado em
- * PaginaVaziosDeAcesso.tsx.
+ * Barra de comparação (30/07/2026 — a versão "Cards Executivos" sem barra,
+ * de uma rodada anterior, foi revertida a pedido do usuário: a barra não é
+ * poluição, é informação — mostra o quanto cada município está acima/abaixo
+ * da referência). Reaproveita RankingItem (components/ranking/RankingItem.tsx
+ * — extraído do PainelRanking do mapa exatamente para listas de valor único
+ * como esta) em vez de duplicar o layout. Clique num município navega para a
+ * Ficha no mapa (`/mapa?municipio=<codigoIbge>`), mesmo padrão de drill-down
+ * já usado em PaginaVaziosDeAcesso.tsx.
+ *
+ * Mediana nacional OU estadual, conforme o filtro (30/07/2026, pedido do
+ * usuário na mesma revisão): sem `ufFiltro`, a barra compara cada município
+ * contra a mediana NACIONAL de IVSH (todos os municípios com dado, não só
+ * Vazio de Acesso — mesmo universo já usado antes desta revisão). Com
+ * `ufFiltro` ativo (clique no Treemap), a comparação vira a mediana DENTRO
+ * do estado filtrado — comparar contra o Brasil inteiro depois de já ter
+ * restringido a lista a um estado seria uma referência menos útil. RankingItem
+ * ganhou a prop opcional `rotuloMediana` para o rótulo do marcador
+ * acompanhar qual referência está sendo mostrada ("Mediana Brasil" vs.
+ * "Mediana BA") — default 'Brasil' preserva o comportamento de
+ * PainelRanking.tsx (mapa), que não passa essa prop.
  *
  * Filtro por UF (30/07/2026, mesma sessão — segunda resposta do usuário à
  * pergunta "o que acontece ao clicar num estado do Treemap": substitui a
@@ -98,21 +107,13 @@ function IconeX({ className }: { className?: string }) {
   );
 }
 
-function IconeSeta({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden="true"
-    >
-      <polyline points="9 18 15 12 9 6" />
-    </svg>
-  );
+function mediana(valores: number[]): number | null {
+  if (valores.length === 0) return null;
+  const ordenados = [...valores].sort((a, b) => a - b);
+  const meio = Math.floor(ordenados.length / 2);
+  return ordenados.length % 2 === 0
+    ? (ordenados[meio - 1] + ordenados[meio]) / 2
+    : ordenados[meio];
 }
 
 export function RankingPrioridadeExecutivo({ dados, ufFiltro, aoLimparFiltro }: RankingPrioridadeExecutivoProps) {
@@ -127,6 +128,26 @@ export function RankingPrioridadeExecutivo({ dados, ufFiltro, aoLimparFiltro }: 
     ? ordenadosNacional.filter((m) => m.uf === ufFiltro)
     : ordenadosNacional;
 
+  // Mediana de apresentação (client-side, sobre os classificados) — não é a
+  // metodologia oficial de Vazio de Acesso, que segue sempre do backend
+  // (mesma ressalva já documentada em PainelRanking.tsx, mediana()).
+  // Nacional: sobre TODOS os municípios com ivsh calculado, não só Vazio de
+  // Acesso — mesmo universo já usado antes desta revisão. Estadual: mesmo
+  // universo, restrito à UF filtrada — só calculada quando há filtro.
+  const medianaNacionalIvsh = mediana(
+    dados.municipios.map((m) => m.ivsh).filter((v): v is number => v !== null),
+  );
+  const medianaEstadualIvsh = ufFiltro
+    ? mediana(
+        dados.municipios
+          .filter((m) => m.uf === ufFiltro)
+          .map((m) => m.ivsh)
+          .filter((v): v is number => v !== null),
+      )
+    : null;
+  const medianaExibida = ufFiltro ? medianaEstadualIvsh : medianaNacionalIvsh;
+  const rotuloMediana = ufFiltro || 'Brasil';
+  const maxIvsh = ordenados.length > 0 ? ordenados[0].ivsh : 0;
   const visiveis = ordenados.slice(0, TOPO_INICIAL);
 
   return (
@@ -177,27 +198,24 @@ export function RankingPrioridadeExecutivo({ dados, ufFiltro, aoLimparFiltro }: 
 
       {ordenados.length > 0 && (
         <>
-          <ol className="space-y-2">
+          <ol>
             {visiveis.map((m, indice) => (
               <li key={m.codigoIbge}>
                 <Link
                   to={`/mapa?municipio=${m.codigoIbge}`}
-                  className="group flex w-full items-center justify-between rounded-xl border border-stone-100 bg-white p-4 shadow-sm transition-all hover:border-red-200 hover:bg-red-50/30 hover:shadow-md"
+                  className="block border-l-2 border-l-transparent transition-colors hover:border-l-red-600"
                 >
-                  <div className="flex min-w-0 items-center gap-4">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-stone-50 text-sm font-black text-stone-400 transition-colors group-hover:bg-red-100 group-hover:text-red-700">
-                      {indice + 1}º
-                    </span>
-                    <h4 className="truncate text-sm font-black text-stone-900">
-                      {m.nome} <span className="font-bold text-stone-400">— {m.uf}</span>
-                    </h4>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-4">
-                    <span className="text-xs font-black text-stone-700 transition-colors group-hover:text-red-700">
-                      IVSH {formatarValor(m.ivsh, 'numero')}
-                    </span>
-                    <IconeSeta className="h-5 w-5 shrink-0 text-stone-300 transition-transform group-hover:translate-x-1 group-hover:text-red-600" />
-                  </div>
+                  <RankingItem
+                    posicao={indice + 1}
+                    nomeMunicipio={`${m.nome} — ${m.uf}`}
+                    valor={m.ivsh}
+                    valorFormatado={`IVSH ${formatarValor(m.ivsh, 'numero')}`}
+                    unidade={null}
+                    medianaNacional={medianaExibida}
+                    rotuloMediana={rotuloMediana}
+                    maxRanking={maxIvsh}
+                    cor={COR_BARRA_NEUTRA}
+                  />
                 </Link>
               </li>
             ))}

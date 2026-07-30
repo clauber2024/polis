@@ -56,8 +56,16 @@ const LARGURA_NO = 10;
 const COL0_X = 6;
 const COL1_X = 280;
 const COL2_X = 600;
-/** Quebra defensiva — qualquer rótulo mais longo que isso some para a próxima linha, não é cortado pelo viewBox. */
-const MAX_CARACTERES_POR_LINHA = 34;
+/**
+ * Quebra defensiva — qualquer rótulo mais longo que isso vai para a
+ * próxima linha, nunca é cortado pelo viewBox. Reduzido de 34 para 24
+ * (30/07/2026, segunda rodada de auditoria): 34 caracteres a ~7,3px cada
+ * (estimativa conservadora para fontWeight 800/Inter Black, mais largo que
+ * peso normal) já encostava na borda direita da coluna 2 (~280px
+ * disponíveis) — sem poder testar visualmente aqui, prefiro linhas bem
+ * mais curtas com folga real a confiar numa estimativa de pixel no limite.
+ */
+const MAX_CARACTERES_POR_LINHA = 24;
 
 const COR_ALTA_VULNERABILIDADE = '#991b1b';
 const COR_MODERADA = '#a8a29e';
