@@ -16,6 +16,38 @@ interface GraficoRadarProps {
   indicadores: IndicadorComparavel[];
 }
 
+interface PropsTickEixoRadar {
+  x: number | string;
+  y: number | string;
+  textAnchor: 'start' | 'middle' | 'end' | 'inherit';
+  payload: { value: string };
+}
+
+/**
+ * Tick customizado do eixo (30/07/2026, sugestão do usuário após a correção
+ * do clipping via rotuloCurto): o rótulo abreviado já resolve o clipping,
+ * mas ainda esconde o nome completo do indicador. `<title>` nativo do SVG
+ * mostra o nome completo ao passar o mouse, sem gastar espaço no card — só
+ * repassa x/y/textAnchor que o Recharts já calculou (não reimplementa a
+ * trigonometria de posicionamento do PolarAngleAxis).
+ *
+ * `rotulosCompletos` vem por closure (fábrica abaixo), não como prop do tick
+ * em si — o tipo que o Recharts espera para `tick` não tem esse campo, então
+ * incluí-lo na assinatura do componente quebra a atribuição de tipo.
+ */
+function criarTickEixoRadar(rotulosCompletos: Map<string, string>) {
+  return function TickEixoRadar({ x, y, textAnchor, payload }: PropsTickEixoRadar) {
+    const abreviado = payload.value;
+    const completo = rotulosCompletos.get(abreviado) ?? abreviado;
+    return (
+      <text x={x} y={y} textAnchor={textAnchor} fill="#78716c" fontSize={9} fontWeight={700}>
+        <title>{completo}</title>
+        {abreviado}
+      </text>
+    );
+  };
+}
+
 /**
  * RF-053 — visão multidimensional dos municípios comparados (recharts, já
  * dependência do frontend). Cada eixo é um indicador selecionado,
@@ -51,6 +83,16 @@ export function GraficoRadar({ municipios, indicadores }: GraficoRadarProps) {
     );
   }
 
+  // Nome completo por rótulo abreviado (30/07/2026) — alimenta o <title> do
+  // TickEixoRadar. Chave já inclui o "▼" para casar exatamente com o valor
+  // que dataKey="indicador" recebe em cada ponto.
+  const rotulosCompletos = new Map<string, string>(
+    indicadores.map((indicador) => {
+      const sufixo = indicador.sentido === 'negativo' ? ' ▼' : '';
+      return [(indicador.rotuloCurto ?? indicador.rotulo) + sufixo, indicador.rotulo + sufixo];
+    }),
+  );
+
   const dadosPorIndicador = indicadores.map((indicador) => {
     const valores = municipios
       .map((m) => m[indicador.id])
@@ -60,7 +102,12 @@ export function GraficoRadar({ municipios, indicadores }: GraficoRadarProps) {
     const amplitude = maximo - minimo;
 
     const ponto: Record<string, string | number> = {
-      indicador: indicador.rotulo + (indicador.sentido === 'negativo' ? ' ▼' : ''),
+      // rotuloCurto (30/07/2026, segunda rodada — auditoria de clipping):
+      // os rótulos completos ("Índice de Vulnerabilidade Social (IVS)", 39
+      // caracteres) são mais largos que o próprio card num grid de 2-3
+      // colunas — nenhuma margem razoável resolve texto mais largo que o
+      // container. Ver docstring de IndicadorComparavel.rotuloCurto.
+      indicador: (indicador.rotuloCurto ?? indicador.rotulo) + (indicador.sentido === 'negativo' ? ' ▼' : ''),
     };
     municipios.forEach((m) => {
       const valor = m[indicador.id];
@@ -113,10 +160,7 @@ export function GraficoRadar({ municipios, indicadores }: GraficoRadarProps) {
                     margin={{ top: 16, right: 50, bottom: 16, left: 50 }}
                   >
                     <PolarGrid stroke="#e7e5e4" />
-                    <PolarAngleAxis
-                      dataKey="indicador"
-                      tick={{ fill: '#78716c', fontSize: 9, fontWeight: 700 }}
-                    />
+                    <PolarAngleAxis dataKey="indicador" tick={criarTickEixoRadar(rotulosCompletos)} />
                     {/* Domínio fixo 0–1 em TODOS os radares — sem isso, cada
                         mini-gráfico escalaria sozinho e um valor baixo num
                         município pareceria visualmente tão "cheio" quanto um
