@@ -123,10 +123,9 @@ export function PaginaMapa() {
   const [erroVazios, setErroVazios] = useState<string | null>(null);
   // Médias nacionais de referência (auditoria de UX/UI, 30/07/2026) — mesmo
   // endpoint/contrato já usado pelo Painel Analítico (RF-049/050), reaproveitado
-  // aqui só para contextualizar a Ficha do Município (IndicadorComparativo).
-  // Fetch lazy, mesmo padrão/gatilho de garantirVaziosCarregados abaixo.
+  // aqui para contextualizar a Ficha do Município E o tooltip de hover do
+  // mapa (ver useEffect de busca eager abaixo).
   const [mediasNacionais, setMediasNacionais] = useState<MediasMunicipios | null>(null);
-  const [carregandoMediasNacionais, setCarregandoMediasNacionais] = useState(false);
 
   const [municipioSelecionado, setMunicipioSelecionado] =
     useState<MunicipioComIndicadores | null>(null);
@@ -191,6 +190,27 @@ export function PaginaMapa() {
     };
   }, []);
 
+  // Médias nacionais de referência (auditoria de UX/UI, 30/07/2026) — mesmo
+  // endpoint/contrato já usado pelo Painel Analítico (RF-049/050). Busca
+  // eager no mount (não lazy por seleção de município): o tooltip de hover
+  // do mapa (MapaMunicipios.tsx) também usa isso, e hover acontece sem
+  // nenhum município selecionado. Payload é pequeno (um número por
+  // indicador) — mesmo espírito de buscarEstadosGeoJson acima, falha
+  // silenciosa (os cards só voltam a exibir o valor bruto, sem termômetro).
+  useEffect(() => {
+    let ativo = true;
+    buscarMediasMunicipios()
+      .then((resultado) => {
+        if (ativo) setMediasNacionais(resultado);
+      })
+      .catch(() => {
+        // Sem médias nacionais — cards e tooltip caem no valor bruto.
+      });
+    return () => {
+      ativo = false;
+    };
+  }, []);
+
   // Busca a classificação de Vazios de Acesso na primeira vez que alguém
   // precisa dela (destaque no mapa OU badges do ranking). De propósito NO
   // HANDLER, não em useEffect: a primeira versão usava um efeito com
@@ -242,22 +262,6 @@ export function PaginaMapa() {
   useEffect(() => {
     if (municipioSelecionado) garantirVaziosCarregados();
   }, [municipioSelecionado]);
-
-  // Mesmo gatilho acima, mas para as médias nacionais do IndicadorComparativo
-  // (fetch independente — não faz parte da classificação de Vazios de
-  // Acesso). `if (mediasNacionais || carregandoMediasNacionais) return`
-  // garante idempotência, mesmo padrão de garantirVaziosCarregados.
-  useEffect(() => {
-    if (!municipioSelecionado || mediasNacionais || carregandoMediasNacionais) return;
-    setCarregandoMediasNacionais(true);
-    buscarMediasMunicipios()
-      .then(setMediasNacionais)
-      .catch(() => {
-        // Falha aqui não bloqueia o painel — os indicadores só voltam a
-        // exibir o valor bruto, sem o termômetro de comparação.
-      })
-      .finally(() => setCarregandoMediasNacionais(false));
-  }, [municipioSelecionado, mediasNacionais, carregandoMediasNacionais]);
 
   const quebras = useMemo(() => {
     if (!dados) return [];
@@ -476,6 +480,7 @@ export function PaginaMapa() {
             setMunicipioSelecionado(municipioPorCodigo.get(codigoIbge) ?? null)
           }
           aoClicarEstado={aoClicarEstadoNoMapa}
+          mediasNacionais={mediasNacionais?.medias ?? null}
         />
       </div>
 

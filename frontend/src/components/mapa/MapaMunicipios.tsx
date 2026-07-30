@@ -10,11 +10,13 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import type {
   EstadosGeoJson,
   FeatureCollectionMunicipios,
+  MediasMunicipios,
   MunicipioComIndicadores,
 } from '../../types/api';
 import { bboxDaGeometria, centroDaGeometria } from '../../utils/geometria';
 import type { IndicadorMapa } from '../../utils/indicadores';
 import { formatarValor } from '../../utils/formatadores';
+import { TermometroComparativo, type SemanticaIndicador } from './TermometroComparativo';
 
 /**
  * Componente de mapa (MapLibre GL) — SÓ renderização (CLAUDE.md Seção 4:
@@ -240,6 +242,14 @@ interface MapaMunicipiosProps {
    * acima desse zoom, clicar seleciona município.
    */
   aoClicarEstado?: (uf: string) => void;
+  /**
+   * Médias nacionais de referência (GET /api/municipios/medias, sem filtro)
+   * — auditoria de UX/UI de 30/07/2026: contextualiza o indicador ativo no
+   * tooltip de hover com o mesmo termômetro (TermometroComparativo) da Ficha
+   * do Município, para as duas telas não divergirem. `null` enquanto não
+   * carregou — o tooltip volta a exibir só o valor bruto até então.
+   */
+  mediasNacionais: MediasMunicipios['medias'] | null;
 }
 
 function expressaoChoropleth(
@@ -275,6 +285,7 @@ export function MapaMunicipios({
   codigosVisiveis,
   aoClicarMunicipio,
   aoClicarEstado,
+  mediasNacionais,
 }: MapaMunicipiosProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapaRef = useRef<MapaMapLibre | null>(null);
@@ -299,6 +310,20 @@ export function MapaMunicipios({
       dados.features.find((f) => f.properties.codigoIbge === hover.codigoIbge)?.properties ?? null
     );
   }, [hover, dados]);
+
+  // Termômetro de comparação nacional do tooltip de hover (30/07/2026) —
+  // mesma lógica da Ficha do Município (IndicadorComparativo), para o hover
+  // do mapa não divergir visualmente do painel de detalhe. `sentido` do
+  // catálogo (utils/indicadores.ts) já é a mesma semântica de "maior/menor é
+  // melhor" usada lá — nenhum indicador de mapa hoje é 'neutro', todos já
+  // carregam uma leitura de direção. Sem média nacional disponível (ainda
+  // carregando, ou indicador sem essa agregação na API), fica `null` — o
+  // tooltip cai no valor bruto de sempre.
+  const valorIndicadorHover = municipioHover ? municipioHover[indicador.id] : null;
+  const mediaNacionalIndicadorAtivo =
+    typeof valorIndicadorHover === 'number' ? (mediasNacionais?.[indicador.id] ?? null) : null;
+  const semanticaIndicadorAtivo: SemanticaIndicador =
+    indicador.sentido === 'positivo' ? 'maiorMelhor' : 'menorMelhor';
 
   const corChoropleth = useMemo(
     () => (quebras.length === 4 ? expressaoChoropleth(indicador, quebras) : COR_SEM_DADO),
@@ -895,8 +920,8 @@ export function MapaMunicipios({
             <span className="mb-1.5 block text-[11px] leading-tight font-bold text-stone-700">
               {indicador.rotulo}
             </span>
-            <div className="flex items-baseline gap-1">
-              <span className="text-xl font-black text-red-700">
+            <div className="mb-1.5 flex items-baseline gap-1">
+              <span className="text-xl font-black text-stone-900">
                 {municipioHover[indicador.id] !== null
                   ? formatarValor(municipioHover[indicador.id] as number, indicador.formato)
                   : 'Não disponível'}
@@ -905,6 +930,16 @@ export function MapaMunicipios({
                 <span className="text-[10px] font-bold text-stone-500">{indicador.unidade}</span>
               )}
             </div>
+
+            {typeof valorIndicadorHover === 'number' && typeof mediaNacionalIndicadorAtivo === 'number' && (
+              <TermometroComparativo
+                valor={valorIndicadorHover}
+                formato={indicador.formato}
+                unidade={indicador.unidade ?? undefined}
+                mediaNacional={mediaNacionalIndicadorAtivo}
+                semantica={semanticaIndicadorAtivo}
+              />
+            )}
           </div>
 
           {indicador.metadados && (

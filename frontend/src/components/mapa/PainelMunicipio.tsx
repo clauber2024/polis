@@ -12,6 +12,7 @@ import { CartaoDescompassoMorfologico } from './CartaoDescompassoMorfologico';
 import { CartaoVazioDeAcesso } from './CartaoVazioDeAcesso';
 import { CartaoDeficitCredito } from './CartaoDeficitCredito';
 import { IndicadorComparativo, type SemanticaIndicador } from './IndicadorComparativo';
+import { CardDadoNeutro, IconeMapa, IconeMoeda, IconeUsuarios, type IconeCard } from './CardDadoNeutro';
 
 interface PainelMunicipioProps {
   municipio: MunicipioComIndicadores;
@@ -112,6 +113,8 @@ interface LinhaIndicador {
    * sempre — nunca se fabrica uma média que a API não devolve.
    */
   semantica?: SemanticaIndicador;
+  /** Ícone do cabeçalho quando renderizado como CardDadoNeutro (dado absoluto, sem termômetro). */
+  icone?: IconeCard;
 }
 
 /**
@@ -279,6 +282,7 @@ export function PainelMunicipio({
           campo: 'numeroContratosReformaCasaBrasilSolar',
           rotulo: 'Contratos Reforma Casa Brasil Solar',
           formato: 'inteiro',
+          icone: IconeMoeda,
           descricao:
             'Programa Reforma Casa Brasil (Caixa/Ministério das Cidades), modalidade solar — extrato pontual nov/2025–abr/2026, fonte não pública.',
         },
@@ -286,6 +290,7 @@ export function PainelMunicipio({
           campo: 'valorLiberadoReformaCasaBrasilSolar',
           rotulo: 'Valor liberado (Reforma Casa Brasil Solar)',
           formato: 'moeda',
+          icone: IconeMoeda,
         },
       ],
     },
@@ -297,14 +302,16 @@ export function PainelMunicipio({
           rotulo: 'População (estimada)',
           formato: 'inteiro',
           unidade: 'hab',
+          icone: IconeUsuarios,
           descricao: 'Estimativa (densidade × área, Censo 2022) — não é contagem censitária direta.',
         },
-        { campo: 'areaKm2', rotulo: 'Área', formato: 'numero', unidade: 'km²' },
+        { campo: 'areaKm2', rotulo: 'Área', formato: 'numero', unidade: 'km²', icone: IconeMapa },
         {
           campo: 'densidadePopulacional',
           rotulo: 'Densidade populacional',
           formato: 'numero',
           unidade: 'hab/km²',
+          icone: IconeMapa,
         },
       ],
     },
@@ -313,33 +320,20 @@ export function PainelMunicipio({
   const notaMunicipio = NOTAS_MUNICIPIO[municipio.codigoIbge];
 
   /**
-   * Um indicador só usa o termômetro de comparação (IndicadorComparativo)
-   * quando tem semântica definida E valor do município E média nacional
-   * disponíveis — sem isso, cai no valor bruto de sempre (nunca fabrica uma
-   * média que a API não devolveu ainda, ex.: antes do fetch lazy terminar).
+   * Nota exibida no tooltip (i) do card (IndicadorComparativo ou
+   * CardDadoNeutro) — prioriza a justificativa de ausência documentada
+   * (utils/notasAusencia.ts) quando o valor é nulo, senão cai no
+   * esclarecimento metodológico do indicador. Substitui a antiga "gaveta"
+   * de notas técnicas no rodapé da seção (auditoria de UX/UI, 30/07/2026):
+   * agora todo KPI já é um card com tooltip próprio, então uma nota fixa
+   * repetida no fim da seção só duplicava a mesma informação.
    */
-  function usaComparativo(linha: LinhaIndicador): boolean {
+  function notaDoCard(linha: LinhaIndicador): string | undefined {
     const valor = municipio[linha.campo];
-    const media = mediasNacionais?.[linha.campo] ?? null;
-    return linha.semantica !== undefined && valor !== null && typeof media === 'number';
-  }
-
-  /**
-   * Notas metodológicas e de ausência da seção, reunidas numa "gaveta" única
-   * no rodapé em vez de intercaladas linha a linha — o KPI não pode competir
-   * visualmente com a nota que o explica. Indicadores que já mostram a nota
-   * no tooltip do termômetro (IndicadorComparativo) saem daqui, para não
-   * duplicar a mesma explicação em dois lugares da tela.
-   */
-  function notasDaSecao(grupo: { linhas: LinhaIndicador[] }) {
-    return grupo.linhas
-      .filter((linha) => !usaComparativo(linha))
-      .map((linha) => {
-        const valor = municipio[linha.campo];
-        const nota = valor === null ? notaAusencia(linha.campo, municipio) : null;
-        return { rotulo: linha.rotulo, texto: nota ?? linha.descricao };
-      })
-      .filter((item): item is { rotulo: string; texto: string } => !!item.texto);
+    if (valor === null) {
+      return notaAusencia(linha.campo, municipio) ?? linha.descricao;
+    }
+    return linha.descricao;
   }
 
   return (
@@ -403,103 +397,49 @@ export function PainelMunicipio({
           periodoReferenciaLenteDeficitCredito={periodoReferenciaLenteDeficitCredito}
         />
 
-        {grupos.map((grupo) => {
-          const notas = notasDaSecao(grupo);
-          return (
-            <section key={grupo.titulo} className="border-b border-stone-200/70 p-5">
-              <h3 className="mb-4 flex items-center gap-2 text-[10px] font-extrabold tracking-widest text-stone-400 uppercase">
-                {grupo.titulo}
-                <span className="h-px flex-1 bg-stone-200" aria-hidden="true" />
-              </h3>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-5">
-                {grupo.linhas.map((linha) => {
-                  const valor = municipio[linha.campo];
-                  const semDado = valor === null;
-                  const mediaNacional = mediasNacionais?.[linha.campo] ?? null;
+        {grupos.map((grupo) => (
+          <section key={grupo.titulo} className="border-b border-stone-200/70 p-5">
+            <h3 className="mb-4 flex items-center gap-2 text-[10px] font-extrabold tracking-widest text-stone-400 uppercase">
+              {grupo.titulo}
+              <span className="h-px flex-1 bg-stone-200" aria-hidden="true" />
+            </h3>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              {grupo.linhas.map((linha) => {
+                const valor = municipio[linha.campo];
+                const mediaNacional = mediasNacionais?.[linha.campo] ?? null;
 
-                  if (linha.semantica && valor !== null && typeof mediaNacional === 'number') {
-                    return (
-                      <IndicadorComparativo
-                        key={linha.rotulo}
-                        rotulo={linha.rotulo}
-                        valor={valor}
-                        formato={linha.formato}
-                        unidade={linha.unidade}
-                        mediaNacional={mediaNacional}
-                        semantica={linha.semantica}
-                        notaTecnica={linha.descricao}
-                        destaque={linha.destaque}
-                      />
-                    );
-                  }
-
-                  if (linha.destaque) {
-                    return (
-                      <div
-                        key={linha.rotulo}
-                        className="col-span-2 rounded-xl border border-stone-200/60 bg-white p-4 shadow-sm"
-                      >
-                        <span className="text-[10px] font-bold tracking-widest text-stone-500 uppercase">
-                          {linha.rotulo}
-                        </span>
-                        <div className="mt-1 flex items-baseline gap-1.5">
-                          <span
-                            className={`text-3xl font-black ${semDado ? 'text-stone-300' : 'text-red-700'}`}
-                          >
-                            {formatarValor(valor, linha.formato)}
-                          </span>
-                          {!semDado && linha.unidade && (
-                            <span className="text-xs font-bold text-stone-400">{linha.unidade}</span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  }
-
+                if (linha.semantica && valor !== null && typeof mediaNacional === 'number') {
                   return (
-                    <div key={linha.rotulo} className={`flex flex-col ${semDado ? 'opacity-60' : ''}`}>
-                      <span className="text-[9px] font-bold tracking-widest text-stone-500 uppercase">
-                        {linha.rotulo}
-                      </span>
-                      <div className="mt-0.5 flex items-baseline gap-1">
-                        {semDado ? (
-                          <span className="text-sm font-bold text-stone-400 italic">Não disponível</span>
-                        ) : (
-                          <>
-                            <span className="text-lg font-black whitespace-nowrap text-stone-900">
-                              {formatarValor(valor, linha.formato)}
-                            </span>
-                            {linha.unidade && (
-                              <span className="text-[10px] font-semibold text-stone-500">
-                                {linha.unidade}
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </div>
+                    <IndicadorComparativo
+                      key={linha.rotulo}
+                      rotulo={linha.rotulo}
+                      valor={valor}
+                      formato={linha.formato}
+                      unidade={linha.unidade}
+                      mediaNacional={mediaNacional}
+                      semantica={linha.semantica}
+                      notaTecnica={notaDoCard(linha)}
+                      destaque={linha.destaque}
+                    />
                   );
-                })}
-              </div>
+                }
 
-              {/* Gaveta metodológica: notas técnicas e justificativas de ausência
-                  reunidas no rodapé da seção, fora do ritmo de leitura dos KPIs. */}
-              {notas.length > 0 && (
-                <div className="mt-4 rounded-lg bg-stone-100/50 p-3 text-[9px] leading-relaxed text-stone-500">
-                  <strong className="mb-1 block font-bold text-stone-700">Notas técnicas</strong>
-                  <ul className="ml-4 list-outside list-disc space-y-1">
-                    {notas.map((nota) => (
-                      <li key={nota.rotulo}>
-                        <strong className="font-semibold text-stone-600">{nota.rotulo}:</strong>{' '}
-                        {nota.texto}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </section>
-          );
-        })}
+                return (
+                  <CardDadoNeutro
+                    key={linha.rotulo}
+                    titulo={linha.rotulo}
+                    valor={valor}
+                    formato={linha.formato}
+                    unidade={linha.unidade}
+                    notaTecnica={notaDoCard(linha)}
+                    icone={linha.icone}
+                    destaque={linha.destaque}
+                  />
+                );
+              })}
+            </div>
+          </section>
+        ))}
 
         {/* RF-043/RF-045: drill-down de setores censitários — só aparece quando
             o backend confirma granularidade fina disponível para este
