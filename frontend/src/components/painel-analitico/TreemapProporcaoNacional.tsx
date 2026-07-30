@@ -64,6 +64,18 @@ const LARGURA_MIN_TEXTO = 90;
 const ALTURA_MIN_TEXTO = 34;
 const LARGURA_MIN_TEXTO_UF = 34;
 const ALTURA_MIN_TEXTO_UF = 20;
+/**
+ * Bug real encontrado (30/07/2026, auditoria pós-deploy): com o limiar
+ * antigo (24px), uma região pequena (Sudeste/Sul/Centro-Oeste — poucos
+ * municípios em Vazio de Acesso) cabia no gatilho do rótulo de região E no
+ * do rótulo do estado dominante ao mesmo tempo — os dois textos (região no
+ * topo, estado centralizado) ficavam a poucos pixels um do outro e
+ * colidiam visualmente ("SUDESTE" espremido dentro do bloco de MG). O
+ * rótulo do estado dispara a partir de ALTURA_MIN_TEXTO_UF (20px); o de
+ * região agora precisa de bem mais altura que isso — só aparece quando há
+ * folga real acima do texto centralizado do estado.
+ */
+const ALTURA_MIN_TEXTO_REGIAO = 64;
 
 const QUADRANTES_OUTROS: Quadrante[] = [
   'acesso_pleno',
@@ -241,7 +253,7 @@ export function TreemapProporcaoNacional({ dados, aoClicarEstado }: TreemapPropo
           // estado, sem preenchimento próprio e sem clique (região agrega
           // vários estados, não é um recorte de ação único).
           if (r.variante === 'regiao') {
-            const mostrarRotulo = r.width > 60 && r.height > 24;
+            const mostrarRotulo = r.width > 60 && r.height > ALTURA_MIN_TEXTO_REGIAO;
             return (
               <g key={r.id}>
                 <rect
