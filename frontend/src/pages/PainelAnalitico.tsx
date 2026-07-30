@@ -85,13 +85,22 @@ function IconePlay({ className }: { className?: string }) {
  * utils/indicadoresComparacao.ts (usado nas barras do gráfico comparativo,
  * RF-050) — mudar aquele mudaria as cores do gráfico também, fora do
  * escopo deste ajuste.
+ *
+ * Correção de 30/07/2026: a tentativa original usava `text-*`, que não
+ * controla o preenchimento de um `<input type="checkbox">` nativo — sem o
+ * plugin `@tailwindcss/forms` (este projeto não o usa, ver index.css), o
+ * navegador usa a propriedade CSS `accent-color`, não `color`, para pintar
+ * a caixa marcada. Resultado real: os checkboxes continuavam azul-padrão do
+ * sistema apesar da classe. Trocado para `accent-*` (utilitário nativo do
+ * Tailwind v4 para `accent-color`) — `text-*` mantido só onde ainda faz
+ * sentido (nenhum caso aqui).
  */
 const COR_CHECKBOX_INDICADOR: Partial<Record<keyof MunicipioComIndicadores, string>> = {
-  mmgdResidencialPer1000Hab: 'text-emerald-600 focus:ring-emerald-600',
-  rendaMediaDomiciliar: 'text-red-600 focus:ring-red-600',
-  percentualPobrezaCadunico: 'text-red-600 focus:ring-red-600',
-  ivs: 'text-red-600 focus:ring-red-600',
-  irradiacaoMediaKwhM2Dia: 'text-amber-500 focus:ring-amber-500',
+  mmgdResidencialPer1000Hab: 'accent-emerald-600 focus:ring-emerald-500',
+  rendaMediaDomiciliar: 'accent-red-600 focus:ring-red-600',
+  percentualPobrezaCadunico: 'accent-red-600 focus:ring-red-600',
+  ivs: 'accent-red-600 focus:ring-red-600',
+  irradiacaoMediaKwhM2Dia: 'accent-amber-500 focus:ring-amber-500',
 };
 
 /**
@@ -539,7 +548,7 @@ export function PainelAnalitico() {
                   type="checkbox"
                   checked={indicadoresIds.has(indicador.id)}
                   onChange={() => aoAlternarIndicador(indicador.id)}
-                  className={`h-4 w-4 rounded border-stone-300 ${COR_CHECKBOX_INDICADOR[indicador.id] ?? 'text-stone-600 focus:ring-stone-600'}`}
+                  className={`h-4 w-4 rounded border-stone-300 ${COR_CHECKBOX_INDICADOR[indicador.id] ?? 'accent-stone-600 focus:ring-stone-600'}`}
                 />
                 <span className="text-sm font-medium text-stone-700">{indicador.rotulo}</span>
               </label>

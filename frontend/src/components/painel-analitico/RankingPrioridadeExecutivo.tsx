@@ -4,7 +4,9 @@ import type { VaziosDeAcessoCompleto } from '../../services/vaziosDeAcesso.servi
 import type { MunicipioClassificado } from '../../types/api';
 import { formatarValor } from '../../utils/formatadores';
 import { RankingItem } from '../ranking/RankingItem';
-import { COR_QUADRANTE } from './GraficoQuadrantes';
+
+/** Tom neutro suave para a barra — mantém o vermelho reservado ao ícone/badge, ver docstring do arquivo. */
+const COR_BARRA_NEUTRA = '#d6d3d1';
 
 /**
  * Ranking Executivo — "por onde começar amanhã de manhã" (30/07/2026,
@@ -22,6 +24,15 @@ import { COR_QUADRANTE } from './GraficoQuadrantes';
  * ranking estadual do mapa. Clique navega para a Ficha do Município no mapa
  * (`/mapa?municipio=<codigoIbge>`), mesmo padrão de drill-down já usado em
  * PaginaVaziosDeAcesso.tsx.
+ *
+ * Cor da barra (30/07/2026, feedback do usuário): NÃO o Vermelho Pólis
+ * saturado (COR_QUADRANTE.vazio_de_acesso) — como toda linha desta lista já
+ * é Vazio de Acesso por construção, uma barra vermelha cheia em cada linha
+ * empilhava como "código de barras" (o "divisor pesado" reportado era essa
+ * barra, não a border-b do RankingItem, que já é stone-100 neutro).
+ * Vermelho fica reservado ao ícone/badge "Foco de ação" — a barra usa tom
+ * neutro suave (RankingItem é componente compartilhado com outras cores em
+ * PainelRanking do mapa; não alterado).
  *
  * "Carregar Top 50": os ~5.500 municípios já estão inteiros na memória
  * (mesmo `dados` do GraficoRegional, carregado uma vez via botão "Carregar
@@ -109,7 +120,10 @@ export function RankingPrioridadeExecutivo({ dados }: RankingPrioridadeExecutivo
       <ol>
         {visiveis.map((m, indice) => (
           <li key={m.codigoIbge}>
-            <Link to={`/mapa?municipio=${m.codigoIbge}`} className="block">
+            <Link
+              to={`/mapa?municipio=${m.codigoIbge}`}
+              className="block border-l-2 border-l-transparent transition-colors hover:border-l-red-600"
+            >
               <RankingItem
                 posicao={indice + 1}
                 nomeMunicipio={`${m.nome} — ${m.uf}`}
@@ -118,7 +132,7 @@ export function RankingPrioridadeExecutivo({ dados }: RankingPrioridadeExecutivo
                 unidade={null}
                 medianaNacional={medianaIvsh}
                 maxRanking={maxIvsh}
-                cor={COR_QUADRANTE.vazio_de_acesso}
+                cor={COR_BARRA_NEUTRA}
               />
             </Link>
           </li>

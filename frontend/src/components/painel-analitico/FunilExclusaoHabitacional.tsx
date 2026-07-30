@@ -137,6 +137,22 @@ export function FunilExclusaoHabitacional({ dados }: FunilExclusaoHabitacionalPr
 
   return (
     <div className="space-y-3">
+      {/* Filete "escoando" do caminho crítico — CSS puro, sem lib de animação. */}
+      <style>{`
+        @keyframes funilFluxoCritico {
+          0% { stroke-dashoffset: 36; }
+          100% { stroke-dashoffset: 0; }
+        }
+        .funil-fluxo-critico {
+          animation: funilFluxoCritico 1.2s linear infinite;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .funil-fluxo-critico {
+            animation: none;
+          }
+        }
+      `}</style>
+
       <p className="max-w-2xl text-xs leading-relaxed text-stone-500">
         Dos {totalVazios.toLocaleString('pt-BR')} municípios em Vazio de Acesso, veja onde a
         exclusão escoa: quantos têm alta vulnerabilidade habitacional (IVSH) e, entre esses,
@@ -163,14 +179,21 @@ export function FunilExclusaoHabitacional({ dados }: FunilExclusaoHabitacionalPr
           d={caminho(COL0_X + LARGURA_NO, banda_0_2, COL1_X, no2)}
           fill="none"
           stroke={COR_LINK_NEUTRO}
-          strokeOpacity={0.6}
+          strokeOpacity={0.45}
           strokeWidth={Math.max(altura(banda_0_2), 0)}
         />
+        {/* Caminho crítico (alta vulnerabilidade → sem financiamento) — contraste
+            máximo (30/07/2026, feedback do usuário): opacidade alta e sólida no
+            vermelho institucional, contra os demais fluxos em stone-300 discreto
+            (a versão anterior tinha o crítico MENOS opaco que os neutros, invertido
+            do que fazia sentido). Filete pontilhado por cima "escoando" da esquerda
+            para a direita via CSS puro — decorativo, não altera a largura real (que
+            continua sempre proporcional ao valor). */}
         <path
           d={caminho(COL1_X + LARGURA_NO, banda_1_3, COL2_X, banda_3_de1)}
           fill="none"
           stroke={COR_QUADRANTE.vazio_de_acesso}
-          strokeOpacity={0.45}
+          strokeOpacity={0.75}
           strokeWidth={Math.max(altura(banda_1_3), 0)}
         >
           <title>
@@ -178,24 +201,35 @@ export function FunilExclusaoHabitacional({ dados }: FunilExclusaoHabitacionalPr
           </title>
         </path>
         <path
+          d={caminho(COL1_X + LARGURA_NO, banda_1_3, COL2_X, banda_3_de1)}
+          fill="none"
+          stroke="#fca5a5"
+          strokeWidth={Math.min(4, Math.max(altura(banda_1_3), 0))}
+          strokeDasharray="12 24"
+          strokeLinecap="round"
+          className="funil-fluxo-critico"
+          opacity={0.85}
+          aria-hidden="true"
+        />
+        <path
           d={caminho(COL1_X + LARGURA_NO, banda_1_4, COL2_X, banda_4_de1)}
           fill="none"
           stroke={COR_LINK_NEUTRO}
-          strokeOpacity={0.6}
+          strokeOpacity={0.45}
           strokeWidth={Math.max(altura(banda_1_4), 0)}
         />
         <path
           d={caminho(COL1_X + LARGURA_NO, banda_2_3, COL2_X, banda_3_de2)}
           fill="none"
           stroke={COR_LINK_NEUTRO}
-          strokeOpacity={0.6}
+          strokeOpacity={0.45}
           strokeWidth={Math.max(altura(banda_2_3), 0)}
         />
         <path
           d={caminho(COL1_X + LARGURA_NO, banda_2_4, COL2_X, banda_4_de2)}
           fill="none"
           stroke={COR_LINK_NEUTRO}
-          strokeOpacity={0.6}
+          strokeOpacity={0.45}
           strokeWidth={Math.max(altura(banda_2_4), 0)}
         />
 

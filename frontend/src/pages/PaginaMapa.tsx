@@ -455,6 +455,28 @@ export function PaginaMapa() {
     setAbaSidebar('ranking');
   }
 
+  // Deep-link ?uf=<sigla> (30/07/2026): mesmo padrão one-shot de
+  // ?municipio= acima — consumido e removido da URL assim que o GeoJSON
+  // nacional chega. Reaproveita 100% a mecânica de "clicar num estado no
+  // mapa" (aoClicarEstadoNoMapa) em vez de inventar um comportamento novo:
+  // usado pelo drill-down de UF do Treemap da Visão Executiva
+  // (TreemapProporcaoNacional.tsx) — clicar num estado ali enquadra +
+  // destaca o estado no mapa e abre a aba Ranking, exatamente como clicar
+  // no próprio estado desenhado no mapa.
+  const ufBuscada = searchParams.get('uf');
+  useEffect(() => {
+    if (!ufBuscada || !dados) return;
+    aoClicarEstadoNoMapa(ufBuscada);
+    setSearchParams(
+      (atuais) => {
+        atuais.delete('uf');
+        return atuais;
+      },
+      { replace: true },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ufBuscada, dados, setSearchParams]);
+
   return (
     <div className="relative h-full w-full overflow-hidden bg-stone-100">
       {/* Camada do mapa — tela cheia. Painéis de controle flutuam por cima
