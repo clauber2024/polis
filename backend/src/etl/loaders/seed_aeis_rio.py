@@ -8,7 +8,6 @@ O tipo='zeis' e usado como padrao no Atlas para esse instrumento, independente
 da nomenclatura local de cada municipio.
 """
 import os, sys, requests
-import geopandas as gpd
 from shapely.geometry import shape
 from shapely.wkb import dumps as wkb_dumps
 from shapely.ops import transform

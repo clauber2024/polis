@@ -44,6 +44,16 @@
  * Seção 10) — sem isso, o botão dispara e falha de forma visível no log
  * (erro de autenticação do Google), não é um pré-requisito manual
  * INTERATIVO como o antigo fluxo `gcloud auth` (que nunca funcionaria aqui).
+ *
+ * `zeis_*`/`aeis_rio` adicionadas em 31/07/2026 — usuário apontou que ZEIS
+ * existia pra mais municípios além dos 2 (São Paulo/Belo Horizonte) que
+ * entraram em `extractoresComUpload.ts` por terem download manual
+ * confirmado. Reconferido cada um dos outros 6 seeds: TODOS já usavam
+ * `requests.get` contra API pública (ArcGIS FeatureServer/MapServer ou
+ * plataforma própria), sem pré-requisito manual nenhum — só não tinham
+ * sido checados antes. Único ajuste necessário: `seed_aeis_rio.py`
+ * importava `geopandas` sem nunca usar (import morto, removido) — teria
+ * inflado a imagem à toa.
  */
 export const IDS_EXTRATORES_ELEGIVEIS = [
   'mmgd_aneel',
@@ -52,6 +62,12 @@ export const IDS_EXTRATORES_ELEGIVEIS = [
   'irradiacao_solar_inpe',
   'renda_trabalho_rais',
   'capital_humano_mortalidade_infantil',
+  'zeis_recife',
+  'zeis_rio_branco',
+  'aeis_rio',
+  'zeis_contagem',
+  'zeis_fortaleza',
+  'zeis_salvador',
 ] as const;
 
 export type IdExtratorElegivel = (typeof IDS_EXTRATORES_ELEGIVEIS)[number];
@@ -92,6 +108,36 @@ export const EXTRACTORES_ELEGIVEIS: readonly ExtractorElegivel[] = [
     id: 'capital_humano_mortalidade_infantil',
     rotulo: 'Mortalidade Infantil — SIM/SINASC (BigQuery)',
     scriptRelativo: 'src/etl/loaders/extrair_capital_humano_mortalidade_infantil.py',
+  },
+  {
+    id: 'zeis_recife',
+    rotulo: 'ZEIS — Recife',
+    scriptRelativo: 'src/etl/loaders/seed_zeis_recife.py',
+  },
+  {
+    id: 'zeis_rio_branco',
+    rotulo: 'ZEIS — Rio Branco',
+    scriptRelativo: 'src/etl/loaders/seed_zeis_rio_branco.py',
+  },
+  {
+    id: 'aeis_rio',
+    rotulo: 'AEIS — Rio de Janeiro',
+    scriptRelativo: 'src/etl/loaders/seed_aeis_rio.py',
+  },
+  {
+    id: 'zeis_contagem',
+    rotulo: 'ZEIS — Contagem',
+    scriptRelativo: 'src/etl/loaders/seed_zeis_contagem.py',
+  },
+  {
+    id: 'zeis_fortaleza',
+    rotulo: 'ZEIS — Fortaleza',
+    scriptRelativo: 'src/etl/loaders/seed_zeis_fortaleza.py',
+  },
+  {
+    id: 'zeis_salvador',
+    rotulo: 'ZEIS — Salvador',
+    scriptRelativo: 'src/etl/loaders/seed_zeis_salvador.py',
   },
 ];
 

@@ -243,22 +243,23 @@ já documentado para `make migrate` local contra um banco já provisionado) e s�
 migrations realmente novas vão de fato criar algo. Confira a saída — qualquer erro que
 **não** seja "já existe" merece atenção antes de considerar a migração concluída.
 
-Nova carga de ETL (rodar um extractor de novo, por atualização de fonte) continua manual
-**para 3 fontes** (ver mais abaixo por quê): rode o extractor localmente contra o banco
-local e repita o dump/restore da Seção 4, ou aponte a `DATABASE_URL` do ambiente Python
-local para o TCP Proxy do Railway temporariamente. **6 fontes já têm botão de atualização**
-direto no Painel Admin (`/admin`), que dispara o extractor no próprio container do backend
-em produção (RF-070 revisitado, 30-31/07/2026) — MMGD, Tarifa Residencial e Ranking de
-Distribuidoras (ANEEL), Irradiação Solar (LABREN/CCST/INPE), Renda e Trabalho/RAIS e
-Mortalidade Infantil (as duas últimas via BigQuery — só funcionam se
-`GOOGLE_APPLICATION_CREDENTIALS_JSON` estiver configurada, ver Seção 10). Requer a Seção 9
-abaixo (Dockerfile) já aplicada.
+**12 fontes já têm botão de atualização automática** direto no Painel Admin (`/admin`), que
+dispara o extractor no próprio container do backend em produção (RF-070 revisitado,
+30-31/07/2026) — MMGD, Tarifa Residencial e Ranking de Distribuidoras (ANEEL), Irradiação
+Solar (LABREN/CCST/INPE), Renda e Trabalho/RAIS e Mortalidade Infantil (via BigQuery — só
+funcionam se `GOOGLE_APPLICATION_CREDENTIALS_JSON` estiver configurada, ver Seção 10), e
+ZEIS/AEIS de Recife, Rio Branco, Rio de Janeiro, Contagem, Fortaleza e Salvador. Requer a
+Seção 9 abaixo (Dockerfile) já aplicada.
 
-Nenhuma dessas 6 precisou de upload de arquivo — todas tinham (ou passaram a ter) um link de
-download estável, verificado ao vivo (`curl`) antes de entrar na whitelist. MMGD chegou a
-ser removida por um dia (31/07/2026) — testado ao vivo e falhou, porque
-`extrair_mmgd_aneel.py` nunca teve lógica de download própria; corrigido no mesmo dia (URL
-real da ANEEL confirmada, `baixar_se_necessario` adicionado). Ver comentário completo em
+Nenhuma dessas 12 precisou de upload de arquivo — todas tinham (ou passaram a ter) um link
+de download estável, verificado ao vivo (`curl`, ou o próprio código já usando
+`requests.get`) antes de entrar na whitelist. MMGD chegou a ser removida por um dia
+(31/07/2026) — testado ao vivo e falhou, porque `extrair_mmgd_aneel.py` nunca teve lógica de
+download própria; corrigido no mesmo dia (URL real da ANEEL confirmada,
+`baixar_se_necessario` adicionado). Os 6 ZEIS/AEIS foram uma descoberta tardia — inicialmente
+só São Paulo e Belo Horizonte tinham sido checados; os outros 6 municípios já baixavam o
+próprio dado via API pública (ArcGIS ou plataforma própria), só não tinham sido reconferidos
+até o usuário apontar que ZEIS existia pra mais cidades. Ver comentário completo em
 `backend/src/utils/extractoresElegiveis.ts` para o histórico de cada fonte.
 
 ## 9. Trocar Nixpacks por Dockerfile (Node + Python)
@@ -274,15 +275,16 @@ isso o backend sobe normalmente, só sem conseguir rodar extractor nenhum pela i
    `backend/src/etl/requirements-runtime.txt` (pandas/numpy/sqlalchemy/psycopg2/requests/
    pyarrow/google-cloud-bigquery/db-dtypes — não o `requirements.txt` completo de
    desenvolvimento, que tem geopandas e deixaria a imagem muito mais pesada sem necessidade).
-4. Teste: logue como Administrador em `/admin`, clique "Atualizar agora" numa das 6 bases do
+4. Teste: logue como Administrador em `/admin`, clique "Atualizar agora" numa das 12 bases do
    card "Atualização de bases (ETL)", e acompanhe o status mudar de "Atualizando…" para
    "Sucesso"/"Falha" (a tela atualiza sozinha).
 
-Essas 6 fontes baixam o próprio dado (URL pública confirmada em cada uma). Mais 3 aceitam
-upload de arquivo antes de disparar — ver Seção 11. Só 0 fontes seguem 100% manuais hoje
-(todas as 9 fontes automatizáveis do Atlas — que baixam sozinhas OU aceitam upload — já têm
-botão no Painel Admin); os extractors que exigem etapas fora do escopo de "baixar/anexar um
-arquivo" (ex.: autenticação `gcloud` interativa fora do fluxo Service Account) seguem
+Essas 12 fontes baixam o próprio dado (URL pública confirmada em cada uma). Mais 3 aceitam
+upload de arquivo antes de disparar — ver Seção 11 (Reforma Casa Brasil Solar, ZEIS São
+Paulo, ZEIS Belo Horizonte — as únicas 2 sedes de ZEIS/AEIS sem download automático, de 8
+municípios cobertos hoje pelo Atlas). Os extractors que exigem etapas fora do escopo de
+"baixar/anexar um arquivo" (ex.: autenticação `gcloud` interativa fora do fluxo Service
+Account, ou fontes ainda não reconferidas) seguem
 documentados individualmente. Ver `backend/src/utils/extractoresElegiveis.ts` e
 `backend/src/utils/extractoresComUpload.ts` para a lista exata e o porquê de cada uma.
 
