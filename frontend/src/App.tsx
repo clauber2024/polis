@@ -11,6 +11,7 @@ import { PainelColaborador } from './pages/PainelColaborador';
 import { PaginaRankingDistribuidoras } from './pages/PaginaRankingDistribuidoras';
 import { PaginaVaziosDeAcesso } from './pages/PaginaVaziosDeAcesso';
 import { PaginaStatusDados } from './pages/PaginaStatusDados';
+import { PaginaGuiaTransicao } from './pages/PaginaGuiaTransicao';
 
 /**
  * Layout do "app interno" (tudo que não é a landing pública): header fixo
@@ -191,6 +192,14 @@ export function App() {
           element={
             <RotaProtegida papeis={['administrador']}>
               <PainelAdmin />
+            </RotaProtegida>
+          }
+        />
+        <Route
+          path="/guia-transicao"
+          element={
+            <RotaProtegida>
+              <PaginaGuiaTransicao />
             </RotaProtegida>
           }
         />
