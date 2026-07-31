@@ -55,7 +55,7 @@ export function CartaoRevisoesBasesDados() {
   return (
     <section className="rounded border border-slate-200 bg-white p-4 shadow-2xs">
       <h2 className="text-base font-semibold text-slate-900">
-        Revisão metodológica das bases (RF-059)
+        Revisão metodológica das bases
       </h2>
       <p className="mb-3 text-xs text-slate-500">
         Status de revisão de cada base de dados primária do Atlas.

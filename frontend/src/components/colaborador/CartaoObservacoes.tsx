@@ -51,7 +51,7 @@ export function CartaoObservacoes() {
   return (
     <section className="rounded border border-slate-200 bg-white p-4 shadow-2xs">
       <h2 className="text-base font-semibold text-slate-900">
-        Observações sobre inconsistências (RF-060)
+        Observações sobre inconsistências
       </h2>
       <div className="my-3 flex items-center gap-2">
         <label htmlFor="obs-base" className="text-xs font-semibold text-slate-600">

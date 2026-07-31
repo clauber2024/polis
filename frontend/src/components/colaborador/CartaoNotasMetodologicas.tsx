@@ -59,7 +59,7 @@ export function CartaoNotasMetodologicas() {
   return (
     <section className="rounded border border-slate-200 bg-white p-4 shadow-2xs">
       <h2 className="text-base font-semibold text-slate-900">
-        Documentação metodológica (RF-062, RF-064/065/066)
+        Registro de notas metodológicas
       </h2>
       <p className="mb-3 text-xs text-slate-500">
         Visualizador + registro de notas metodológicas — cada envio entra como uma nova linha no

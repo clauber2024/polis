@@ -67,7 +67,7 @@ export function CartaoMateriaisComunicacao() {
   return (
     <section className="rounded border border-slate-200 bg-white p-4 shadow-2xs">
       <h2 className="text-base font-semibold text-slate-900">
-        Materiais de comunicação (RF-067)
+        Materiais de comunicação e divulgação
       </h2>
 
       <form onSubmit={aoSubmeter} className="my-3 flex gap-2">
