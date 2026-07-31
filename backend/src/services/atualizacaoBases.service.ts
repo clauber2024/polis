@@ -39,7 +39,7 @@ import {
  * depender de Node ≥20.11 especificamente.
  */
 const DIRETORIO_ATUAL = path.dirname(fileURLToPath(import.meta.url));
-const DIRETORIO_BACKEND = path.resolve(DIRETORIO_ATUAL, '../../');
+export const DIRETORIO_BACKEND = path.resolve(DIRETORIO_ATUAL, '../../');
 
 const PYTHON_EXECUTABLE = process.env.PYTHON_EXECUTABLE ?? 'python3';
 
@@ -82,6 +82,18 @@ export async function dispararAtualizacao(baseId: string, usuarioId: number) {
     throw new AppError(404, `Base "${baseId}" não está na whitelist de atualização automática.`);
   }
 
+  const execucao = await iniciarExecucao(baseId, extractor.rotulo, usuarioId);
+  executarSubprocesso(execucao.id, extractor.scriptRelativo);
+  return { execucaoId: execucao.id };
+}
+
+/**
+ * Checa concorrência (409 amigável — o índice parcial único da migration
+ * 0031 é o guard definitivo) e cria a linha de execução. Reaproveitado por
+ * `uploadBases.service.ts` (mesma tabela, baseId de namespace diferente —
+ * `extractoresElegiveis.ts` vs `extractoresComUpload.ts`, nunca colidem).
+ */
+export async function iniciarExecucao(baseId: string, rotulo: string, usuarioId: number) {
   const [ultima] = await db
     .select({ status: execucoesEtl.status })
     .from(execucoesEtl)
@@ -89,7 +101,7 @@ export async function dispararAtualizacao(baseId: string, usuarioId: number) {
     .orderBy(desc(execucoesEtl.iniciadoEm))
     .limit(1);
   if (ultima?.status === ('em_execucao' satisfies StatusExecucaoEtl)) {
-    throw new AppError(409, `"${extractor.rotulo}" já está atualizando — aguarde terminar.`);
+    throw new AppError(409, `"${rotulo}" já está atualizando — aguarde terminar.`);
   }
 
   const [execucao] = await db
@@ -97,15 +109,23 @@ export async function dispararAtualizacao(baseId: string, usuarioId: number) {
     .values({ baseId, iniciadoPorUsuarioId: usuarioId })
     .returning({ id: execucoesEtl.id });
 
-  executarSubprocesso(execucao.id, extractor.scriptRelativo);
-
-  return { execucaoId: execucao.id };
+  return execucao;
 }
 
-function executarSubprocesso(execucaoId: number, scriptRelativo: string) {
+/**
+ * `envExtra` sobrepõe `process.env` (usado pelo fluxo de upload pra apontar
+ * `BASE_DOWNLOADS` pra pasta temporária do arquivo recém-enviado).
+ * `aoFinalizar` roda sempre, sucesso ou falha (usado pra limpar a pasta
+ * temporária depois que o script termina de ler dela).
+ */
+export function executarSubprocesso(
+  execucaoId: number,
+  scriptRelativo: string,
+  opcoes?: { envExtra?: NodeJS.ProcessEnv; aoFinalizar?: () => void },
+) {
   const processo = spawn(PYTHON_EXECUTABLE, [scriptRelativo], {
     cwd: DIRETORIO_BACKEND,
-    env: process.env,
+    env: { ...process.env, ...opcoes?.envExtra },
   });
 
   let saida = '';
@@ -129,7 +149,8 @@ function executarSubprocesso(execucaoId: number, scriptRelativo: string) {
       .where(eq(execucoesEtl.id, execucaoId))
       .catch((erro: unknown) => {
         console.error(`Falha ao registrar conclusão da execução ${execucaoId}:`, erro);
-      });
+      })
+      .finally(() => opcoes?.aoFinalizar?.());
   });
 
   processo.on('error', (erro) => {
@@ -142,7 +163,8 @@ function executarSubprocesso(execucaoId: number, scriptRelativo: string) {
       .where(eq(execucoesEtl.id, execucaoId))
       .catch((erroSecundario: unknown) => {
         console.error(`Falha ao registrar erro de início da execução ${execucaoId}:`, erroSecundario);
-      });
+      })
+      .finally(() => opcoes?.aoFinalizar?.());
   });
 }
 

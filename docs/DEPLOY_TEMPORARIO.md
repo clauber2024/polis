@@ -278,20 +278,24 @@ isso o backend sobe normalmente, só sem conseguir rodar extractor nenhum pela i
    card "Atualização de bases (ETL)", e acompanhe o status mudar de "Atualizando…" para
    "Sucesso"/"Falha" (a tela atualiza sozinha).
 
-Só essas 6 fontes rodam neste container — 3 continuam exigindo execução manual no ambiente
-de desenvolvimento (Reforma Casa Brasil Solar — extrato pontual fornecido pelo usuário, não
-tem URL pública nenhuma —, ZEIS de São Paulo e de Belo Horizonte — download manual
-obrigatório no site de origem, confirmado nos próprios scripts). Ver
-`backend/src/utils/extractoresElegiveis.ts` para a lista exata e o porquê de cada exclusão.
+Essas 6 fontes baixam o próprio dado (URL pública confirmada em cada uma). Mais 3 aceitam
+upload de arquivo antes de disparar — ver Seção 11. Só 0 fontes seguem 100% manuais hoje
+(todas as 9 fontes automatizáveis do Atlas — que baixam sozinhas OU aceitam upload — já têm
+botão no Painel Admin); os extractors que exigem etapas fora do escopo de "baixar/anexar um
+arquivo" (ex.: autenticação `gcloud` interativa fora do fluxo Service Account) seguem
+documentados individualmente. Ver `backend/src/utils/extractoresElegiveis.ts` e
+`backend/src/utils/extractoresComUpload.ts` para a lista exata e o porquê de cada uma.
 
 ## 10. Credencial do BigQuery (RAIS/Mortalidade Infantil)
 
 RAIS e Mortalidade Infantil usam BigQuery, autenticado localmente via
 `gcloud auth application-default login` — um fluxo interativo (abre navegador) que só
-funciona numa máquina com tela, nunca dentro de um servidor. Isso não muda com o
-Dockerfile da Seção 9: essas duas fontes **não** foram adicionadas à whitelist do botão de
-atualização (rodá-las exigiria também inflar a imagem com `google-cloud-bigquery` e
-`db-dtypes`, hoje de propósito fora do `requirements-runtime.txt`).
+funciona numa máquina com tela, nunca dentro de um servidor. As duas fontes JÁ ESTÃO na
+whitelist do botão de atualização (`google-cloud-bigquery` e `db-dtypes` incluídos em
+`requirements-runtime.txt` desde 31/07/2026) — mas o botão só funciona de verdade se a
+variável abaixo estiver configurada; sem ela, clicar "Atualizar agora" nessas duas bases
+falha com erro de autenticação visível no log (não trava nada, é esperado até você
+configurar isso).
 
 O código já está preparado (`backend/src/etl/loaders/_autenticacao_bigquery.py`,
 importado por `extrair_renda_trabalho_rais.py` e
@@ -315,16 +319,52 @@ necessário rodar uma dessas duas fontes fora da sua própria máquina:
    ```
    GOOGLE_APPLICATION_CREDENTIALS_JSON=<cole o conteúdo do arquivo JSON aqui>
    ```
-6. Redeploy. Ao rodar `extrair_renda_trabalho_rais.py` ou
-   `extrair_capital_humano_mortalidade_infantil.py` nesse ambiente (hoje só manualmente —
-   não estão na whitelist do botão), o script detecta a variável sozinho e autentica sem
-   nenhuma janela/login.
+6. Redeploy. Da próxima vez que clicar "Atualizar agora" em RAIS ou Mortalidade Infantil no
+   Painel Admin (ou rodar o script manualmente nesse ambiente), ele detecta a variável
+   sozinho e autentica sem nenhuma janela/login.
 
 Sem essa variável configurada, os dois scripts continuam funcionando normalmente **na sua
 própria máquina** (fluxo `gcloud` local, nada muda) — a Service Account só é necessária
 para rodar essas duas fontes fora dali.
 
-## 11. Quando for oferecer ao Instituto Pólis
+## 11. Upload de arquivo pelo Painel Admin (Reforma Casa Brasil Solar, ZEIS SP/BH)
+
+3 fontes nunca tiveram (e não devem ter) uma URL pública: Reforma Casa Brasil Solar (extrato
+pontual que você mesmo obteve, não é dado aberto), ZEIS de São Paulo e de Belo Horizonte
+(as prefeituras exigem navegação manual pra baixar o zoneamento, confirmado nos próprios
+scripts). Desde 31/07/2026, o card "Upload de bases sem fonte pública" no Painel Admin
+(`/admin`) aceita anexar o(s) arquivo(s) exatos que cada extractor espera e dispara a
+atualização — sem precisar de terminal.
+
+**Como funciona por trás:** os 3 scripts (`extrair_reforma_casa_brasil_solar.py`,
+`seed_zeis_sao_paulo.py`, `seed_zeis_belo_horizonte.py`) sempre esperaram os arquivos numa
+pasta fixa (`BASE_DOWNLOADS`, antes hardcoded pro Downloads do Windows de quem desenvolveu o
+projeto) — agora essa pasta é configurável por variável de ambiente. O backend salva o
+upload numa pasta temporária do próprio container (`os.tmpdir()`), aponta `BASE_DOWNLOADS`
+pra lá só durante aquela execução, e apaga a pasta ao final (sucesso ou falha) — o
+filesystem do container é efêmero mesmo, então não faz sentido guardar o arquivo bruto ali;
+o que importa é o dado já ter ido pro Postgres.
+
+**Formato esperado por fonte** (ver `backend/src/utils/extractoresComUpload.ts` pra lista
+completa e nomes exatos):
+- **Reforma Casa Brasil Solar**: 1 PDF (o extrato SIC/Caixa, modalidade solar).
+- **ZEIS São Paulo**: 3 arquivos GeoJSON (GeoSampa) — precisa dos 3 juntos, na ordem que a
+  tela pedir.
+- **ZEIS Belo Horizonte**: 1 CSV (zoneamento, camada 11181, com geometria em WKT).
+
+**Sem novo passo de infraestrutura** — usa o mesmo Dockerfile/container da Seção 9 (as
+dependências novas — `pypdf`, `shapely`, `pyproj` — já foram incluídas em
+`requirements-runtime.txt`).
+
+**Limitação importante, deixada de propósito assim nesta primeira versão**: cada uma dessas
+3 fontes só existe hoje porque alguém (nesta sessão, eu) escreveu um script específico pra
+ela — não é um importador genérico de shapefile/GeoJSON. Adicionar um MUNICÍPIO NOVO de ZEIS
+(além de São Paulo/Belo Horizonte/Recife/Rio Branco/Rio de Janeiro/Contagem/Fortaleza/
+Salvador, que já existem) sempre vai exigir escrever um script novo primeiro — o upload só
+cobre municípios que já têm script pronto. Ver `docs/DECISOES.md` se/quando decidir investir
+num fluxo mais genérico pra isso.
+
+## 12. Quando for oferecer ao Instituto Pólis
 
 - **Railway**: Project Settings → "Transfer Project" — transfere posse (e cobrança) para
   a conta/organização do Pólis.

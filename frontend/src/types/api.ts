@@ -675,3 +675,17 @@ export interface StatusExtrator {
   rotulo: string;
   ultimaExecucao: ExecucaoEtl | null;
 }
+
+/** RF-070 revisitado, fase 2 (31/07/2026) — fontes sem URL pública, exigem upload. */
+export interface ArquivoEsperadoUpload {
+  extensaoAceita: string;
+  descricao: string;
+}
+
+/** Espelho de listarStatusExtratoresComUpload (GET /api/admin/bases-de-dados-upload/status-execucao). */
+export interface StatusExtratorComUpload {
+  id: string;
+  rotulo: string;
+  arquivos: ArquivoEsperadoUpload[];
+  ultimaExecucao: ExecucaoEtl | null;
+}

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { validateRequest } from '../middlewares/validateRequest.js';
 import { requireAutenticacao, requirePapel } from '../middlewares/auth.js';
 import {
@@ -12,6 +13,7 @@ import {
   atualizarUsuarioBodySchema,
   removerUsuarioParamsSchema,
   dispararAtualizacaoBaseParamsSchema,
+  dispararComUploadParamsSchema,
 } from '../schemas/admin.schema.js';
 import {
   listarMetadadosBasesDadosController,
@@ -26,7 +28,21 @@ import {
   removerUsuarioController,
   listarStatusExtratoresController,
   dispararAtualizacaoBaseController,
+  listarStatusExtratoresComUploadController,
+  dispararComUploadController,
 } from '../controllers/admin.controller.js';
+
+/**
+ * Memória, não disco — o service (`uploadBases.service.ts`) grava os bytes
+ * na pasta temporária com o nome exato que o extractor espera, não com o
+ * nome original do upload. Limite generoso (50 MB/arquivo, até 3 arquivos —
+ * cobre o caso de 3 GeoJSON do ZEIS São Paulo) mas não ilimitado, pra não
+ * deixar a memória do container aberta a um upload absurdo.
+ */
+const uploadMemoria = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024, files: 3 },
+});
 
 export const adminRouter = Router();
 
@@ -92,4 +108,19 @@ adminRouter.post(
   ...requireAdmin,
   validateRequest({ params: dispararAtualizacaoBaseParamsSchema }),
   dispararAtualizacaoBaseController,
+);
+
+// RF-070 revisitado, fase 2 (31/07/2026) — fontes sem URL pública, exigem
+// upload de arquivo (ver utils/extractoresComUpload.ts). Tudo Admin.
+adminRouter.get(
+  '/admin/bases-de-dados-upload/status-execucao',
+  ...requireAdmin,
+  listarStatusExtratoresComUploadController,
+);
+adminRouter.post(
+  '/admin/bases-de-dados-upload/:baseId/atualizar',
+  ...requireAdmin,
+  validateRequest({ params: dispararComUploadParamsSchema }),
+  uploadMemoria.array('arquivos', 3),
+  dispararComUploadController,
 );

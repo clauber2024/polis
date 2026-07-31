@@ -6,11 +6,12 @@ import type {
   Papel,
   StatusAprovacaoIndicador,
   StatusExtrator,
+  StatusExtratorComUpload,
   StatusMetadadoBaseDados,
   UsuarioAdmin,
   VersaoPublicada,
 } from '../types/api';
-import { enviarJson, obterJson } from './http';
+import { enviarFormData, enviarJson, obterJson } from './http';
 
 // -- RF-071/072/073: metadados técnicos das bases (leitura pública) ---------
 
@@ -111,5 +112,30 @@ export function dispararAtualizacaoBase(
     'POST',
     `/api/admin/bases-de-dados/${baseId}/atualizar`,
     { token },
+  );
+}
+
+// -- RF-070 revisitado, fase 2: upload de bases sem URL pública (tudo Admin) --
+
+export function listarStatusExtratoresComUpload(token: string): Promise<StatusExtratorComUpload[]> {
+  return obterJson<StatusExtratorComUpload[]>(
+    '/api/admin/bases-de-dados-upload/status-execucao',
+    undefined,
+    token,
+  );
+}
+
+/** `arquivos` precisa vir NA ORDEM esperada pelo backend (ver extractoresComUpload.ts). */
+export function dispararComUpload(
+  baseId: string,
+  arquivos: File[],
+  token: string,
+): Promise<{ execucaoId: number }> {
+  const formData = new FormData();
+  arquivos.forEach((arquivo) => formData.append('arquivos', arquivo));
+  return enviarFormData<{ execucaoId: number }>(
+    `/api/admin/bases-de-dados-upload/${baseId}/atualizar`,
+    formData,
+    token,
   );
 }

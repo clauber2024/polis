@@ -3,14 +3,17 @@ import { CartaoAtualizacaoEtl } from '../components/admin/CartaoAtualizacaoEtl';
 import { CartaoAtualizacaoIndicadoresExternos } from '../components/admin/CartaoAtualizacaoIndicadoresExternos';
 import { CartaoGestaoUsuarios } from '../components/admin/CartaoGestaoUsuarios';
 import { CartaoMetadadosBasesDados } from '../components/admin/CartaoMetadadosBasesDados';
+import { CartaoUploadBases } from '../components/admin/CartaoUploadBases';
 import { CartaoVersoesPublicadas } from '../components/admin/CartaoVersoesPublicadas';
 import { useAuth } from '../contexts/AuthContext';
 
 /**
  * Painel Admin (RF-070 a RF-077) — só papel Administrador acessa (ver
- * RotaProtegida em App.tsx). RF-070 (upload de arquivo real) não
- * implementado por decisão do projeto — carga de dado continua via ETL
- * Python; aqui só o workflow/status.
+ * RotaProtegida em App.tsx). RF-070 revisitado em 30-31/07/2026: 6 fontes
+ * disparam o extractor Python de verdade pela interface
+ * (CartaoAtualizacaoEtl, baixam o próprio dado) e mais 3 aceitam upload de
+ * arquivo antes de disparar (CartaoUploadBases, sem URL pública nenhuma) —
+ * as demais fontes do Atlas continuam exigindo ETL Python via terminal.
  */
 export function PainelAdmin() {
   const { sessao } = useAuth();
@@ -56,6 +59,7 @@ export function PainelAdmin() {
 
       <CartaoMetadadosBasesDados />
       <CartaoAtualizacaoEtl />
+      <CartaoUploadBases />
       <CartaoAtualizacaoIndicadoresExternos />
       <CartaoAprovacoesIndicadores />
       <CartaoVersoesPublicadas />

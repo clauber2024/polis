@@ -11,6 +11,7 @@
 import { z } from 'zod';
 import { IDS_METADADOS_BASES_DADOS } from '../utils/basesDeDadosCanonicas.js';
 import { IDS_EXTRATORES_ELEGIVEIS } from '../utils/extractoresElegiveis.js';
+import { IDS_EXTRATORES_COM_UPLOAD } from '../utils/extractoresComUpload.js';
 
 /** RF-071/072/073: PUT /api/admin/metadados-bases-dados/:baseDados */
 export const atualizarMetadadoParamsSchema = z.object({
@@ -64,4 +65,9 @@ export const removerUsuarioParamsSchema = z.object({
 /** RF-070 revisitado (30/07/2026): POST /api/admin/bases-de-dados/:baseId/atualizar */
 export const dispararAtualizacaoBaseParamsSchema = z.object({
   baseId: z.enum(IDS_EXTRATORES_ELEGIVEIS),
+});
+
+/** RF-070 revisitado, fase 2 (31/07/2026): POST /api/admin/bases-de-dados/:baseId/upload */
+export const dispararComUploadParamsSchema = z.object({
+  baseId: z.enum(IDS_EXTRATORES_COM_UPLOAD),
 });

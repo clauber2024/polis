@@ -46,7 +46,10 @@ from sqlalchemy import create_engine, text
 DATABASE_URL = os.environ.get(
     "DATABASE_URL", "postgresql://atlas:atlas_dev_local@localhost:5432/atlas_solar_justo"
 )
-BASE_DOWNLOADS = "/mnt/c/Users/Rosana Santos/Downloads"
+# Env-configurável (31/07/2026) — permite o upload pela interface do Painel
+# Admin apontar pra uma pasta temporária no container, sem mudar o default
+# local. Ver backend/src/services/uploadBases.service.ts.
+BASE_DOWNLOADS = os.environ.get("BASE_DOWNLOADS", "/mnt/c/Users/Rosana Santos/Downloads")
 NOME_ARQUIVO_PDF = "SOLAR_REFORMA_CASA_BRASIL-SIC - solar.pdf"
 PERIODO_REFERENCIA = "2026-04-30"
 

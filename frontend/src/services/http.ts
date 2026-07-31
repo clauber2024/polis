@@ -86,6 +86,42 @@ export async function enviarJson<T>(
 }
 
 /**
+ * Envia arquivo(s) via multipart/form-data (RF-070 revisitado, fase 2 —
+ * upload de bases sem URL pública, ver uploadBases.service.ts no backend).
+ * NUNCA define Content-Type manualmente — o navegador precisa gerar o
+ * boundary do multipart sozinho a partir do FormData.
+ */
+export async function enviarFormData<T>(
+  caminho: string,
+  formData: FormData,
+  token?: string | null,
+): Promise<T> {
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const resposta = await fetch(`${BASE_URL}${caminho}`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  if (!resposta.ok) {
+    let mensagem = `Erro ${resposta.status} ao chamar ${caminho}`;
+    let detalhes: unknown;
+    try {
+      const corpo = (await resposta.json()) as ErroApi;
+      mensagem = corpo.erro?.mensagem ?? mensagem;
+      detalhes = corpo.erro?.detalhes;
+    } catch {
+      // corpo não-JSON — mantém a mensagem genérica
+    }
+    throw new ErroDeApi(resposta.status, mensagem, detalhes);
+  }
+
+  return (await resposta.json()) as T;
+}
+
+/**
  * Baixa um arquivo binário (CSV/XLSX/PDF) e dispara o download no navegador.
  * Usado pelas exportações (RF-047/RF-052/RF-058) — mesmo tratamento de erro
  * de obterJson (formato { erro: { mensagem } } do backend), mas a resposta de

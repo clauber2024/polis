@@ -57,7 +57,8 @@ except OverflowError:
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://atlas:atlas_dev_local@localhost:5432/atlas_solar_justo")
 CODIGO_IBGE_BH = "3106200"
 SIMPLIFY_TOLERANCE = 0.0001
-BASE_DOWNLOADS = "/mnt/c/Users/Rosana Santos/Downloads"
+# Env-configurável (31/07/2026) — ver backend/src/services/uploadBases.service.ts.
+BASE_DOWNLOADS = os.environ.get("BASE_DOWNLOADS", "/mnt/c/Users/Rosana Santos/Downloads")
 PADRAO_ARQUIVO = "*zoneamento_11181*.csv"  # casa qualquer data (20260101_zoneamento_11181.csv etc.)
 EPSG_ORIGEM = 31983  # SIRGAS 2000 / UTM zone 23S
 _transformer = Transformer.from_crs(f"EPSG:{EPSG_ORIGEM}", "EPSG:4674", always_xy=True)

@@ -11,6 +11,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { AppError } from '../utils/AppError.js';
 import * as adminService from '../services/admin.service.js';
 import * as atualizacaoBasesService from '../services/atualizacaoBases.service.js';
+import * as uploadBasesService from '../services/uploadBases.service.js';
 import type { IdMetadadoBaseDados } from '../utils/basesDeDadosCanonicas.js';
 import type { IdExtratorElegivel } from '../utils/extractoresElegiveis.js';
 import type {
@@ -200,6 +201,40 @@ export async function dispararAtualizacaoBaseController(
     const { id: usuarioId } = usuarioAutenticado(req);
     const { baseId } = req.params as unknown as { baseId: IdExtratorElegivel };
     res.status(202).json(await atualizacaoBasesService.dispararAtualizacao(baseId, usuarioId));
+  } catch (erro) {
+    next(erro);
+  }
+}
+
+// -- upload de arquivo + disparo de ETL (RF-070 revisitado, fase 2) ----------
+
+export async function listarStatusExtratoresComUploadController(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    res.json(await uploadBasesService.listarStatusExtratoresComUpload());
+  } catch (erro) {
+    next(erro);
+  }
+}
+
+export async function dispararComUploadController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { id: usuarioId } = usuarioAutenticado(req);
+    const { baseId } = req.params as unknown as { baseId: string };
+    const arquivos = (req.files as Express.Multer.File[] | undefined) ?? [];
+    if (arquivos.length === 0) {
+      throw new AppError(400, 'Nenhum arquivo enviado.');
+    }
+    res
+      .status(202)
+      .json(await uploadBasesService.dispararComUpload(baseId, arquivos, usuarioId));
   } catch (erro) {
     next(erro);
   }

@@ -16,7 +16,8 @@ from sqlalchemy import create_engine, text
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://atlas:atlas_dev_local@localhost:5432/atlas_solar_justo")
 CODIGO_IBGE_SP = "3550308"
 SIMPLIFY_TOLERANCE = 0.0001
-BASE_DOWNLOADS = "/mnt/c/Users/Rosana Santos/Downloads"
+# Env-configurável (31/07/2026) — ver backend/src/services/uploadBases.service.ts.
+BASE_DOWNLOADS = os.environ.get("BASE_DOWNLOADS", "/mnt/c/Users/Rosana Santos/Downloads")
 ARQUIVOS = [
     "geoportal_pde2014_v_zeis_04_map_v2.geojson",
     "geoportal_pde2014_v_zeis_04a_map_v2.geojson",
