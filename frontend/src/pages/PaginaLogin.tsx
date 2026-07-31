@@ -2,6 +2,14 @@ import { useState, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ErroDeApi } from '../services/http';
+import type { Papel } from '../types/api';
+
+// Sem redirecionamento pendente (RotaProtegida não empurrou pra cá), o
+// destino padrão é o painel do próprio papel — não '/mapa': quem loga pelo
+// acesso técnico está vindo ver Colaborador/Admin, não o mapa público.
+function destinoPorPapel(papel: Papel): string {
+  return papel === 'administrador' ? '/admin' : '/colaborador';
+}
 
 /**
  * RF-011/012 — perfis de demonstração para preencher o formulário com um
@@ -36,12 +44,10 @@ export function PaginaLogin() {
   const [enviando, setEnviando] = useState(false);
   const [mostrarAvisoSenha, setMostrarAvisoSenha] = useState(false);
 
-  // Default '/mapa', não '/' — "/" é a landing pública (RF-001), não faz
-  // sentido devolver quem acabou de logar pra lá.
-  const destino = (location.state as { de?: string } | null)?.de ?? '/mapa';
+  const destinoRedirecionado = (location.state as { de?: string } | null)?.de;
 
   if (sessao) {
-    navigate(destino, { replace: true });
+    navigate(destinoRedirecionado ?? destinoPorPapel(sessao.usuario.papel), { replace: true });
     return null;
   }
 
@@ -50,8 +56,8 @@ export function PaginaLogin() {
     setErro(null);
     setEnviando(true);
     try {
-      await entrar(email, senha);
-      navigate(destino, { replace: true });
+      const usuario = await entrar(email, senha);
+      navigate(destinoRedirecionado ?? destinoPorPapel(usuario.papel), { replace: true });
     } catch (causa) {
       setErro(causa instanceof ErroDeApi ? causa.message : 'Falha ao entrar. Tente novamente.');
     } finally {
@@ -66,7 +72,7 @@ export function PaginaLogin() {
         className="w-96 space-y-5 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm"
       >
         <div className="text-center">
-          <div className="mb-3 inline-flex rounded-full bg-violet-50 p-3 text-violet-700">
+          <div className="mb-3 inline-flex rounded-full bg-stone-100 p-3 text-stone-700">
             <svg
               className="h-6 w-6"
               viewBox="0 0 24 24"
@@ -107,7 +113,7 @@ export function PaginaLogin() {
             onChange={(evento) => setEmail(evento.target.value)}
             required
             autoComplete="username"
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 focus:bg-white focus:ring-1 focus:ring-violet-600 focus:outline-none"
+            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 focus:bg-white focus:ring-1 focus:ring-stone-700 focus:outline-none"
           />
         </div>
 
@@ -122,12 +128,12 @@ export function PaginaLogin() {
             onChange={(evento) => setSenha(evento.target.value)}
             required
             autoComplete="current-password"
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 focus:bg-white focus:ring-1 focus:ring-violet-600 focus:outline-none"
+            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 focus:bg-white focus:ring-1 focus:ring-stone-700 focus:outline-none"
           />
           <button
             type="button"
             onClick={() => setMostrarAvisoSenha((atual) => !atual)}
-            className="text-xs font-medium text-violet-700 hover:underline"
+            className="text-xs font-medium text-stone-700 hover:underline"
           >
             Esqueci minha senha
           </button>
@@ -150,14 +156,13 @@ export function PaginaLogin() {
           {enviando ? 'Entrando…' : 'Autenticar no Sistema'}
         </button>
 
-        <p className="text-xs text-slate-400">
-          Acesso restrito a Colaboradores e Administradores — ver README, seção "Acesso de
-          demonstração".
+        <p className="text-xs text-stone-400">
+          Acesso restrito a Colaboradores e Administradores autorizados do Atlas Solar Justo.
         </p>
 
         {/* RF-011/012: preenchimento automático com contas reais de demonstração. */}
-        <div className="space-y-2 border-t border-slate-100 pt-4">
-          <span className="block font-mono text-[10px] font-semibold tracking-wider text-slate-400 uppercase">
+        <div className="space-y-2 border-t border-stone-100 pt-4">
+          <span className="block font-mono text-[10px] font-semibold tracking-wider text-stone-400 uppercase">
             Perfis de demonstração (clique para autocompletar)
           </span>
           {PERFIS_DEMONSTRACAO.map((perfil) => (
@@ -169,7 +174,7 @@ export function PaginaLogin() {
                 setSenha(SENHA_DEMONSTRACAO);
                 setErro(null);
               }}
-              className="flex w-full items-start gap-2.5 rounded-lg border border-slate-100 p-2.5 text-left transition-all hover:border-violet-300 hover:bg-violet-50/30"
+              className="flex w-full items-start gap-2.5 rounded-lg border border-stone-100 p-2.5 text-left transition-all hover:border-stone-300 hover:bg-stone-50"
             >
               <span
                 className={`mt-0.5 shrink-0 rounded-md px-1.5 py-1 font-mono text-[9px] font-bold uppercase ${
@@ -181,9 +186,9 @@ export function PaginaLogin() {
                 {perfil.papel === 'administrador' ? 'Admin' : 'Colab'}
               </span>
               <span className="space-y-0.5">
-                <span className="block text-xs font-bold text-slate-800">{perfil.nome}</span>
-                <span className="block font-mono text-[10px] text-slate-500">{perfil.email}</span>
-                <span className="block text-[10px] leading-normal text-slate-400">
+                <span className="block text-xs font-bold text-stone-800">{perfil.nome}</span>
+                <span className="block font-mono text-[10px] text-stone-500">{perfil.email}</span>
+                <span className="block text-[10px] leading-normal text-stone-400">
                   {perfil.descricao}
                 </span>
               </span>

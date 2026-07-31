@@ -14,7 +14,7 @@ interface AuthContextValor {
   /** true enquanto restaura a sessão do localStorage no primeiro render — evita
    *  redirecionar para /login antes de saber se já havia sessão salva. */
   carregando: boolean;
-  entrar: (email: string, senha: string) => Promise<void>;
+  entrar: (email: string, senha: string) => Promise<UsuarioAutenticado>;
   sair: () => void;
   temPapel: (...papeis: Papel[]) => boolean;
 }
@@ -44,11 +44,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setCarregando(false);
   }, []);
 
-  async function entrar(email: string, senha: string): Promise<void> {
+  async function entrar(email: string, senha: string): Promise<UsuarioAutenticado> {
     const resultado = await authService.login(email, senha);
     const novaSessao: Sessao = { token: resultado.token, usuario: resultado.usuario };
     setSessao(novaSessao);
     localStorage.setItem(CHAVE_STORAGE, JSON.stringify(novaSessao));
+    return resultado.usuario;
   }
 
   function sair(): void {
