@@ -56,6 +56,10 @@ export type StatusFonte = 'completo' | 'parcial' | 'bloqueado';
 export interface StatusFonteDados {
   id: string;
   nome: string;
+  /** Órgão/instituição oficial provedora da fonte (30/07/2026, RF-063 — trilha de proveniência). */
+  orgaoProvedor: string;
+  /** Como o Atlas obtém o dado desta fonte (API, download direto, seed manual etc.). */
+  metodoColeta: string;
   municipiosCobertos: number;
   percentualCobertura: number;
   periodoReferenciaMaisRecente: string | null;
@@ -193,6 +197,8 @@ export async function buscarStatusBasesDeDados(): Promise<StatusBasesDeDadosResu
   function montarFonte(
     id: string,
     nome: string,
+    orgaoProvedor: string,
+    metodoColeta: string,
     dado: { cobertos: number; periodo: string | null },
     observacao: string | null = null,
   ): StatusFonteDados {
@@ -201,6 +207,8 @@ export async function buscarStatusBasesDeDados(): Promise<StatusBasesDeDadosResu
     return {
       id,
       nome,
+      orgaoProvedor,
+      metodoColeta,
       municipiosCobertos: dado.cobertos,
       percentualCobertura,
       periodoReferenciaMaisRecente: dado.periodo,
@@ -210,45 +218,78 @@ export async function buscarStatusBasesDeDados(): Promise<StatusBasesDeDadosResu
   }
 
   const fontes: StatusFonteDados[] = [
-    montarFonte('aneel', 'ANEEL — Micro e Minigeração Distribuída (MMGD)', mmgd),
+    montarFonte(
+      'aneel',
+      'ANEEL — Registro de Sistemas MMGD (potência instalada)',
+      'ANEEL (Agência Nacional de Energia Elétrica)',
+      'Download direto de arquivo público (dados abertos ANEEL/MMGD) — publicação atualizada mensalmente pela própria fonte',
+      mmgd,
+      'Fonte DIFERENTE da usada no Ranking de Fricção e Atrasos (Visão Setorial): aqui é o registro de sistemas MMGD instalados (potência, nº de UCs), atualizado mensalmente pela ANEEL. O ranking usa a "Fila de Conexão de MMGD" — outro dataset da ANEEL, sobre cumprimento de prazo no atendimento a pedidos, com uma janela histórica fixa (2022-2023) — ver nota naquela tela.',
+    ),
     montarFonte(
       'ibge',
       'IBGE — Censo 2022 (Infraestrutura Urbana, via SIDRA)',
+      'IBGE (Instituto Brasileiro de Geografia e Estatística)',
+      'API pública SIDRA',
       ibge,
       'Cobertura calculada pelo indicador "% água inadequada", representativo do bloco Infraestrutura Urbana carregado do Censo.',
     ),
-    montarFonte('cadunico', 'CadÚnico (MDS/SAGI)', cadunico),
+    montarFonte(
+      'cadunico',
+      'CadÚnico (MDS/SAGI)',
+      'MDS/SAGI (Ministério do Desenvolvimento Social)',
+      'API pública "MI Social" (Solr), atualizada mensalmente pela fonte',
+      cadunico,
+    ),
     montarFonte(
       'tsee',
       'TSEE — Tarifa Social de Energia Elétrica (ANEEL/CDE)',
+      'ANEEL — CDE (Conta de Desenvolvimento Energético)',
+      'Bloqueado — sem coleta em andamento',
       { cobertos: 0, periodo: null },
       'Bloqueado: a coluna percentual_tsee ainda não existe no schema. Aguardando dado ANEEL de Beneficiários da CDE pós-janeiro/2026 com a nova subclasse "Residencial Desconto Social" (Lei 15.235/2025) — ver CLAUDE.md.',
     ),
     montarFonte(
       'ivs_ipea',
       'IVS Consolidado (índice próprio, inspirado no IVS/IPEA)',
+      'Construção própria do Atlas (metodologia inspirada no IVS/IPEA)',
+      'Cálculo interno (média de 3 blocos de indicadores já carregados)',
       ivs,
       'Construção própria do Atlas (média de 3 blocos normalizados), não o IVS oficial do IPEA — ver ARQUITETURA.md, "Índices compostos e metodologia de cruzamentos".',
     ),
-    montarFonte('inpe', 'INPE — Irradiação Solar (Atlas Brasileiro de Energia Solar)', irradiacao),
+    montarFonte(
+      'inpe',
+      'INPE — Irradiação Solar (Atlas Brasileiro de Energia Solar)',
+      'INPE (Instituto Nacional de Pesquisas Espaciais) — LABREN/CCST',
+      'Download direto do Atlas Brasileiro de Energia Solar, 2ª edição (2017)',
+      irradiacao,
+    ),
     montarFonte(
       'rais',
       'RAIS — Ministério do Trabalho (Renda e Trabalho, via BigQuery)',
+      'Ministério do Trabalho e Emprego (RAIS)',
+      'Consulta via Google BigQuery (Base dos Dados)',
       rais,
     ),
     montarFonte(
       'datasus',
       'DATASUS — Mortalidade Infantil (SIM + SINASC)',
+      'Ministério da Saúde (DATASUS)',
+      'Consulta via Google BigQuery (Base dos Dados)',
       datasus,
     ),
     montarFonte(
       'mcmv',
       'Caixa/FGTS e Ministério das Cidades — Minha Casa Minha Vida',
+      'Caixa Econômica Federal (FGTS) e Ministério das Cidades (OGU)',
+      'Download direto de dados públicos de contratação',
       mcmv,
     ),
     montarFonte(
       'zeis_aeis',
       'Prefeituras municipais — Zonas Especiais de Interesse Social (ZEIS/AEIS)',
+      'Prefeituras municipais (8 municípios com perímetro publicado)',
+      'Seed manual por perímetro publicado — sem fonte nacional única',
       zeisAeis,
       'Cobertura baixa por desenho, não por lacuna de carga: perímetros de ZEIS/AEIS só ' +
         'existem publicados hoje em 8 prefeituras (São Paulo, Recife, Rio Branco, Belo ' +
@@ -258,6 +299,8 @@ export async function buscarStatusBasesDeDados(): Promise<StatusBasesDeDadosResu
     montarFonte(
       'reforma_casa_brasil_solar',
       'Caixa Econômica Federal — Reforma Casa Brasil Solar',
+      'Caixa Econômica Federal',
+      'Extrato pontual via Lei de Acesso à Informação (fonte não pública/automatizável)',
       reformaSolar,
       'Cobertura parcial por desenho, não por lacuna de carga: fonte pontual e NÃO pública ' +
         '(extrato via Lei de Acesso à Informação, nov/2025–abr/2026), reflete o alcance real ' +

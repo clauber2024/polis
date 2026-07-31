@@ -1,4 +1,4 @@
-import { Link, NavLink, Outlet, Route, Routes, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { BuscaMunicipio } from './components/BuscaMunicipio';
 import { RotaProtegida } from './components/RotaProtegida';
 import { useAuth } from './contexts/AuthContext';
@@ -32,6 +32,11 @@ function classeAba({ isActive }: { isActive: boolean }) {
 function LayoutApp() {
   const navigate = useNavigate();
   const { sessao, sair } = useAuth();
+  // Busca de município escondida na "Base de Evidências" (30/07/2026, pedido
+  // do usuário) — é um painel de status macro de bases nacionais, a busca
+  // por município individual não se aplica ali. Continua nas demais rotas.
+  const location = useLocation();
+  const exibirBuscaMunicipio = location.pathname !== '/base-de-evidencias';
 
   return (
     <div className="flex h-full flex-col font-sans">
@@ -92,9 +97,11 @@ function LayoutApp() {
           )}
         </nav>
         <div className="ml-auto flex items-center gap-4">
-          <BuscaMunicipio
-            aoSelecionar={(municipio) => navigate(`/mapa?municipio=${municipio.codigoIbge}`)}
-          />
+          {exibirBuscaMunicipio && (
+            <BuscaMunicipio
+              aoSelecionar={(municipio) => navigate(`/mapa?municipio=${municipio.codigoIbge}`)}
+            />
+          )}
           {sessao ? (
             <div className="flex items-center gap-2">
               <span className="hidden flex-col items-end text-[11px] leading-tight text-slate-500 sm:flex">

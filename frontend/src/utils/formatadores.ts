@@ -46,6 +46,20 @@ export function formatarMesAno(dataIso: string | null): string {
   return `${NOMES_MES_ABREVIADOS[indiceMes] ?? mes}/${ano}`;
 }
 
+/**
+ * Formata uma coluna DATE pura (`YYYY-MM-DD`) como `DD/MM/AAAA` — padrão
+ * brasileiro estrito (30/07/2026, RF-063, "Base de Evidências"). Mesmo
+ * cuidado de `formatarMesAno`: parseia a string diretamente, sem passar por
+ * `Date`/`timeZone`, porque uma DATE pura não é uma TIMESTAMPTZ — convertê-la
+ * via `Date` deslocaria o dia para trás (meia-noite UTC vira o dia anterior
+ * em UTC-3).
+ */
+export function formatarDataBrasileira(dataIso: string | null): string {
+  if (!dataIso) return 'sem dado';
+  const [ano, mes, dia] = dataIso.split('-');
+  return `${dia}/${mes}/${ano}`;
+}
+
 export function formatarValor(
   valor: number | null | undefined,
   formato: FormatoIndicador,

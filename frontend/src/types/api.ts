@@ -593,6 +593,10 @@ export type StatusFonte = 'completo' | 'parcial' | 'bloqueado';
 export interface StatusFonteDados {
   id: string;
   nome: string;
+  /** Órgão/instituição oficial provedora da fonte. */
+  orgaoProvedor: string;
+  /** Como o Atlas obtém o dado desta fonte (API, download direto, seed manual etc.). */
+  metodoColeta: string;
   municipiosCobertos: number;
   percentualCobertura: number;
   periodoReferenciaMaisRecente: string | null;
