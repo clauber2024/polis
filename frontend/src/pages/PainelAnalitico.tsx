@@ -72,10 +72,16 @@ function IconeAlerta({ className }: { className?: string }) {
   );
 }
 
-function IconePlay({ className }: { className?: string }) {
+/** Spinner de carregamento (30/07/2026, substitui IconePlay do botão manual removido). */
+function IconeCarregando({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-      <polygon points="5 3 19 12 5 21 5 3" />
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={3} />
+      <path
+        className="opacity-90"
+        fill="currentColor"
+        d="M12 2a10 10 0 0 1 10 10h-3a7 7 0 0 0-7-7V2Z"
+      />
     </svg>
   );
 }
@@ -356,10 +362,17 @@ export function PainelAnalitico() {
     });
   }
 
-  // Scatter nacional de quadrantes (14/07/2026) — LAZY por botão, nunca no
-  // carregamento da página: é a maior rajada de requisições do frontend
-  // (~28 páginas do endpoint de classificação). Mesmo padrão de handler (não
-  // useEffect com loading nas deps) já usado em garantirVaziosCarregados.
+  // Scatter/composição nacional de quadrantes (14/07/2026, LAZY por botão
+  // até 30/07/2026 — era a maior rajada de requisições do frontend, ~28
+  // páginas do endpoint de classificação, deliberadamente adiada até o
+  // clique do usuário). CORREÇÃO PEDIDA PELO USUÁRIO (30/07/2026): a Visão
+  // Executiva é o elemento de maior peso analítico da tela ("onde
+  // priorizar sem exigir nenhuma escolha") — exigir um clique extra pra
+  // ver o próprio conteúdo principal da tela contradizia esse objetivo.
+  // Passa a carregar automaticamente ao montar (useEffect abaixo). Troca
+  // consciente: a tela agora sempre dispara as ~28 requisições ao abrir,
+  // mesmo pra quem só quer ver a Comparação de municípios mais abaixo —
+  // aceito pelo usuário em troca de eliminar o clique manual.
   const [quadrantesNacionais, setQuadrantesNacionais] = useState<VaziosDeAcessoCompleto | null>(
     null,
   );
@@ -399,6 +412,14 @@ export function PainelAnalitico() {
       })
       .finally(() => setCarregandoQuadrantes(false));
   }
+
+  // Dispara automaticamente ao montar a página (30/07/2026) — ver docstring
+  // do estado acima. O guard já existente em carregarQuadrantesNacionais
+  // (quadrantesNacionais || carregandoQuadrantes) protege contra double-fire
+  // do StrictMode/re-render, mesmo sem esses valores nas deps do efeito.
+  useEffect(() => {
+    carregarQuadrantesNacionais();
+  }, []);
 
   async function aoExportar(formato: 'csv' | 'xlsx') {
     setExportando(formato);
@@ -474,26 +495,28 @@ export function PainelAnalitico() {
           </div>
         )}
 
-        {!quadrantesNacionais && (
-          <div className="mt-6 flex flex-col items-center justify-center rounded-xl border border-dashed border-stone-300 bg-stone-50/50 p-10 text-center">
-            <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-stone-200">
-              <IconeGrafico className="h-5 w-5 text-stone-400" />
-            </div>
-            <h3 className="mb-1 text-sm font-bold text-stone-900">Diagnóstico pronto para carregar</h3>
-            <p className="mb-6 max-w-md text-xs font-medium text-stone-500">
-              Carrega os ~5.500 municípios do país com a classificação oficial de Vazio de Acesso.
-              Pode levar alguns segundos.
+        {/* Carregamento automático ao montar (30/07/2026) — sem botão manual,
+            ver docstring do estado quadrantesNacionais acima. */}
+        {carregandoQuadrantes && !quadrantesNacionais && (
+          <div className="mt-6 flex min-h-[220px] flex-col items-center justify-center gap-3 rounded-xl border border-stone-200/60 bg-stone-50/50 p-10 text-center">
+            <IconeCarregando className="h-8 w-8 animate-spin text-red-700" />
+            <p className="text-xs font-bold tracking-widest text-stone-500 uppercase">
+              Carregando os ~5.500 municípios do país…
             </p>
+          </div>
+        )}
+
+        {erroQuadrantes && !quadrantesNacionais && !carregandoQuadrantes && (
+          <div className="mt-6 flex flex-col items-center justify-center gap-3 rounded-xl border border-red-200 bg-red-50/50 p-10 text-center">
+            <IconeAlerta className="h-6 w-6 text-red-600" />
+            <p className="max-w-md text-xs font-medium text-stone-600">{erroQuadrantes}</p>
             <button
               type="button"
               onClick={carregarQuadrantesNacionais}
-              disabled={carregandoQuadrantes}
-              className="group relative inline-flex items-center gap-2 rounded-lg bg-red-700 px-6 py-3 font-bold text-white shadow-sm transition-all hover:bg-red-800 focus:ring-2 focus:ring-red-700 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
+              className="rounded-lg bg-red-700 px-4 py-2 text-xs font-bold text-white shadow-sm transition-all hover:bg-red-800"
             >
-              <IconePlay className="h-4 w-4 fill-white transition-transform group-hover:scale-110" />
-              {carregandoQuadrantes ? 'Carregando…' : 'Carregar diagnóstico'}
+              Tentar novamente
             </button>
-            {erroQuadrantes && <p className="mt-3 text-xs text-red-600">{erroQuadrantes}</p>}
           </div>
         )}
 
