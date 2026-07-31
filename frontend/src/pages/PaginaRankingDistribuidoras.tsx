@@ -77,6 +77,23 @@ export function PaginaRankingDistribuidoras() {
     ? rankingComPosicao.filter((item) => item.regiaoPrincipal === filtroRegiao)
     : rankingComPosicao;
 
+  // Agregados nacionais (30/07/2026, pedido do usuário) — calculados aqui, no
+  // cliente, a partir da lista completa já carregada (dados.ranking), nunca
+  // um número fixo/fabricado. Índice médio é PONDERADO por volume de pedidos
+  // (mesmo critério já usado em resumoNacional.mediaNacionalPctForaDoPrazo,
+  // no backend) — inclui as distribuidoras penalizadas por dado ausente
+  // (indiceFriccaoRanking=1 pra elas), de propósito: excluí-las inflaria
+  // artificialmente a média nacional pra melhor do que ela é de fato.
+  const agregadosNacionais = useMemo(() => {
+    if (!dados || dados.ranking.length === 0) return null;
+    const totalPedidos = dados.ranking.reduce((soma, item) => soma + item.nPedidos, 0);
+    const indiceMedioPonderado =
+      totalPedidos > 0
+        ? dados.ranking.reduce((soma, item) => soma + item.nPedidos * item.indiceFriccaoRanking, 0) / totalPedidos
+        : null;
+    return { totalPedidos, indiceMedioPonderado };
+  }, [dados]);
+
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
       <h1 className="text-2xl font-black tracking-tight text-stone-900">
@@ -94,15 +111,26 @@ export function PaginaRankingDistribuidoras() {
 
       {dados && (
         <>
+          {agregadosNacionais && <CabecalhoBaseENacional agregados={agregadosNacionais} />}
+
           {dados.resumoNacional && <CardAlertaNacional resumo={dados.resumoNacional} />}
 
-          {/* Metodologia — versão curta e direta (30/07/2026, pedido do usuário:
-              o bloco anterior, com 2 parágrafos densos, poluía o topo da tela). */}
-          <p className="mt-6 text-xs leading-relaxed text-stone-500">
-            <strong className="font-bold text-stone-700">Índice de Fricção</strong> = taxa de conexão +
-            cumprimento de prazo da ANEEL, normalizados entre distribuidoras. Fatores socioeconômicos da
-            região atendida não entram nesta pontuação.
-          </p>
+          {/* Metodologia — versão curta e direta (30/07/2026). Reescrita a pedido do
+              usuário: o "+" da versão anterior lia como soma simples de métricas
+              distintas, impreciso. "Média simples" (não "ponderada" — a fórmula real dá
+              peso igual aos dois indicadores, não pesos deliberadamente diferentes; ver
+              rankingDistribuidoras.service.ts) descreve exatamente o cálculo real. */}
+          <div className="mt-6 text-xs leading-relaxed text-stone-600">
+            <strong className="font-black text-stone-900">Índice de Fricção (escala de 0 a 1):</strong>{' '}
+            média simples de dois indicadores operacionais — taxa de não conexão e taxa de
+            descumprimento de prazo regulatório da ANEEL — cada um normalizado independentemente entre
+            as concessionárias (mínimo–máximo, 0 a 1).{' '}
+            <strong className="font-bold text-stone-900">
+              Valores mais próximos de 1 indicam maior barreira, lentidão e fricção na conexão.
+            </strong>{' '}
+            Fatores socioeconômicos da região atendida são deliberadamente isolados desta pontuação,
+            para refletir exclusivamente o desempenho regulatório operacional da concessionária.
+          </div>
 
           {/* Filtro rápido */}
           <div className="mt-6 flex flex-wrap items-end gap-3 rounded-2xl bg-white/70 p-4 shadow-lg shadow-stone-200/50 ring-1 ring-stone-900/5 backdrop-blur-xl">
@@ -168,6 +196,59 @@ interface ItemComPosicao extends DistribuidoraRanking {
 
 function formatarMultiplicador(valor: number): string {
   return `${valor.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}x`;
+}
+
+/**
+ * Janela temporal real do dataset ANEEL "Atendimento a pedidos de conexão de
+ * MMGD (pós Lei 14.300)" (30/07/2026) — verificada direto na página do
+ * dataset em dadosabertos.aneel.gov.br, não presumida: "realizadas no
+ * período entre 7 de janeiro de 2022 e 7 de janeiro de 2023". O pedido
+ * original sugeria "Nov/2025 – Abr/2026", que na verdade é a janela de uma
+ * fonte TOTALMENTE DIFERENTE já usada neste projeto (contratos do Reforma
+ * Casa Brasil Solar, ver ARQUITETURA.md) — usar essa data aqui seria
+ * publicar uma janela temporal errada numa peça pensada justamente para ser
+ * auditável. O dataset em si foi publicado/atualizado em 2026, mas os
+ * PEDIDOS DE CONEXÃO que ele registra são desse período de 2022-2023.
+ */
+const JANELA_TEMPORAL_DATASET_ANEEL = '7 jan/2022 – 7 jan/2023';
+
+interface AgregadosNacionais {
+  totalPedidos: number;
+  indiceMedioPonderado: number | null;
+}
+
+function CabecalhoBaseENacional({ agregados }: { agregados: AgregadosNacionais }) {
+  return (
+    <div className="mt-6 rounded-2xl border border-stone-200/50 bg-white/80 p-4 shadow-sm backdrop-blur-xl">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <p className="text-xs font-bold text-stone-500">
+          Base de dados oficial ANEEL — "Atendimento a pedidos de conexão de MMGD (pós Lei 14.300)" •
+          Janela temporal dos pedidos:{' '}
+          <span className="font-black text-stone-900">{JANELA_TEMPORAL_DATASET_ANEEL}</span>
+        </p>
+
+        <div className="flex items-center gap-4 rounded-xl border border-stone-200/60 bg-stone-50 px-4 py-2.5 text-xs">
+          <div>
+            <span className="block text-[9px] font-bold tracking-widest text-stone-400 uppercase">
+              Volume total nacional
+            </span>
+            <span className="font-black text-stone-900">
+              {formatarValor(agregados.totalPedidos, 'inteiro')} pedidos
+            </span>
+          </div>
+          <div className="h-6 w-px bg-stone-200" />
+          <div>
+            <span className="block text-[9px] font-bold tracking-widest text-stone-400 uppercase">
+              Índice médio Brasil
+            </span>
+            <span className="font-black text-red-600">
+              {formatarValor(agregados.indiceMedioPonderado, 'numero')}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function CardAlertaNacional({ resumo }: { resumo: ResumoNacionalFriccao }) {
@@ -367,19 +448,17 @@ function TabelaRanking({ itens, resumoNacional, linhaExpandida, aoAlternarExpans
                       )}
                     </td>
                   </tr>
-                  {expandida && resumoNacional && (
+                  {expandida && (
                     <tr className="border-t border-stone-100/80 bg-stone-50/60">
                       <td colSpan={5} className="px-6 py-4">
-                        {item.pctForaDoPrazo !== null ? (
+                        {item.pctForaDoPrazo !== null && resumoNacional ? (
                           <ComparativoBarras
                             nomeEmpresa={item.distribuidora}
                             valorEmpresa={item.pctForaDoPrazo}
                             resumo={resumoNacional}
                           />
                         ) : (
-                          <p className="max-w-xl text-xs leading-relaxed text-stone-500">
-                            {item.motivosDadosIncompletos[0]}
-                          </p>
+                          <TrilhaAuditoriaDadoAusente />
                         )}
                       </td>
                     </tr>
@@ -440,6 +519,78 @@ function ComparativoBarras({
           </span>
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Trilha de auditoria/evidência para linhas penalizadas por dado ausente
+ * (30/07/2026, pedido do usuário — rastreabilidade técnica pra facilitar
+ * verificação em caso de contestação externa). Os metadados de fonte/
+ * variável abaixo são reais: nome oficial do dataset ANEEL e nome real do
+ * campo (`DatLim`), ver docstring de
+ * `backend/src/etl/loaders/extrair_desempenho_conexao_mmgd.py`.
+ *
+ * A nota metodológica NÃO usa o termo "opacidade" nem cita uma "diretriz do
+ * observatório" — o pedido original incluía isso, mas equivaleria a
+ * afirmar publicamente que a distribuidora é culpada pela ausência do
+ * dado (sem confirmar se a causa é dela ou da própria base da ANEEL) e a
+ * citar uma política institucional que não existe neste projeto. A
+ * apuração real já registrada em ARQUITETURA.md mostra a MAIOR
+ * distribuidora do país (Cemig-D, 7,4 milhões de pedidos) com o mesmo
+ * problema, atravessando vários grupos econômicos sem relação entre si —
+ * por isso a nota descreve a REGRA aplicada (penalidade máxima, sem
+ * isenção) sem atribuir causa. Ver mesma decisão em
+ * `rankingDistribuidoras.service.ts` (backend).
+ */
+function TrilhaAuditoriaDadoAusente() {
+  return (
+    <div className="max-w-2xl space-y-4 rounded-xl border border-stone-200 bg-stone-50 p-5">
+      <div className="flex items-center justify-between border-b border-stone-200 pb-3">
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-red-600" />
+          <h5 className="text-xs font-black tracking-wider text-stone-900 uppercase">
+            Trilha de auditoria e evidência regulatória
+          </h5>
+        </div>
+        <span className="rounded border border-stone-200 bg-white px-2 py-1 text-[10px] font-bold text-stone-500">
+          Ref. base: ANEEL / MMGD
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 text-xs md:grid-cols-3">
+        <div>
+          <span className="block text-[9px] font-bold tracking-widest text-stone-400 uppercase">Fonte oficial</span>
+          <span className="font-semibold text-stone-800">
+            ANEEL — "Atendimento a pedidos de conexão de MMGD (pós Lei 14.300)"
+          </span>
+        </div>
+        <div>
+          <span className="block text-[9px] font-bold tracking-widest text-stone-400 uppercase">
+            Variável analisada
+          </span>
+          <span className="font-mono font-semibold text-stone-800">DatLim</span>{' '}
+          <span className="text-stone-500">(prazo regulatório de atendimento)</span>
+        </div>
+        <div>
+          <span className="block text-[9px] font-bold tracking-widest text-stone-400 uppercase">
+            Tratamento metodológico
+          </span>
+          <span className="font-semibold text-stone-800">
+            Atribuição da penalidade máxima de fricção por ausência do campo na fonte pública.
+          </span>
+        </div>
+      </div>
+
+      <p className="border-t border-stone-200/60 pt-3 text-justify text-[11px] leading-relaxed font-medium text-stone-600">
+        <strong>Nota metodológica:</strong> a ausência do campo <code className="font-mono">DatLim</code> impede
+        aferir cumprimento de prazo para esta concessionária. Por decisão metodológica deste ranking, vazio de dado
+        em fonte oficial não gera isenção nem pontuação neutra — recebe a penalidade máxima, para não favorecer quem
+        tem dado ausente sobre quem tem dado desfavorável. Essa mesma ausência de campo já foi identificada em
+        várias distribuidoras de grupos econômicos diferentes na mesma base nacional, incluindo a maior
+        distribuidora do país (Cemig-D) — não é possível, só com este dado, determinar se a causa é uma falha de
+        reporte da distribuidora à ANEEL ou uma lacuna da própria base pública.
+      </p>
     </div>
   );
 }

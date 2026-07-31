@@ -2353,6 +2353,20 @@ incentivo a incluir em rankings compostos nacionais.
 
 ### Ideia de produto: ranking publico de distribuidoras por desempenho em conexao de MMGD
 
+**JANELA TEMPORAL DO DATASET (verificada 30/07/2026, direto na pagina do
+dataset em dadosabertos.aneel.gov.br - nunca documentada antes neste
+arquivo):** os pedidos de conexao cobertos foram "realizadas no periodo
+entre 7 de janeiro de 2022 e 7 de janeiro de 2023" - e uma janela historica
+FIXA (~1 ano, pos Lei 14.300), nao uma serie continua/rolante. O dataset em
+si (pagina/publicacao) foi criado em 2026 e tem cadencia de atualizacao
+mensal declarada, mas isso e sobre a PUBLICACAO, nao sobre os PEDIDOS
+registrados - nao presumir que dados mais recentes que jan/2023 estao
+incluidos sem reverificar a fonte. Motivo do registro: o Ranking de Friccao
+e Atrasos (`PaginaRankingDistribuidoras.tsx`) passou a exibir essa janela
+explicitamente no cabecalho (pedido do usuario) - sem essa checagem, a data
+teria sido publicada errada (o pedido original sugeria "Nov/2025-Abr/2026",
+que e a janela de uma fonte diferente, o Reforma Casa Brasil Solar).
+
 Levantada pelo usuario a partir do achado acima (sessao 06/07/2026): o
 dataset ANEEL "Atendimento a pedidos de conexoes MMGD" permite construir,
 por distribuidora, metricas objetivas e comparaveis de desempenho no
