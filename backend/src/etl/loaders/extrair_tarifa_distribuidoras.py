@@ -30,6 +30,25 @@ nova necessária. Municípios com MÚLTIPLAS distribuidoras (área de concessão
 dividida entre agentes) ficam SEM tarifa (não é possível atribuir um valor
 único) — reportados separadamente, não é erro.
 
+CROSSWALK_SIG_AGENTE_INDQUAL_PARA_TARIFA (30/07/2026, correção de bug real —
+usuário perguntou por que Amazonas/Roraima ficavam 100% sem tarifa apesar de
+serem estados de distribuidora única, o que descartava a causa "múltiplas
+distribuidoras"): o `sig_agente` do INDQUAL e o `SigAgente` do dataset de
+tarifas são DOIS CAMPOS DE DOIS DATASETS DIFERENTES da própria ANEEL, sem
+garantia de baterem — mesma classe de problema já resolvida para "Enel GO" =
+"EQUATORIAL GO" no crosswalk de `extrair_desempenho_conexao_mmgd.py`, mas
+aqui entre INDQUAL e Tarifas Homologadas, não entre a fila de conexão e o
+INDQUAL. Investigação registrada em
+`backend/src/etl/analises/investigar_cobertura_tarifa_distribuidoras.py`
+confirmou que "AME" (Amazonas Energia) e "BOA VISTA" (Roraima Energia) são
+os ÚNICOS dois sig_agente do INDQUAL, entre distribuidoras de área de
+concessão única (sem ambiguidade), sem nenhuma tarifa homologada batendo —
+CONFIRMADO via CNPJ IDÊNTICO entre os dois datasets (não por semelhança de
+nome): AME = CNPJ 02341467000120 = "Âmbar Amazonas" no dataset de tarifas;
+BOA VISTA = CNPJ 02341470000144 = "ÂMBAR ENERGIA RR". As duas distribuidoras
+foram adquiridas pelo grupo Âmbar Energia — o dataset de tarifas (mais
+recente) já reflete o nome novo, o INDQUAL ainda não.
+
 VALOR GRAVADO: tarifa vigente MAIS RECENTE (TUSD+TE somadas, R$/MWh),
 subgrupo B1, modalidade Convencional, Tarifa de Aplicação (o que o
 consumidor de fato paga, não a Base Econômica). Não é uma média histórica —
@@ -67,6 +86,77 @@ CAMINHO_LOCAL = os.environ.get(
 # tarifas têm vigências distintas por distribuidora; este é um snapshot do
 # "estado atual" no momento em que o extractor rodou).
 PERIODO_REFERENCIA = os.environ.get("PERIODO_REFERENCIA_TARIFA", "2026-07-06")
+
+# Crosswalk sig_agente (INDQUAL) -> SigAgente (dataset de tarifas) — ver
+# docstring do módulo para o achado completo (evidência de CNPJ). Só entram
+# aqui casos CONFIRMADOS manualmente, nunca candidatos automáticos por
+# substring (mesmo princípio do MAPEAMENTO_MANUAL_CONFIRMADO em
+# extrair_desempenho_conexao_mmgd.py).
+CROSSWALK_SIG_AGENTE_INDQUAL_PARA_TARIFA = {
+    "AME": "Âmbar Amazonas",
+    "BOA VISTA": "ÂMBAR ENERGIA RR",
+}
+
+# Normalização DENTRO do próprio INDQUAL — casos em que dois sig_agente
+# distintos em `qualidade_conjuntos` (CNPJs diferentes) não são duas
+# distribuidoras reais hoje, e sim a MESMA empresa em épocas diferentes,
+# por fusão/incorporação nunca refletida nos registros de conjunto antigos.
+# Sem isso, `resolver_municipio_distribuidora` conta essas duas entradas
+# como "múltiplas distribuidoras" e exclui o município da tarifa por engano.
+# Confirmado para RGE/RGE SUL (30/07/2026), via evidência temporal no
+# próprio dataset de tarifas homologadas da ANEEL: até 2018-06-19 existiam
+# duas empresas com tarifas homologadas separadamente — "RGE" (CNPJ
+# 02016439000138) e "RGE SUL" (CNPJ 02016440000162); a partir de
+# 2019-06-19 só o CNPJ 02016440000162 continua homologando tarifa, agora
+# sob o rótulo "RGE" — rastro de incorporação da antiga RGE pela RGE Sul,
+# com a sobrevivente adotando o nome "RGE". O INDQUAL nunca consolidou os
+# dois registros de conjunto antigos. Município cujos únicos sig_agente
+# distintos sejam os dois lados dessa fusão não tem, de fato, mais de uma
+# distribuidora hoje — mapeados ao nome atual ("RGE") antes de contar
+# distribuidora única. Mesma classe de problema do CROSSWALK acima
+# (naming divergente entre registros ANEEL), aqui dentro de um único
+# dataset em vez de entre dois. Aplicar o mesmo tratamento a outros pares
+# recorrentes só depois de confirmação individual via CNPJ/histórico —
+# nunca por semelhança de nome.
+#
+# Segundo caso confirmado (30/07/2026): CPFL Jaguari, CPFL Mococa, CPFL
+# Leste Paulista, CPFL Sul Paulista e CPFL Santa Cruz — 5 concessionárias
+# do Grupo CPFL no interior de SP — agrupadas numa só por decisão
+# regulatória explícita, não achado indireto: Resolução Autorizativa
+# ANEEL nº 6.723/2017 (21/11/2017) aprovou a incorporação das outras 4 na
+# Jaguari (CNPJ 53859112000169), efetiva em 01/01/2018, com a empresa
+# resultante renomeada "CPFL Santa Cruz S.A.". Bate com a evidência
+# temporal do dataset de tarifas: as 5 param de homologar com nome/CNPJ
+# originais em 2017-03-22/2018-03-22, e só o CNPJ 53859112000169 segue
+# homologando a partir de 2018-03-22, sob o rótulo "CPFL Santa Cruz"
+# (grafia mista — é a chave usada por
+# `carregar_tarifa_mais_recente_por_distribuidora`, case sensitive, para
+# achar a tarifa vigente mais recente).
+#
+# Terceiro caso confirmado (30/07/2026), padrão diferente dos dois
+# anteriores: EDEVP, EEB e CNEE eram 3 concessionárias do "Grupo Rede"
+# (adquirido pela Energisa em 2014) que homologavam tarifa
+# SEPARADAMENTE até 2017-04-01, quando as três param ao mesmo tempo — não
+# uma renomeação de CNPJ (como RGE/CPFL), e sim unificação formal das
+# áreas de concessão na "Energisa Sul-Sudeste" (sig_agente "ESS", CNPJ
+# 07282377000120, PRÓPRIO — já homologava tarifa em paralelo desde 2010,
+# não é o CNPJ de nenhuma das três), confirmado via busca (EDEVP
+# oficialmente renomeada "Energisa Sul-Sudeste") + notícia de unificação
+# de áreas de concessão pela Energisa. Município cujos únicos sig_agente
+# distintos sejam ESS + um desses três nomes antigos tem, de fato, uma
+# única distribuidora hoje.
+NORMALIZACAO_SIG_AGENTE_MESMA_EMPRESA_INDQUAL = {
+    "RGE": "RGE",
+    "RGE SUL": "RGE",
+    "CPFL JAGUARI": "CPFL Santa Cruz",
+    "CPFL SANTA CRUZ": "CPFL Santa Cruz",
+    "CPFL LESTE PAULI": "CPFL Santa Cruz",
+    "CPFL SUL PAULIST": "CPFL Santa Cruz",
+    "CPFL MOCOCA": "CPFL Santa Cruz",
+    "EDEVP": "ESS",
+    "EEB": "ESS",
+    "CNEE": "ESS",
+}
 
 TAMANHO_CHUNK = 200_000
 
@@ -179,6 +269,10 @@ def resolver_municipio_distribuidora(engine) -> pd.DataFrame:
     with engine.connect() as conexao:
         pares = pd.read_sql(query, conexao)
 
+    pares["sig_agente"] = pares["sig_agente"].replace(
+        NORMALIZACAO_SIG_AGENTE_MESMA_EMPRESA_INDQUAL
+    )
+
     agrupado = pares.groupby("codigo_ibge")["sig_agente"].agg(lambda s: sorted(set(s)))
     n_unica = int((agrupado.apply(len) == 1).sum())
     n_multipla = int((agrupado.apply(len) > 1).sum())
@@ -198,7 +292,10 @@ def montar_tarifa_por_municipio(
     print("\n[4/6] Cruzando tarifa por distribuidora com o mapeamento município -> distribuidora...")
 
     df = municipio_distribuidora.copy()
-    df["tarifa_energia_residencial"] = df["distribuidora_unica"].map(tarifa_por_distribuidora)
+    sig_agente_para_busca = df["distribuidora_unica"].replace(
+        CROSSWALK_SIG_AGENTE_INDQUAL_PARA_TARIFA
+    )
+    df["tarifa_energia_residencial"] = sig_agente_para_busca.map(tarifa_por_distribuidora)
 
     sem_distribuidora_unica = df["distribuidora_unica"].isna().sum()
     tem_distribuidora_sem_tarifa = (
