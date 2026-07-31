@@ -601,6 +601,12 @@ export interface StatusFonteDados {
   percentualCobertura: number;
   periodoReferenciaMaisRecente: string | null;
   status: StatusFonte;
+  /**
+   * true quando o baixo `percentualCobertura` reflete o alcance real do
+   * fenômeno/programa na fonte, não uma falha de extração — quando true,
+   * `status` já vem forçado para 'completo' pelo backend.
+   */
+  alcanceLimitadoPorDesenho: boolean;
   observacao: string | null;
 }
 

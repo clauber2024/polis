@@ -34,17 +34,30 @@
  *   - MCMV       -> indicadores_sociais.unidades_habitacionais_fgts OU
  *                   empreendimentos_ogu (Caixa/FGTS + Ministério das
  *                   Cidades/OGU)
- *   - ZEIS/AEIS  -> unidades_espaciais.tipo IN ('zeis','aeis') — cobertura
- *                   aqui é DELIBERADAMENTE baixa (só 8 municípios têm seed:
- *                   São Paulo, Recife, Rio Branco, Belo Horizonte, Contagem,
- *                   Fortaleza, Salvador, Rio de Janeiro — confirmado via
- *                   consulta direta ao banco em 21/07/2026), não é lacuna de
- *                   carga, é o alcance real da fonte (perímetros de ZEIS só
- *                   existem publicados nessas prefeituras)
+ *   - ZEIS/AEIS  -> unidades_espaciais.tipo IN ('zeis','aeis') — cobertura de
+ *                   só 8 municípios (São Paulo, Recife, Rio Branco, Belo
+ *                   Horizonte, Contagem, Fortaleza, Salvador, Rio de Janeiro
+ *                   — confirmado via consulta direta ao banco em 21/07/2026).
+ *                   CORREÇÃO 30/07/2026 (esclarecimento do usuário): isto NÃO
+ *                   é "alcance real da fonte" como Reforma Casa Brasil Solar
+ *                   abaixo — é PECULIARIDADE DE PROCESSO: o Instituto Pólis
+ *                   extrai o perímetro de ZEIS/AEIS manualmente, um município
+ *                   de cada vez (sem portal/API nacional único), e o dado
+ *                   PODE existir em muitos outros municípios ainda não
+ *                   processados. Cobertura baixa reflete o esforço manual já
+ *                   feito, não um teto real conhecido — por isso NÃO usa
+ *                   `alcanceLimitadoPorDesenho` (status continua 'parcial'
+ *                   pelo percentualCobertura normal), diferente de Reforma
+ *                   Casa Brasil Solar.
  *   - Reforma Casa Brasil Solar -> indicadores_sociais.
  *                   numero_contratos_reforma_casa_brasil_solar (Caixa, fonte
- *                   pontual não pública, extrato nov/2025-abr/2026 — baixa
- *                   cobertura é o recorte real do programa, não lacuna)
+ *                   pontual não pública, extrato nov/2025-abr/2026). Este SIM
+ *                   é alcance real e fechado: o programa genuinamente só
+ *                   chegou a esses municípios no período, é um fato
+ *                   documentado pela própria Caixa (extrato via LAI), não uma
+ *                   lacuna de esforço de extração — por isso usa
+ *                   `alcanceLimitadoPorDesenho = true` (status forçado
+ *                   'completo', a extração capturou 100% do que existe).
  * ============================================================================
  */
 
@@ -64,6 +77,17 @@ export interface StatusFonteDados {
   percentualCobertura: number;
   periodoReferenciaMaisRecente: string | null;
   status: StatusFonte;
+  /**
+   * true quando o baixo `percentualCobertura` reflete o ALCANCE REAL do
+   * fenômeno/programa na fonte (ex.: um programa que só atendeu 1.093
+   * municípios, ou uma zoneamento que só 8 prefeituras publicam) — NÃO uma
+   * falha/lacuna de extração (30/07/2026, correção conceitual pedida pelo
+   * usuário: "integridade do dado" ≠ "alcance territorial". Quando true,
+   * `status` é forçado para 'completo' mesmo com percentualCobertura baixo
+   * — a extração capturou 100% do que existe, o restante é ausência real,
+   * não dado faltando).
+   */
+  alcanceLimitadoPorDesenho: boolean;
   observacao: string | null;
 }
 
@@ -201,6 +225,7 @@ export async function buscarStatusBasesDeDados(): Promise<StatusBasesDeDadosResu
     metodoColeta: string,
     dado: { cobertos: number; periodo: string | null },
     observacao: string | null = null,
+    alcanceLimitadoPorDesenho = false,
   ): StatusFonteDados {
     const percentualCobertura =
       totalMunicipios > 0 ? Number(((dado.cobertos / totalMunicipios) * 100).toFixed(1)) : 0;
@@ -212,7 +237,10 @@ export async function buscarStatusBasesDeDados(): Promise<StatusBasesDeDadosResu
       municipiosCobertos: dado.cobertos,
       percentualCobertura,
       periodoReferenciaMaisRecente: dado.periodo,
-      status: calcularStatus(percentualCobertura),
+      // Alcance limitado por desenho = extração 100% completa, mesmo com
+      // baixa cobertura territorial (ver docstring de alcanceLimitadoPorDesenho).
+      status: alcanceLimitadoPorDesenho ? 'completo' : calcularStatus(percentualCobertura),
+      alcanceLimitadoPorDesenho,
       observacao,
     };
   }
@@ -247,7 +275,7 @@ export async function buscarStatusBasesDeDados(): Promise<StatusBasesDeDadosResu
       'ANEEL — CDE (Conta de Desenvolvimento Energético)',
       'Bloqueado — sem coleta em andamento',
       { cobertos: 0, periodo: null },
-      'Bloqueado: a coluna percentual_tsee ainda não existe no schema. Aguardando dado ANEEL de Beneficiários da CDE pós-janeiro/2026 com a nova subclasse "Residencial Desconto Social" (Lei 15.235/2025) — ver CLAUDE.md.',
+      'Bloqueado: a coluna percentual_tsee ainda não existe no schema. Aguardando dado ANEEL de Beneficiários da CDE pós-janeiro/2026 com a nova subclasse "Residencial Desconto Social" (Lei 15.235/2025).',
     ),
     montarFonte(
       'ivs_ipea',
@@ -255,7 +283,7 @@ export async function buscarStatusBasesDeDados(): Promise<StatusBasesDeDadosResu
       'Construção própria do Atlas (metodologia inspirada no IVS/IPEA)',
       'Cálculo interno (média de 3 blocos de indicadores já carregados)',
       ivs,
-      'Construção própria do Atlas (média de 3 blocos normalizados), não o IVS oficial do IPEA — ver ARQUITETURA.md, "Índices compostos e metodologia de cruzamentos".',
+      'Construção própria do Atlas (média de 3 blocos normalizados), não substitui o IVS oficial do IPEA, servindo exclusivamente como indicador interno de priorização socioterritorial.',
     ),
     montarFonte(
       'inpe',
@@ -288,13 +316,28 @@ export async function buscarStatusBasesDeDados(): Promise<StatusBasesDeDadosResu
     montarFonte(
       'zeis_aeis',
       'Prefeituras municipais — Zonas Especiais de Interesse Social (ZEIS/AEIS)',
-      'Prefeituras municipais (8 municípios com perímetro publicado)',
-      'Seed manual por perímetro publicado — sem fonte nacional única',
+      'Prefeituras municipais (8 municípios extraídos até agora)',
+      'Extração MANUAL, um município de cada vez — sem base nacional única para baixar de uma vez',
       zeisAeis,
-      'Cobertura baixa por desenho, não por lacuna de carga: perímetros de ZEIS/AEIS só ' +
-        'existem publicados hoje em 8 prefeituras (São Paulo, Recife, Rio Branco, Belo ' +
-        'Horizonte, Contagem, Fortaleza, Salvador, Rio de Janeiro) — não há fonte nacional ' +
-        'única e estruturada para essa camada.',
+      // Peculiaridade real desta fonte (30/07/2026, correção pedida pelo
+      // usuário): diferente do Reforma Casa Brasil Solar (onde o programa
+      // genuinamente só chegou a X municípios — fato fechado, documentado
+      // pela própria Caixa), ZEIS/AEIS não tem esse teto conhecido. O
+      // Instituto Pólis extrai o perímetro publicado por cada prefeitura
+      // manualmente, uma de cada vez, porque não existe portal/API nacional
+      // único. O dado PODE existir em muitos outros municípios ainda não
+      // processados — a cobertura baixa reflete o esforço manual de extração
+      // já feito até agora, não uma constatação de que ZEIS só exista nesses
+      // 8 lugares. Por isso NÃO usa alcanceLimitadoPorDesenho (status seguiu
+      // 'parcial' pelo percentualCobertura normal) — diferente de
+      // reforma_casa_brasil_solar, que usa.
+      `Base de dados íntegra para os municípios já extraídos — sem erro de carga. A cobertura de ` +
+        `${zeisAeis.cobertos.toLocaleString('pt-BR')} municípios (São Paulo, Recife, Rio Branco, ` +
+        `Belo Horizonte, Contagem, Fortaleza, Salvador, Rio de Janeiro) reflete o estágio atual do ` +
+        `trabalho manual de extração, não uma constatação de que ZEIS/AEIS só exista nesses locais: ` +
+        `o perímetro pode existir em outros municípios ainda não processados, mas cada prefeitura ` +
+        `precisa ser levantada individualmente — não há fonte nacional única e estruturada para ` +
+        `essa camada.`,
     ),
     montarFonte(
       'reforma_casa_brasil_solar',
@@ -302,9 +345,11 @@ export async function buscarStatusBasesDeDados(): Promise<StatusBasesDeDadosResu
       'Caixa Econômica Federal',
       'Extrato pontual via Lei de Acesso à Informação (fonte não pública/automatizável)',
       reformaSolar,
-      'Cobertura parcial por desenho, não por lacuna de carga: fonte pontual e NÃO pública ' +
-        '(extrato via Lei de Acesso à Informação, nov/2025–abr/2026), reflete o alcance real ' +
-        'do programa no período, não uma extração incompleta.',
+      `Base de dados 100% carregada para o período solicitado. A concentração em apenas ` +
+        `${reformaSolar.cobertos.toLocaleString('pt-BR')} municípios reflete a limitação de ` +
+        `alcance territorial real do programa (dados obtidos via extrato pontual por Lei de ` +
+        `Acesso à Informação, nov/2025–abr/2026).`,
+      true,
     ),
   ];
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { KeyboardEvent, SVGProps } from 'react';
 import { buscarStatusBasesDeDados } from '../services/basesDeDados.service';
 import type { StatusBasesDeDadosResultado, StatusFonte, StatusFonteDados } from '../types/api';
 import { formatarDataBrasileira } from '../utils/formatadores';
@@ -23,6 +24,15 @@ import { formatarDataBrasileira } from '../utils/formatadores';
  * escondida especificamente nesta rota — não se aplica a um painel de status
  * macro de bases nacionais, mas continua nas demais telas (mapa, dossiê
  * etc.), onde faz sentido.
+ *
+ * Accordion por card (30/07/2026, pedido do usuário — a lista ficou extensa
+ * demais com todo o bloco de proveniência/nota sempre aberto): cada
+ * `CartaoFonte` tem seu próprio `useState` de expansão, independente dos
+ * demais (não é um accordion clássico "abrir um fecha os outros" — com ~11
+ * fontes, faz mais sentido deixar comparar proveniência de 2-3 fontes ao
+ * mesmo tempo do que forçar uma de cada vez). Estado colapsado mostra só
+ * título, tag de status, resumo de cobertura e barra; expandido revela o
+ * grid de proveniência e a nota de rodapé.
  */
 
 const ESTILO_STATUS: Record<StatusFonte, { rotulo: string; classes: string; barra: string }> = {
@@ -109,60 +119,116 @@ function CartaoFonte({
   fonte: StatusFonteDados;
   totalMunicipios: number;
 }) {
+  const [expandido, setExpandido] = useState(false);
   const estilo = ESTILO_STATUS[fonte.status];
 
+  function alternar() {
+    setExpandido((atual) => !atual);
+  }
+
   return (
-    <div className="rounded-2xl border border-stone-200/60 bg-white/80 p-5 shadow-sm backdrop-blur-xl">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h2 className="text-sm font-black text-stone-900">{fonte.nome}</h2>
-          <p className="font-mono text-xs text-stone-400">
-            {fonte.municipiosCobertos.toLocaleString('pt-BR')} de{' '}
-            {totalMunicipios.toLocaleString('pt-BR')} municípios
-          </p>
+    <div className="rounded-2xl border border-stone-200/60 bg-white/80 shadow-sm backdrop-blur-xl">
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={expandido}
+        onClick={alternar}
+        onKeyDown={(evento: KeyboardEvent<HTMLDivElement>) => {
+          if (evento.key === 'Enter' || evento.key === ' ') {
+            evento.preventDefault();
+            alternar();
+          }
+        }}
+        className="cursor-pointer rounded-2xl p-5 outline-none transition-colors hover:bg-stone-50/60"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="flex min-w-0 items-start gap-2">
+            <IconeChevronExpandir
+              className={`mt-0.5 h-4 w-4 shrink-0 text-stone-400 transition-transform duration-200 ${expandido ? 'rotate-90' : ''}`}
+            />
+            <div>
+              <h2 className="text-sm font-black text-stone-900">{fonte.nome}</h2>
+              <p className="font-mono text-xs text-stone-400">
+                {fonte.alcanceLimitadoPorDesenho && 'Alcance real: presença em '}
+                {fonte.municipiosCobertos.toLocaleString('pt-BR')} de{' '}
+                {totalMunicipios.toLocaleString('pt-BR')} municípios
+              </p>
+            </div>
+          </div>
+          <span
+            className={`shrink-0 rounded border px-2 py-0.5 font-mono text-[10px] font-bold tracking-wider uppercase ${estilo.classes}`}
+          >
+            {estilo.rotulo} · {fonte.percentualCobertura.toLocaleString('pt-BR')}%
+          </span>
         </div>
-        <span
-          className={`rounded border px-2 py-0.5 font-mono text-[10px] font-bold tracking-wider uppercase ${estilo.classes}`}
-        >
-          {estilo.rotulo} · {fonte.percentualCobertura.toLocaleString('pt-BR')}%
-        </span>
-      </div>
 
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-stone-100">
-        <div
-          className={`h-full rounded-full ${estilo.barra}`}
-          style={{ width: `${Math.max(1, fonte.percentualCobertura)}%` }}
-        />
-      </div>
-
-      {/* Trilha de proveniência (30/07/2026) — mesmo padrão de grid rotulado
-          já usado na Trilha de Auditoria do Ranking de Fricção. */}
-      <div className="mt-4 grid grid-cols-1 gap-3 rounded-xl border border-stone-200/60 bg-stone-50 p-4 text-xs sm:grid-cols-3">
-        <div>
-          <span className="block text-[9px] font-bold tracking-widest text-stone-400 uppercase">
-            Órgão provedor oficial
-          </span>
-          <span className="font-semibold text-stone-800">{fonte.orgaoProvedor}</span>
-        </div>
-        <div>
-          <span className="block text-[9px] font-bold tracking-widest text-stone-400 uppercase">
-            Método de coleta
-          </span>
-          <span className="font-semibold text-stone-800">{fonte.metodoColeta}</span>
-        </div>
-        <div>
-          <span className="block text-[9px] font-bold tracking-widest text-stone-400 uppercase">
-            Última referência
-          </span>
-          <span className="font-semibold text-stone-800">
-            {formatarDataBrasileira(fonte.periodoReferenciaMaisRecente)}
-          </span>
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-stone-100">
+          <div
+            className={`h-full rounded-full ${estilo.barra}`}
+            style={{ width: `${Math.max(1, fonte.percentualCobertura)}%` }}
+          />
         </div>
       </div>
 
-      {fonte.observacao && (
-        <p className="mt-3 text-xs leading-relaxed text-stone-500">{fonte.observacao}</p>
-      )}
+      {/* Detalhes técnicos — colapsados por padrão (30/07/2026, pedido do
+          usuário: a lista inteira ficava muito extensa com tudo sempre
+          aberto). max-h + opacity em vez de height auto porque o conteúdo
+          tem altura variável entre fontes (nota de rodapé mais longa em
+          algumas) — height auto não anima em CSS puro, max-h generoso dá o
+          efeito suave sem precisar medir altura via JS. */}
+      <div
+        className={`grid overflow-hidden px-5 transition-all duration-300 ease-in-out ${
+          expandido ? 'grid-rows-[1fr] pb-5 opacity-100' : 'grid-rows-[0fr] pb-0 opacity-0'
+        }`}
+      >
+        <div className="min-h-0">
+          {/* Trilha de proveniência — mesmo padrão de grid rotulado já usado
+              na Trilha de Auditoria do Ranking de Fricção. */}
+          <div className="grid grid-cols-1 gap-3 rounded-xl border border-stone-200/60 bg-stone-50 p-4 text-xs sm:grid-cols-3">
+            <div>
+              <span className="block text-[9px] font-bold tracking-widest text-stone-400 uppercase">
+                Órgão provedor oficial
+              </span>
+              <span className="font-semibold text-stone-800">{fonte.orgaoProvedor}</span>
+            </div>
+            <div>
+              <span className="block text-[9px] font-bold tracking-widest text-stone-400 uppercase">
+                Método de coleta
+              </span>
+              <span className="font-semibold text-stone-800">{fonte.metodoColeta}</span>
+            </div>
+            <div>
+              <span className="block text-[9px] font-bold tracking-widest text-stone-400 uppercase">
+                Última referência
+              </span>
+              <span className="font-semibold text-stone-800">
+                {formatarDataBrasileira(fonte.periodoReferenciaMaisRecente)}
+              </span>
+            </div>
+          </div>
+
+          {fonte.observacao && (
+            <p className="mt-3 text-xs leading-relaxed text-stone-500">{fonte.observacao}</p>
+          )}
+        </div>
+      </div>
     </div>
+  );
+}
+
+function IconeChevronExpandir(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...props}
+    >
+      <path d="M9 6l6 6-6 6" />
+    </svg>
   );
 }
