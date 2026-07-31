@@ -17,10 +17,11 @@
  * PRÓPRIO dado, versus só ler um arquivo local que se assume já existir
  * (`CAMINHO_PARQUET`/`CAMINHO_LOCAL` sem lógica de `baixar_se_necessario`).
  * `extrair_mmgd_aneel.py` falhou em produção justamente por isso — nunca
- * baixou o Parquet sozinho, sempre exigiu o arquivo já estar em
- * `backend/src/etl/data/raw/` (não versionado). Removido da whitelist até
- * confirmar uma URL de download estável da ANEEL pra esse dataset
- * especificamente (nenhuma foi verificada ainda — não adivinhar).
+ * baixou o Parquet sozinho. Corrigido no mesmo dia: URL real confirmada
+ * (curl -I, 200 OK) no Portal de Dados Abertos da ANEEL — dataset
+ * "Relação de empreendimentos de Mini e Micro Geração Distribuída" —, e
+ * `baixar_se_necessario` adicionado ao script, mesmo padrão de
+ * `extrair_desempenho_conexao_mmgd.py`. De volta à whitelist.
  *
  * `scriptRelativo` é relativo à pasta `backend/` (não à raiz do
  * repositório) — a Railway sobe o backend com "Root Directory: backend"
@@ -29,10 +30,28 @@
  * (`python3 backend/src/etl/loaders/<script>.py`, como documentado no
  * README), é só prefixar com "backend/" — nunca um caminho vindo de input
  * do usuário.
+ *
+ * `irradiacao_solar_inpe` adicionada em 31/07/2026 — o docstring do script
+ * dizia "Download direto, não há API" (verdade, mas irrelevante: o site do
+ * LABREN é estático, o link do ZIP não muda) — URL confirmada ao vivo
+ * (curl -IL, 200 OK após redirect http->https), extração do CSV de dentro
+ * do ZIP feita com `zipfile` da stdlib (sem dependência nova).
+ *
+ * `renda_trabalho_rais` e `capital_humano_mortalidade_infantil` adicionadas
+ * em 31/07/2026 — usam BigQuery, que dentro deste container SÓ autentica se
+ * `GOOGLE_APPLICATION_CREDENTIALS_JSON` estiver configurada (Service
+ * Account, ver `_autenticacao_bigquery.py` e docs/DEPLOY_TEMPORARIO.md,
+ * Seção 10) — sem isso, o botão dispara e falha de forma visível no log
+ * (erro de autenticação do Google), não é um pré-requisito manual
+ * INTERATIVO como o antigo fluxo `gcloud auth` (que nunca funcionaria aqui).
  */
 export const IDS_EXTRATORES_ELEGIVEIS = [
+  'mmgd_aneel',
   'tarifa_distribuidoras',
   'desempenho_conexao_distribuidoras',
+  'irradiacao_solar_inpe',
+  'renda_trabalho_rais',
+  'capital_humano_mortalidade_infantil',
 ] as const;
 
 export type IdExtratorElegivel = (typeof IDS_EXTRATORES_ELEGIVEIS)[number];
@@ -45,6 +64,11 @@ export interface ExtractorElegivel {
 
 export const EXTRACTORES_ELEGIVEIS: readonly ExtractorElegivel[] = [
   {
+    id: 'mmgd_aneel',
+    rotulo: 'MMGD (ANEEL)',
+    scriptRelativo: 'src/etl/loaders/extrair_mmgd_aneel.py',
+  },
+  {
     id: 'tarifa_distribuidoras',
     rotulo: 'Tarifa Residencial (ANEEL)',
     scriptRelativo: 'src/etl/loaders/extrair_tarifa_distribuidoras.py',
@@ -53,6 +77,21 @@ export const EXTRACTORES_ELEGIVEIS: readonly ExtractorElegivel[] = [
     id: 'desempenho_conexao_distribuidoras',
     rotulo: 'Ranking de Distribuidoras — Conexão MMGD (ANEEL)',
     scriptRelativo: 'src/etl/loaders/extrair_desempenho_conexao_mmgd.py',
+  },
+  {
+    id: 'irradiacao_solar_inpe',
+    rotulo: 'Irradiação Solar (LABREN/CCST/INPE)',
+    scriptRelativo: 'src/etl/loaders/extrair_irradiacao_solar_inpe.py',
+  },
+  {
+    id: 'renda_trabalho_rais',
+    rotulo: 'Renda e Trabalho — RAIS (BigQuery)',
+    scriptRelativo: 'src/etl/loaders/extrair_renda_trabalho_rais.py',
+  },
+  {
+    id: 'capital_humano_mortalidade_infantil',
+    rotulo: 'Mortalidade Infantil — SIM/SINASC (BigQuery)',
+    scriptRelativo: 'src/etl/loaders/extrair_capital_humano_mortalidade_infantil.py',
   },
 ];
 

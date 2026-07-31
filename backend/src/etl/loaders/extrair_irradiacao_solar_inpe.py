@@ -78,10 +78,14 @@ irradiacao_solar.
 """
 
 import csv
+import io
 import os
+import time
 import unicodedata
+import zipfile
 
 import pandas as pd
+import requests
 from sqlalchemy import create_engine, text
 
 
@@ -95,6 +99,21 @@ CAMINHO_CSV = os.path.join(
     "..", "data", "raw", "inpe_atlas_solar_2017",
     "global_horizontal_means_sedes-munic.csv",
 )
+
+# Download automático (31/07/2026) — até então este extractor sempre exigiu
+# o CSV já extraído localmente (o próprio docstring dizia "Download direto,
+# não há API", mas isso se referia à ausência de API estruturada, não à
+# inexistência de um link estável — o site do LABREN é estático, o link do
+# arquivo não muda). URL confirmada ao vivo (curl -IL, 200 OK após redirect
+# http->https, ~600 KB, Last-Modified 2019 — arquivo publicado, não
+# atualiza). O ZIP contém metadados/PDF/readme junto do CSV — extrai só o
+# CSV necessário.
+URL_ZIP_IRRADIACAO_INPE = os.environ.get(
+    "URL_ZIP_IRRADIACAO_INPE",
+    "https://labren.ccst.inpe.br/projetos/atlas_2017/"
+    "GLOBAL_HORIZONTAL_sedes-munic_(csv).zip",
+)
+NOME_CSV_NO_ZIP = "GLOBAL_HORIZONTAL/global_horizontal_means_sedes-munic.csv"
 
 PERIODO_REFERENCIA = "2017-01-01"
 
@@ -249,9 +268,50 @@ def executar_upsert(engine, df: pd.DataFrame):
             print(f"        - {codigo}: {erro[:120]}")
 
 
+def baixar_e_extrair_se_necessario() -> None:
+    if os.path.exists(CAMINHO_CSV):
+        print(f"      Arquivo já existe localmente em {CAMINHO_CSV} — pulando download.")
+        return
+
+    print(f"      Baixando ZIP do LABREN/CCST/INPE: {URL_ZIP_IRRADIACAO_INPE}")
+    max_tentativas = 4
+    resposta = None
+    ultimo_erro = None
+    for tentativa in range(1, max_tentativas + 1):
+        try:
+            resposta = requests.get(URL_ZIP_IRRADIACAO_INPE, timeout=120)
+            resposta.raise_for_status()
+            ultimo_erro = None
+            break
+        except requests.exceptions.RequestException as erro:
+            ultimo_erro = erro
+            print(f"      [AVISO] Tentativa {tentativa}/{max_tentativas} falhou "
+                  f"({erro.__class__.__name__}: {str(erro)[:150]}).")
+            if tentativa < max_tentativas:
+                espera = 5 * tentativa
+                print(f"      Aguardando {espera}s antes de tentar de novo...")
+                time.sleep(espera)
+
+    if ultimo_erro is not None:
+        print(f"\n[ERRO] Não foi possível baixar o arquivo após {max_tentativas} tentativas: "
+              f"{ultimo_erro}")
+        print(f"       Tente rodar de novo em alguns minutos, ou baixar manualmente em "
+              f"{URL_ZIP_IRRADIACAO_INPE} e extrair '{NOME_CSV_NO_ZIP}' para: {CAMINHO_CSV}")
+        raise SystemExit(1)
+
+    os.makedirs(os.path.dirname(CAMINHO_CSV), exist_ok=True)
+    with zipfile.ZipFile(io.BytesIO(resposta.content)) as zip_arquivo:
+        with zip_arquivo.open(NOME_CSV_NO_ZIP) as origem, open(CAMINHO_CSV, "wb") as destino:
+            destino.write(origem.read())
+    print(f"      CSV extraído para {CAMINHO_CSV} ({len(resposta.content) / 1_048_576:.1f} MB "
+          f"do ZIP baixado).")
+
+
 def main():
     print("Carregando Irradiacao Solar (Atlas Brasileiro de Energia Solar 2017, LABREN/CCST/INPE)")
     print("=" * 70)
+
+    baixar_e_extrair_se_necessario()
 
     engine = create_engine(DATABASE_URL)
 

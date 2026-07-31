@@ -244,15 +244,22 @@ migrations realmente novas vão de fato criar algo. Confira a saída — qualque
 **não** seja "já existe" merece atenção antes de considerar a migração concluída.
 
 Nova carga de ETL (rodar um extractor de novo, por atualização de fonte) continua manual
-**para a maioria das fontes**: rode o extractor localmente contra o banco local e repita o
-dump/restore da Seção 4, ou aponte a `DATABASE_URL` do ambiente Python local para o TCP
-Proxy do Railway temporariamente. **2 fontes são exceção** desde 30/07/2026 (RF-070
-revisitado) — Tarifa Residencial e Ranking de Distribuidoras, ambas ANEEL, têm botão de
-atualização direto no Painel Admin (`/admin`), que dispara o extractor no próprio container
-do backend em produção. Requer a Seção 9 abaixo (Dockerfile) já aplicada. MMGD (ANEEL)
-chegou a entrar nessa lista mas foi removida em 31/07/2026 — testado ao vivo em produção e
-falhou, porque `extrair_mmgd_aneel.py` não baixa o Parquet sozinho (sempre exigiu o arquivo
-já salvo localmente) — ver comentário em `backend/src/utils/extractoresElegiveis.ts`.
+**para 3 fontes** (ver mais abaixo por quê): rode o extractor localmente contra o banco
+local e repita o dump/restore da Seção 4, ou aponte a `DATABASE_URL` do ambiente Python
+local para o TCP Proxy do Railway temporariamente. **6 fontes já têm botão de atualização**
+direto no Painel Admin (`/admin`), que dispara o extractor no próprio container do backend
+em produção (RF-070 revisitado, 30-31/07/2026) — MMGD, Tarifa Residencial e Ranking de
+Distribuidoras (ANEEL), Irradiação Solar (LABREN/CCST/INPE), Renda e Trabalho/RAIS e
+Mortalidade Infantil (as duas últimas via BigQuery — só funcionam se
+`GOOGLE_APPLICATION_CREDENTIALS_JSON` estiver configurada, ver Seção 10). Requer a Seção 9
+abaixo (Dockerfile) já aplicada.
+
+Nenhuma dessas 6 precisou de upload de arquivo — todas tinham (ou passaram a ter) um link de
+download estável, verificado ao vivo (`curl`) antes de entrar na whitelist. MMGD chegou a
+ser removida por um dia (31/07/2026) — testado ao vivo e falhou, porque
+`extrair_mmgd_aneel.py` nunca teve lógica de download própria; corrigido no mesmo dia (URL
+real da ANEEL confirmada, `baixar_se_necessario` adicionado). Ver comentário completo em
+`backend/src/utils/extractoresElegiveis.ts` para o histórico de cada fonte.
 
 ## 9. Trocar Nixpacks por Dockerfile (Node + Python)
 
@@ -264,17 +271,18 @@ isso o backend sobe normalmente, só sem conseguir rodar extractor nenhum pela i
 2. **Dockerfile Path**: `Dockerfile` (o arquivo já existe em `backend/Dockerfile` — como o
    Root Directory do serviço já é `backend`, o caminho é relativo a essa pasta).
 3. Redeploy. O build agora inclui Python 3 + as dependências de
-   `backend/src/etl/requirements-runtime.txt` (só pandas/numpy/sqlalchemy/psycopg2/requests
-   — não o `requirements.txt` completo de desenvolvimento, que tem geopandas/BigQuery e
-   deixaria a imagem muito mais pesada sem necessidade).
-4. Teste: logue como Administrador em `/admin`, clique "Atualizar agora" numa das 2 bases do
+   `backend/src/etl/requirements-runtime.txt` (pandas/numpy/sqlalchemy/psycopg2/requests/
+   pyarrow/google-cloud-bigquery/db-dtypes — não o `requirements.txt` completo de
+   desenvolvimento, que tem geopandas e deixaria a imagem muito mais pesada sem necessidade).
+4. Teste: logue como Administrador em `/admin`, clique "Atualizar agora" numa das 6 bases do
    card "Atualização de bases (ETL)", e acompanhe o status mudar de "Atualizando…" para
    "Sucesso"/"Falha" (a tela atualiza sozinha).
 
-Só essas 2 fontes rodam neste container — as demais (MMGD, RAIS/Mortalidade Infantil via
-BigQuery, Irradiação INPE, Reforma Casa Brasil Solar, ZEIS de SP/BH) continuam exigindo
-execução manual no ambiente de desenvolvimento (ver `backend/src/utils/
-extractoresElegiveis.ts` para a lista exata e o porquê de cada exclusão).
+Só essas 6 fontes rodam neste container — 3 continuam exigindo execução manual no ambiente
+de desenvolvimento (Reforma Casa Brasil Solar — extrato pontual fornecido pelo usuário, não
+tem URL pública nenhuma —, ZEIS de São Paulo e de Belo Horizonte — download manual
+obrigatório no site de origem, confirmado nos próprios scripts). Ver
+`backend/src/utils/extractoresElegiveis.ts` para a lista exata e o porquê de cada exclusão.
 
 ## 10. Credencial do BigQuery (RAIS/Mortalidade Infantil)
 

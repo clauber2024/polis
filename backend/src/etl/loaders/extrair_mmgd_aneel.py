@@ -76,14 +76,32 @@ migration 0025 aplicada antes de rodar este script.
 
 import os
 import sys
+import time
 
 import pandas as pd
+import requests
 from sqlalchemy import create_engine, text
 
 
 CAMINHO_PARQUET = os.environ.get(
     "CAMINHO_PARQUET",
     "backend/src/etl/data/raw/aneel_mmgd/empreendimento-geracao-distribuida.parquet",
+)
+
+# Download automático (31/07/2026) — até então este script sempre exigiu o
+# Parquet já salvo localmente, sem lógica nenhuma pra buscá-lo sozinho
+# (achado ao testar o disparo de ETL pela interface em produção — ver
+# backend/src/utils/extractoresElegiveis.ts). URL confirmada ao vivo
+# (curl -I, 200 OK, ~117 MB, Last-Modified do próprio dia) no Portal de
+# Dados Abertos da ANEEL, dataset "Relação de empreendimentos de Mini e
+# Micro Geração Distribuída": https://dadosabertos.aneel.gov.br/dataset/
+# relacao-de-empreendimentos-de-geracao-distribuida — mesmo padrão de
+# `baixar_se_necessario` já usado em extrair_desempenho_conexao_mmgd.py.
+URL_PARQUET_MMGD = os.environ.get(
+    "URL_PARQUET_MMGD",
+    "https://dadosabertos.aneel.gov.br/dataset/5e0fafd2-21b9-4d5b-b622-40438d40aba2/"
+    "resource/cd29f6eb-e08d-4db7-b6fb-ed6e3b682d27/download/"
+    "empreendimento-geracao-distribuida.parquet",
 )
 
 DATABASE_URL = os.environ.get(
@@ -326,11 +344,46 @@ def executar_upsert_mmgd(engine, agregado: pd.DataFrame, periodo_referencia: str
             print(f"        ... e mais {len(falhas) - 10} falha(s).")
 
 
+def baixar_se_necessario(url: str, caminho: str) -> None:
+    if os.path.exists(caminho):
+        print(f"      Arquivo já existe localmente em {caminho} — pulando download.")
+        return
+
+    print(f"      Baixando Parquet da ANEEL: {url}")
+    os.makedirs(os.path.dirname(caminho), exist_ok=True)
+
+    max_tentativas = 4
+    resposta = None
+    ultimo_erro = None
+    for tentativa in range(1, max_tentativas + 1):
+        try:
+            resposta = requests.get(url, timeout=300)
+            resposta.raise_for_status()
+            ultimo_erro = None
+            break
+        except requests.exceptions.RequestException as erro:
+            ultimo_erro = erro
+            print(f"      [AVISO] Tentativa {tentativa}/{max_tentativas} falhou "
+                  f"({erro.__class__.__name__}: {str(erro)[:150]}).")
+            if tentativa < max_tentativas:
+                espera = 5 * tentativa
+                print(f"      Aguardando {espera}s antes de tentar de novo...")
+                time.sleep(espera)
+
+    if ultimo_erro is not None:
+        print(f"\n[ERRO] Não foi possível baixar o arquivo após {max_tentativas} tentativas: "
+              f"{ultimo_erro}")
+        print(f"       Tente rodar de novo em alguns minutos, ou baixar manualmente e salvar em: "
+              f"{caminho}")
+        raise SystemExit(1)
+
+    with open(caminho, "wb") as f:
+        f.write(resposta.content)
+    print(f"      {len(resposta.content) / 1_048_576:.1f} MB baixado(s).")
+
+
 def main():
-    if not os.path.exists(CAMINHO_PARQUET):
-        print(f"[ERRO] Arquivo Parquet não encontrado em: {CAMINHO_PARQUET}")
-        print("       Defina a variável de ambiente CAMINHO_PARQUET ou ajuste o caminho padrão.")
-        sys.exit(1)
+    baixar_se_necessario(URL_PARQUET_MMGD, CAMINHO_PARQUET)
 
     df = carregar_dados(CAMINHO_PARQUET)
     periodo_referencia = extrair_periodo_referencia(df)
