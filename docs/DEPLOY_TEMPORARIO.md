@@ -279,10 +279,11 @@ isso o backend sobe normalmente, só sem conseguir rodar extractor nenhum pela i
    card "Atualização de bases (ETL)", e acompanhe o status mudar de "Atualizando…" para
    "Sucesso"/"Falha" (a tela atualiza sozinha).
 
-Essas 12 fontes baixam o próprio dado (URL pública confirmada em cada uma). Mais 3 aceitam
-upload de arquivo antes de disparar — ver Seção 11 (Reforma Casa Brasil Solar, ZEIS São
-Paulo, ZEIS Belo Horizonte — as únicas 2 sedes de ZEIS/AEIS sem download automático, de 8
-municípios cobertos hoje pelo Atlas). Os extractors que exigem etapas fora do escopo de
+Essas 12 fontes baixam o próprio dado (URL pública confirmada em cada uma). Mais 5 aceitam
+upload de arquivo antes de disparar — ver Seção 11 (Reforma Casa Brasil Solar; ZEIS São
+Paulo e ZEIS Belo Horizonte — as únicas 2 sedes de ZEIS/AEIS sem download automático, de 8
+municípios cobertos hoje pelo Atlas; e os 2 indicadores da EPE, BEN e PDGD). 17 fontes no
+total já têm botão no Painel Admin. Os extractors que exigem etapas fora do escopo de
 "baixar/anexar um arquivo" (ex.: autenticação `gcloud` interativa fora do fluxo Service
 Account, ou fontes ainda não reconferidas) seguem
 documentados individualmente. Ver `backend/src/utils/extractoresElegiveis.ts` e
@@ -329,23 +330,31 @@ Sem essa variável configurada, os dois scripts continuam funcionando normalment
 própria máquina** (fluxo `gcloud` local, nada muda) — a Service Account só é necessária
 para rodar essas duas fontes fora dali.
 
-## 11. Upload de arquivo pelo Painel Admin (Reforma Casa Brasil Solar, ZEIS SP/BH)
+## 11. Upload de arquivo pelo Painel Admin (fontes sem URL pública)
 
-3 fontes nunca tiveram (e não devem ter) uma URL pública: Reforma Casa Brasil Solar (extrato
-pontual que você mesmo obteve, não é dado aberto), ZEIS de São Paulo e de Belo Horizonte
-(as prefeituras exigem navegação manual pra baixar o zoneamento, confirmado nos próprios
-scripts). Desde 31/07/2026, o card "Upload de bases sem fonte pública" no Painel Admin
-(`/admin`) aceita anexar o(s) arquivo(s) exatos que cada extractor espera e dispara a
-atualização — sem precisar de terminal.
+5 fontes nunca tiveram (e a maioria não deve ter) uma URL pública: Reforma Casa Brasil
+Solar (extrato pontual que você mesmo obteve, não é dado aberto), ZEIS de São Paulo e de
+Belo Horizonte (as prefeituras exigem navegação manual pra baixar o zoneamento, confirmado
+nos próprios scripts), e os dois indicadores da EPE (Geração Elétrica Nacional/BEN e
+Geração MMGD/PDGD — nenhum dos dois painéis tem API, ver o card "Atualizar participação da
+MMGD na matriz elétrica" logo acima, que já existia e só abre os dashboards certos). Desde
+31/07/2026, o card "Upload de bases sem fonte pública" no Painel Admin (`/admin`) aceita
+anexar o(s) arquivo(s) exatos que cada extractor espera e dispara a atualização — sem
+precisar de terminal.
 
-**Como funciona por trás:** os 3 scripts (`extrair_reforma_casa_brasil_solar.py`,
-`seed_zeis_sao_paulo.py`, `seed_zeis_belo_horizonte.py`) sempre esperaram os arquivos numa
-pasta fixa (`BASE_DOWNLOADS`, antes hardcoded pro Downloads do Windows de quem desenvolveu o
-projeto) — agora essa pasta é configurável por variável de ambiente. O backend salva o
-upload numa pasta temporária do próprio container (`os.tmpdir()`), aponta `BASE_DOWNLOADS`
-pra lá só durante aquela execução, e apaga a pasta ao final (sucesso ou falha) — o
-filesystem do container é efêmero mesmo, então não faz sentido guardar o arquivo bruto ali;
-o que importa é o dado já ter ido pro Postgres.
+**Como funciona por trás — dois modos, por fonte:**
+- Reforma Casa Brasil Solar, ZEIS SP, ZEIS BH: os scripts sempre esperaram os arquivos numa
+  pasta fixa (`BASE_DOWNLOADS`, antes hardcoded pro Downloads do Windows de quem
+  desenvolveu o projeto) — agora configurável por variável de ambiente. O backend salva o
+  upload numa pasta temporária do container, aponta `BASE_DOWNLOADS` pra lá só durante
+  aquela execução.
+- EPE BEN/PDGD: cada script sempre teve seu próprio caminho fixo isolado (`CAMINHO_XLSX`,
+  sem conceito de pasta compartilhada) — agora cada um lê de uma variável de ambiente
+  própria (`CAMINHO_XLSX_BEN`/`CAMINHO_XLSX_PDGD`), apontada pro arquivo recém-enviado.
+
+Em ambos os casos, a pasta/arquivo temporário é apagado ao final da execução (sucesso ou
+falha) — o filesystem do container é efêmero mesmo, então não faz sentido guardar o bruto
+ali; o que importa é o dado já ter ido pro Postgres.
 
 **Formato esperado por fonte** (ver `backend/src/utils/extractoresComUpload.ts` pra lista
 completa e nomes exatos):
@@ -353,9 +362,12 @@ completa e nomes exatos):
 - **ZEIS São Paulo**: 3 arquivos GeoJSON (GeoSampa) — precisa dos 3 juntos, na ordem que a
   tela pedir.
 - **ZEIS Belo Horizonte**: 1 CSV (zoneamento, camada 11181, com geometria em WKT).
+- **Geração Elétrica Nacional (EPE, BEN)**: 1 XLSX (Anexo X, formato "tabela (tidyverse)").
+- **Geração MMGD (EPE, PDGD)**: 1 XLSX (aba "Capacidade Instalada" → "Geração de
+  Eletricidade").
 
 **Sem novo passo de infraestrutura** — usa o mesmo Dockerfile/container da Seção 9 (as
-dependências novas — `pypdf`, `shapely`, `pyproj` — já foram incluídas em
+dependências novas — `pypdf`, `shapely`, `pyproj`, `openpyxl` — já foram incluídas em
 `requirements-runtime.txt`).
 
 **Limitação importante, deixada de propósito assim nesta primeira versão**: cada uma dessas

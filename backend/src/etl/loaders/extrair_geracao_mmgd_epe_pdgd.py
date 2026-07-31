@@ -50,9 +50,13 @@ from sqlalchemy import create_engine, text
 DATABASE_URL = os.environ.get(
     "DATABASE_URL", "postgresql://atlas:atlas_dev_local@localhost:5432/atlas_solar_justo"
 )
-CAMINHO_XLSX = os.path.join(
-    os.path.dirname(__file__),
-    "..", "data", "raw", "epe_pdgd_geracao", "dados.xlsx",
+# Env-configurável (31/07/2026) — ver backend/src/services/uploadBases.service.ts.
+CAMINHO_XLSX = os.environ.get(
+    "CAMINHO_XLSX_PDGD",
+    os.path.join(
+        os.path.dirname(__file__),
+        "..", "data", "raw", "epe_pdgd_geracao", "dados.xlsx",
+    ),
 )
 FONTE_CITACAO = (
     "EPE, Painel de Dados de MMGD (PDGD), aba Geracao de Eletricidade, "

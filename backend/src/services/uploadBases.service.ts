@@ -83,13 +83,24 @@ export async function dispararComUpload(
   const execucao = await iniciarExecucao(baseId, extractor.rotulo, usuarioId);
 
   const pastaTemp = fs.mkdtempSync(path.join(os.tmpdir(), `atlas-upload-${baseId}-`));
+  const envExtra: NodeJS.ProcessEnv = { BASE_DOWNLOADS: pastaTemp };
+
   extractor.arquivos.forEach((esperado, indice) => {
-    const destino = path.join(pastaTemp, esperado.nomeArquivoDestino);
-    fs.writeFileSync(destino, arquivos[indice].buffer);
+    if ('envVarCaminhoCompleto' in esperado) {
+      // Arquivo avulso (EPE BEN/PDGD) — grava fora da convenção de pasta
+      // compartilhada e aponta a variável de ambiente específica pra ele.
+      const nomeGravado = `arquivo${indice}${esperado.extensaoAceita}`;
+      const destino = path.join(pastaTemp, nomeGravado);
+      fs.writeFileSync(destino, arquivos[indice].buffer);
+      envExtra[esperado.envVarCaminhoCompleto] = destino;
+    } else {
+      const destino = path.join(pastaTemp, esperado.nomeArquivoDestino);
+      fs.writeFileSync(destino, arquivos[indice].buffer);
+    }
   });
 
   executarSubprocesso(execucao.id, extractor.scriptRelativo, {
-    envExtra: { BASE_DOWNLOADS: pastaTemp },
+    envExtra,
     aoFinalizar: () => {
       fs.rm(pastaTemp, { recursive: true, force: true }, (erro) => {
         if (erro) console.error(`Falha ao limpar pasta temporária ${pastaTemp}:`, erro);

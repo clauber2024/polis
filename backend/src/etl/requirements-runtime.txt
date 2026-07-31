@@ -22,6 +22,8 @@
 # shapely/pyproj: seed_zeis_sao_paulo.py e seed_zeis_belo_horizonte.py (também
 #   enviados por upload) — processam geometria (WKB/reprojeção) SEM precisar
 #   de geopandas/GDAL completo, shapely e pyproj têm wheel próprio.
+# openpyxl: extrair_geracao_eletrica_nacional_epe.py e
+#   extrair_geracao_mmgd_epe_pdgd.py (também via upload) — leem .xlsx.
 pandas
 numpy
 sqlalchemy
@@ -33,3 +35,4 @@ db-dtypes
 pypdf
 shapely
 pyproj
+openpyxl

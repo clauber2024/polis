@@ -4,10 +4,12 @@
  * participação da MMGD na matriz elétrica nacional (EPE/PDGD)". Nenhum dos
  * dois painéis tem API/download automatizável (PDGD é uma app Shiny sem
  * endpoint estável; BEN não tem API REST) — este cartão só poupa a
- * navegação manual até a aba certa. O download em si, e a carga no banco,
- * continuam manuais via ETL Python (mesmo padrão de irradiação solar/INPE e
- * Reforma Casa Brasil Solar — RF-070 não permite upload real disparando ETL
- * pela interface).
+ * navegação manual até a aba certa.
+ *
+ * Depois de baixar o arquivo aqui, a carga no banco é feita pelo card
+ * "Upload de bases sem fonte pública" (`CartaoUploadBases.tsx`, RF-070
+ * revisitado fase 2, 31/07/2026) — anexa o `.xlsx` baixado e dispara o
+ * extractor pela própria interface, sem precisar de terminal.
  */
 
 const LINKS = [
@@ -39,8 +41,8 @@ export function CartaoAtualizacaoIndicadoresExternos() {
       </h2>
       <p className="mb-3 text-xs text-slate-500">
         Abre os dashboards da EPE direto na aba usada por este indicador — os links não baixam
-        nem carregam nada sozinhos. Depois de baixar os arquivos, a carga no banco segue pelo ETL
-        Python, mesmo padrão das demais fontes sem API (ver docs/PLANO_ATUAL.md).
+        nem carregam nada sozinhos. Depois de baixar o arquivo, anexe-o no card "Upload de bases
+        sem fonte pública" abaixo para carregar no banco.
       </p>
       <div className="space-y-2">
         {LINKS.map((link) => (

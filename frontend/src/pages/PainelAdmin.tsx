@@ -59,8 +59,8 @@ export function PainelAdmin() {
 
       <CartaoMetadadosBasesDados />
       <CartaoAtualizacaoEtl />
-      <CartaoUploadBases />
       <CartaoAtualizacaoIndicadoresExternos />
+      <CartaoUploadBases />
       <CartaoAprovacoesIndicadores />
       <CartaoVersoesPublicadas />
       <CartaoGestaoUsuarios />

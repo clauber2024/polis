@@ -40,9 +40,15 @@ from sqlalchemy import create_engine, text
 DATABASE_URL = os.environ.get(
     "DATABASE_URL", "postgresql://atlas:atlas_dev_local@localhost:5432/atlas_solar_justo"
 )
-CAMINHO_XLSX = os.path.join(
-    os.path.dirname(__file__),
-    "..", "data", "raw", "epe_ben_geracao", "tabela_balanco_energitico_unidades_comerciais.xlsx",
+# Env-configurável (31/07/2026) — permite o upload pela interface do Painel
+# Admin apontar pra um arquivo temporário no container, sem mudar o default
+# local. Ver backend/src/services/uploadBases.service.ts.
+CAMINHO_XLSX = os.environ.get(
+    "CAMINHO_XLSX_BEN",
+    os.path.join(
+        os.path.dirname(__file__),
+        "..", "data", "raw", "epe_ben_geracao", "tabela_balanco_energitico_unidades_comerciais.xlsx",
+    ),
 )
 FONTE_CITACAO = (
     "EPE, Balanco Energetico Nacional (BEN), Anexo X - Unidades Comerciais, "
