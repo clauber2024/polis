@@ -486,12 +486,11 @@ export interface ListarVaziosDeAcessoResultado {
 /**
  * Espelho de DistribuidoraRanking (GET /api/ranking-distribuidoras). Ver
  * docstring de rankingDistribuidoras.service.ts (backend) para a metodologia
- * completa: segregação visual (rankingPrincipal x
- * distribuidorasComDadosIncompletos, nunca a mesma posição ordinal),
- * ranking ordenado do PIOR pro melhor (posição 1 = maior fricção), e a
- * mudança de escopo de 30/07/2026 — a posição usa exclusivamente eixoTecnico
- * (desempenho regulatório operacional), o IVSH (eixoJustica) é só dado de
- * contexto e não entra na pontuação.
+ * completa: lista ÚNICA (30/07/2026, sem seção separada para dado ausente),
+ * ordenada do PIOR pro melhor por `indiceFriccaoRanking` (posição 1 = maior
+ * fricção) — distribuidoras sem `prazoConfiavel` recebem a penalidade máxima
+ * nesse índice em vez de ficarem fora do ranking. O IVSH (eixoJustica) é só
+ * dado de contexto e não entra na pontuação.
  */
 export interface DistribuidoraRanking {
   distribuidora: string;
@@ -509,8 +508,12 @@ export interface DistribuidoraRanking {
   nMunicipiosAtendidos: number | null;
   nMunicipiosComIvsh: number | null;
   ivshMedioPonderadoPorPopulacao: number | null;
-  /** Índice Sintético de Fricção — critério que define a posição no ranking. */
+  /** Índice Sintético de Fricção calculado (conexão + prazo) — null/parcial quando faltam dados. Ver indiceFriccaoRanking para o valor efetivamente usado na posição. */
   eixoTecnico: number | null;
+  /** true quando `!prazoConfiavel` — penalizada com o valor máximo em indiceFriccaoRanking. */
+  penalizadoPorDadoAusente: boolean;
+  /** Valor 0–1 que define a posição no ranking (0=melhor, 1=pior): eixoTecnico quando prazoConfiavel, senão 1 (penalidade máxima). Nunca null. */
+  indiceFriccaoRanking: number;
   /** IVSH — dado de contexto, NÃO usado na posição do ranking. */
   eixoJustica: number | null;
   /** Mantido por completude — NÃO usado na posição do ranking. */
@@ -545,11 +548,11 @@ export interface RankingDistribuidorasResultado {
     limiarAmostraPequena: number;
   };
   notaMetodologicaJustica: string;
-  notaMetodologicaDadosIncompletos: string;
+  notaMetodologicaPenalidade: string;
   totalDistribuidoras: number;
   resumoNacional: ResumoNacionalFriccao | null;
-  rankingPrincipal: DistribuidoraRanking[];
-  distribuidorasComDadosIncompletos: DistribuidoraRanking[];
+  /** Lista ÚNICA — todas as distribuidoras, sem seção separada para dado ausente. Ordenada do pior pro melhor. */
+  ranking: DistribuidoraRanking[];
 }
 
 // ---------------------------------------------------------------------------

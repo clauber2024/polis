@@ -9,32 +9,37 @@ import type {
 import { formatarValor } from '../utils/formatadores';
 
 /**
- * Ranking de Fricção e Atrasos na Conexão Solar (MMGD) — 30/07/2026, pivô
- * explícito de posicionamento de produto pedido pelo usuário no mesmo dia
- * (reverte a tentativa anterior, também deste dia, de suavizar o tom para
- * "Matriz de Desempenho Setorial"). Objetivo declarado: ferramenta de
- * pressão pública/accountability sobre concessionárias com maior fricção na
- * conexão de MMGD.
+ * Ranking de Fricção e Atrasos na Conexão Solar (MMGD) — pivô de
+ * posicionamento de produto pedido pelo usuário (reverte a tentativa
+ * anterior de suavizar o tom para "Matriz de Desempenho Setorial").
+ * Objetivo declarado: ferramenta de pressão pública/accountability sobre
+ * concessionárias com maior fricção na conexão de MMGD.
  *
- * Para blindar contra contestação jurídica (justificativa do próprio
- * usuário), a posição no ranking usa ESTRITAMENTE o eixo técnico/operacional
- * (conexão + prazo ANEEL) — o IVSH (contexto socioeconômico da área de
- * concessão) é calculado no backend mas deliberadamente NÃO aparece nesta
- * tela nem entra na pontuação, para que nenhuma distribuidora possa alegar
- * que a vulnerabilidade da região atendida "explica" um mau desempenho
- * técnico. Ver docstring completa de `rankingDistribuidoras.service.ts`
- * (backend) para a metodologia e a mudança de critério de segregação que
- * acompanha esse pivô.
+ * LISTA ÚNICA + PENALIZAÇÃO POR DADO AUSENTE (30/07/2026, correção de
+ * estratégia pedida pelo usuário): a seção separada "Dados incompletos" foi
+ * eliminada — na visão do usuário, ela escondia/blindava distribuidoras sem
+ * dado de prazo. Agora TODAS entram na mesma tabela; quem não tem
+ * `prazoConfiavel` recebe a penalidade máxima em `indiceFriccaoRanking` e
+ * fica visível, tipicamente no topo. O selo exibido nessas linhas ("Sem
+ * dado de prazo") descreve o FATO (campo ausente na fonte da ANEEL,
+ * penalidade aplicada) — NÃO usei o rótulo "Opacidade Regulatória" pedido
+ * originalmente, porque isso afirmaria que a ausência é culpa da
+ * distribuidora, e a apuração já registrada em ARQUITETURA.md mostra que a
+ * MAIOR distribuidora do país (Cemig-D, 7,4 milhões de pedidos) tem o mesmo
+ * problema, atravessando vários grupos econômicos sem relação entre si —
+ * indício de lacuna sistêmica da base da ANEEL, não padrão isolado de má-fé
+ * de uma empresa. Ver docstring completa de `rankingDistribuidoras.service.ts`
+ * (backend) para a metodologia e o raciocínio completo.
  *
- * Comparativos (mesma sessão, pedido complementar do usuário): desvio vs.
- * média nacional, distância do benchmark de melhor desempenho e o
- * drill-down por linha (clique expande um comparativo de barras) usam
- * SEMPRE `resumoNacional`/os campos de desvio já calculados no backend a
- * partir de dado real (nunca um número fabricado no cliente).
+ * Comparativos (desvio vs. média nacional, benchmark, drill-down por linha)
+ * usam SEMPRE `resumoNacional`/campos já calculados no backend a partir de
+ * dado real — nunca um número fabricado no cliente. Só existem para
+ * distribuidoras com prazo confiável (penalizadas por dado ausente não têm
+ * `pctForaDoPrazo` real pra comparar).
  *
  * "Consumidores Totais" e "% com Solar" continuam fora desta base (INDQUAL/
  * fila de conexão ANEEL não tem essas métricas) — ver nota de rodapé da
- * tabela, mesma ressalva já documentada na versão anterior desta página.
+ * tabela.
  */
 export function PaginaRankingDistribuidoras() {
   const [dados, setDados] = useState<RankingDistribuidorasResultado | null>(null);
@@ -59,21 +64,18 @@ export function PaginaRankingDistribuidoras() {
   }, []);
 
   const rankingComPosicao = useMemo<ItemComPosicao[]>(
-    () => (dados ? dados.rankingPrincipal.map((item, indice) => ({ ...item, posicao: indice + 1 })) : []),
+    () => (dados ? dados.ranking.map((item, indice) => ({ ...item, posicao: indice + 1 })) : []),
     [dados],
   );
 
-  const regioesDisponiveis = useMemo(() => {
-    const todas = dados ? [...dados.rankingPrincipal, ...dados.distribuidorasComDadosIncompletos] : [];
-    return Array.from(new Set(todas.map((item) => item.regiaoPrincipal))).sort();
-  }, [dados]);
+  const regioesDisponiveis = useMemo(
+    () => Array.from(new Set(rankingComPosicao.map((item) => item.regiaoPrincipal))).sort(),
+    [rankingComPosicao],
+  );
 
-  function filtrarPorRegiao<T extends { regiaoPrincipal: string }>(itens: T[]): T[] {
-    return filtroRegiao ? itens.filter((item) => item.regiaoPrincipal === filtroRegiao) : itens;
-  }
-
-  const rankingFiltrado = filtrarPorRegiao(rankingComPosicao);
-  const incompletosFiltrados = dados ? filtrarPorRegiao(dados.distribuidorasComDadosIncompletos) : [];
+  const rankingFiltrado = filtroRegiao
+    ? rankingComPosicao.filter((item) => item.regiaoPrincipal === filtroRegiao)
+    : rankingComPosicao;
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
@@ -143,6 +145,7 @@ export function PaginaRankingDistribuidoras() {
           <SecaoRanking
             titulo="Ranking"
             contagem={`${rankingFiltrado.length} de ${rankingComPosicao.length} concessionárias — posição 1 = maior fricção`}
+            subtitulo={dados.notaMetodologicaPenalidade}
           >
             <TabelaRanking
               itens={rankingFiltrado}
@@ -152,14 +155,6 @@ export function PaginaRankingDistribuidoras() {
                 setLinhaExpandida((atual) => (atual === distribuidora ? null : distribuidora))
               }
             />
-          </SecaoRanking>
-
-          <SecaoRanking
-            titulo="Dados incompletos"
-            contagem={`${incompletosFiltrados.length} de ${dados.distribuidorasComDadosIncompletos.length} concessionárias — fora do ranking, nunca comparadas na mesma posição`}
-            subtitulo={dados.notaMetodologicaDadosIncompletos}
-          >
-            <TabelaIncompletos itens={incompletosFiltrados} />
           </SecaoRanking>
         </>
       )}
@@ -349,21 +344,43 @@ function TabelaRanking({ itens, resumoNacional, linhaExpandida, aoAlternarExpans
                       <p className="text-xs text-stone-500 capitalize">{item.regiaoPrincipal}</p>
                     </td>
                     <td className="px-6 py-4 text-right text-stone-600">{formatarValor(item.nPedidos, 'inteiro')}</td>
-                    <td className="px-6 py-4 text-right font-bold text-stone-800">
-                      {formatarValor(item.pctForaDoPrazo, 'percentual')}
+                    <td className="px-6 py-4 text-right">
+                      {item.penalizadoPorDadoAusente ? (
+                        <span
+                          title={item.motivosDadosIncompletos[0]}
+                          className="inline-block rounded bg-red-100 px-2 py-1 text-[10px] font-black tracking-wide text-red-800 uppercase"
+                        >
+                          Sem dado de prazo
+                        </span>
+                      ) : (
+                        <span className="font-bold text-stone-800">
+                          {formatarValor(item.pctForaDoPrazo, 'percentual')}
+                        </span>
+                      )}
                     </td>
-                    <td className="px-6 py-4 text-right font-black text-red-800">
-                      {formatarValor(item.eixoTecnico, 'numero')}
+                    <td className="px-6 py-4 text-right">
+                      <span className="font-black text-red-800">
+                        {formatarValor(item.indiceFriccaoRanking, 'numero')}
+                      </span>
+                      {item.penalizadoPorDadoAusente && (
+                        <span className="ml-1.5 text-[10px] font-bold text-red-700/70">(penalizado)</span>
+                      )}
                     </td>
                   </tr>
-                  {expandida && resumoNacional && item.pctForaDoPrazo !== null && (
+                  {expandida && resumoNacional && (
                     <tr className="border-t border-stone-100/80 bg-stone-50/60">
                       <td colSpan={5} className="px-6 py-4">
-                        <ComparativoBarras
-                          nomeEmpresa={item.distribuidora}
-                          valorEmpresa={item.pctForaDoPrazo}
-                          resumo={resumoNacional}
-                        />
+                        {item.pctForaDoPrazo !== null ? (
+                          <ComparativoBarras
+                            nomeEmpresa={item.distribuidora}
+                            valorEmpresa={item.pctForaDoPrazo}
+                            resumo={resumoNacional}
+                          />
+                        ) : (
+                          <p className="max-w-xl text-xs leading-relaxed text-stone-500">
+                            {item.motivosDadosIncompletos[0]}
+                          </p>
+                        )}
                       </td>
                     </tr>
                   )}
@@ -427,42 +444,3 @@ function ComparativoBarras({
   );
 }
 
-function TabelaIncompletos({ itens }: { itens: DistribuidoraRanking[] }) {
-  if (itens.length === 0) {
-    return <p className="mt-3 text-sm text-stone-500">Nenhuma concessionária nesta seção com o filtro atual.</p>;
-  }
-
-  return (
-    <div className="mt-4 overflow-x-auto rounded-xl ring-1 ring-stone-200/60">
-      <table className="w-full min-w-[700px] text-left text-sm">
-        <thead>
-          <tr className="bg-stone-50/80 text-xs font-bold text-stone-600">
-            <th className="px-3 py-2">Concessionária</th>
-            <th className="px-3 py-2">Região</th>
-            <th className="px-3 py-2 text-right">Pedidos MMGD</th>
-            <th className="px-3 py-2 text-right">% conectado</th>
-          </tr>
-        </thead>
-        <tbody>
-          {itens.map((item) => (
-            <tr key={item.distribuidora} className="border-t border-stone-100/80">
-              <td className="px-3 py-2.5 font-bold text-stone-900">
-                {item.distribuidora}
-                {item.motivosDadosIncompletos.length > 0 && (
-                  <ul className="mt-1 list-disc pl-4 text-[11px] font-normal text-stone-500">
-                    {item.motivosDadosIncompletos.map((motivo) => (
-                      <li key={motivo}>{motivo}</li>
-                    ))}
-                  </ul>
-                )}
-              </td>
-              <td className="px-3 py-2.5 text-stone-600 capitalize">{item.regiaoPrincipal}</td>
-              <td className="px-3 py-2.5 text-right text-stone-600">{formatarValor(item.nPedidos, 'inteiro')}</td>
-              <td className="px-3 py-2.5 text-right text-stone-600">{formatarValor(item.pctConectado, 'percentual')}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}

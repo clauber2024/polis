@@ -12,8 +12,11 @@ cruza o dataset de fila de conexão MMGD da ANEEL (nomes de distribuidora livres
 `SigAgenteDistribuicao`) com o schema INDQUAL (`qualidade_conjuntos.sig_agente`,
 nomenclatura própria) via crosswalk manual + automático
 (`backend/src/etl/loaders/extrair_desempenho_conexao_mmgd.py`). Qualquer distribuidora
-sem par no INDQUAL, ou cujos municípios atendidos não têm IVSH calculável, cai em
-`distribuidorasComDadosIncompletos`.
+sem par no INDQUAL, ou cujos municípios atendidos não têm IVSH calculável, fica com
+`eixoJustica`/`ivshMedioPonderadoPorPopulacao` nulos — desde 30/07/2026 isso NÃO afeta
+a posição no ranking (o IVSH é só dado de contexto, não entra em `indiceFriccaoRanking`)
+nem tira a distribuidora da lista única `ranking` (a segregação por seção separada foi
+eliminada; só falta de `prazoConfiavel` gera penalidade/destaque hoje).
 
 **Sintoma:**
 Uma distribuidora aparece com `eixoJustica: null` / `ivshMedioPonderadoPorPopulacao: null`

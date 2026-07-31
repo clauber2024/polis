@@ -36,14 +36,33 @@
  * exigia os dois eixos disponíveis, agora exige só `prazoConfiavel` (só isso
  * é necessário pra comparar "% fora do prazo" de forma justa).
  *
- * SEGREGAÇÃO (mantida, só o critério mudou): distribuidoras com prazo
- * confiável entram em `rankingPrincipal`, ORDENADO DO PIOR PARA O MELHOR
- * (posição 1 = maior fricção — é um ranking de accountability, não uma
- * lista neutra). As demais (sem dado confiável de prazo) entram em
- * `distribuidorasComDadosIncompletos`, cada uma com `motivosDadosIncompletos`
- * explícito — nunca competem pela mesma posição ordinal do ranking
- * principal, mesma lógica que protege contra contestação jurídica de dado
- * incompleto sendo usado contra uma distribuidora.
+ * FIM DA SEGREGAÇÃO / PENALIZAÇÃO POR DADO AUSENTE (30/07/2026, pedido
+ * explícito do usuário — 2ª correção de estratégia do dia): a separação
+ * anterior ("ranking principal" x "dados incompletos" à parte) foi
+ * revertida por decisão do usuário — na visão dele, esconder distribuidoras
+ * sem dado de prazo numa seção à parte "premiava ou blindava" quem não tem
+ * o campo preenchido na fonte ANEEL. Agora TODAS entram numa única lista
+ * (`ranking`), e quem não tem `prazoConfiavel` recebe a PENALIDADE MÁXIMA no
+ * `indiceFriccaoRanking` (valor fixo 1, o pior possível na escala 0–1) e
+ * fica visível, geralmente no topo (empatada com as demais penalizadas,
+ * desempate por volume de pedidos — a maior primeiro).
+ *
+ * RESSALVA IMPORTANTE (mudei o texto pedido pelo usuário por isso): o pedido
+ * original queria rotular isso como "Opacidade Regulatória" (a distribuidora
+ * sonega dado). NÃO fiz essa afirmação causal — a apuração já registrada em
+ * ARQUITETURA.md ("ACHADO CRITICO PARA ESTE PRODUTO", sessão 06/07/2026)
+ * mostra que a maior distribuidora do país inteiro (Cemig-D, 7,4 milhões de
+ * pedidos, ~13,6% do total nacional) também tem 0% de DatLim preenchido, e
+ * que o padrão atravessa vários grupos econômicos sem relação entre si — é
+ * descrito lá como "problema de completude de reporte à ANEEL mais amplo",
+ * não uma exceção pontual de má-fé de uma distribuidora. Afirmar
+ * publicamente que uma distribuidora específica pratica "opacidade
+ * regulatória" sem confirmar se a ausência é dela ou da própria base da
+ * ANEEL seria uma acusação não verificada sobre uma empresa real — o texto
+ * exibido ao usuário (`motivosDadosIncompletos` por distribuidora) descreve
+ * o fato observável (campo ausente na fonte, penalidade aplicada) sem
+ * atribuir a causa. A PENALIZAÇÃO em si (pior posição possível) foi mantida
+ * exatamente como pedido — só a alegação de causa/culpa é que não entrou.
  *
  * COMPARATIVOS (mesma sessão, pedido complementar do usuário — "métricas de
  * desvio comparativo"): `resumoNacional` e os campos de desvio por
@@ -185,8 +204,12 @@ export interface DistribuidoraRanking {
   nMunicipiosAtendidos: number | null;
   nMunicipiosComIvsh: number | null;
   ivshMedioPonderadoPorPopulacao: number | null;
-  /** Índice Sintético de Fricção - critério que define a posição no ranking (ver docstring do arquivo). */
+  /** Índice Sintético de Fricção calculado (conexão + prazo) - null/parcial quando faltam dados. Ver indiceFriccaoRanking para o valor efetivamente usado na posição. */
   eixoTecnico: number | null;
+  /** true quando `!prazoConfiavel` - penalizada com o valor máximo em indiceFriccaoRanking (ver docstring do arquivo). */
+  penalizadoPorDadoAusente: boolean;
+  /** Valor 0-1 que define a posição no ranking (0=melhor, 1=pior): eixoTecnico quando prazoConfiavel, senão 1 (penalidade máxima). Nunca null. */
+  indiceFriccaoRanking: number;
   /** IVSH - dado de contexto, NÃO usado na posição do ranking desde 30/07/2026. */
   eixoJustica: number | null;
   /** Mantido por completude - NÃO usado na posição do ranking desde 30/07/2026 (ver eixoTecnico). */
@@ -228,11 +251,11 @@ const NOTA_METODOLOGICA_JUSTICA =
   'de prazo da ANEEL) — vulnerabilidade socioeconômica da região atendida não é considerada ' +
   'justificativa para atraso ou barreira de conexão.';
 
-const NOTA_METODOLOGICA_DADOS_INCOMPLETOS =
-  'Distribuidoras nesta seção têm o campo de prazo regulatório (DatLim) praticamente ' +
-  'ausente na fonte ANEEL — não podem ser comparadas de forma justa em "% fora do prazo" e, ' +
-  'por isso, não competem pela mesma posição do ranking principal. NUNCA leia a ausência de ' +
-  'pctDentroDoPrazo como "0% no prazo" — é um vazio de dado, não desempenho ruim.';
+const NOTA_METODOLOGICA_PENALIDADE =
+  'Distribuidoras cujo campo de prazo regulatório (DatLim) está ausente na fonte da ANEEL ' +
+  'recebem a penalidade máxima no Índice de Fricção — sem esse campo não é possível medir o ' +
+  'cumprimento de prazo, então a distribuidora fica com a pior posição possível em vez de ' +
+  'ser comparada de forma incompleta ou favorecida por um vazio de dado.';
 
 export interface RankingDistribuidorasResultado {
   metodologia: {
@@ -242,12 +265,12 @@ export interface RankingDistribuidorasResultado {
     limiarAmostraPequena: number;
   };
   notaMetodologicaJustica: string;
-  notaMetodologicaDadosIncompletos: string;
+  notaMetodologicaPenalidade: string;
   totalDistribuidoras: number;
   /** null só quando não há nenhuma distribuidora com prazo confiável (caso degenerado, nunca visto na prática). */
   resumoNacional: ResumoNacionalFriccao | null;
-  rankingPrincipal: DistribuidoraRanking[];
-  distribuidorasComDadosIncompletos: DistribuidoraRanking[];
+  /** Lista ÚNICA (30/07/2026) - todas as distribuidoras, sem seção separada para dado ausente. Ordenada do pior pro melhor. */
+  ranking: DistribuidoraRanking[];
 }
 
 interface BaseCalculada {
@@ -300,10 +323,20 @@ export async function calcularRankingDistribuidoras(): Promise<RankingDistribuid
     const pctForaDoPrazo =
       linha.prazoConfiavel && linha.pctDentroDoPrazo !== null ? 100 - linha.pctDentroDoPrazo : null;
 
+    // Descreve o FATO observável (campo ausente, penalidade aplicada), nunca
+    // a causa/culpa — a apuração em ARQUITETURA.md não confirma se a ausência
+    // é falha de reporte da distribuidora ou lacuna da própria base da ANEEL
+    // (a MAIOR distribuidora do país, Cemig-D, tem o mesmo problema). Ver
+    // "RESSALVA IMPORTANTE" na docstring do arquivo.
     const motivosDadosIncompletos: string[] = [];
     if (!linha.prazoConfiavel) {
       motivosDadosIncompletos.push(
-        'Prazo regulatório (DatLim) praticamente ausente na fonte ANEEL para esta distribuidora — sem dado confiável de atraso de conexão.',
+        'Campo de prazo regulatório (DatLim) ausente na fonte da ANEEL para esta distribuidora — ' +
+          'não é possível aferir cumprimento de prazo, por isso recebe a penalidade máxima no ' +
+          'Índice de Fricção. Essa ausência de campo já foi identificada em várias distribuidoras ' +
+          'de grupos econômicos diferentes na mesma base nacional, incluindo a maior distribuidora ' +
+          'do país (Cemig-D) — não é possível, só com este dado, determinar se a causa é uma falha ' +
+          'de reporte da distribuidora à ANEEL ou uma lacuna da própria base pública.',
       );
     }
 
@@ -376,6 +409,11 @@ export async function calcularRankingDistribuidoras(): Promise<RankingDistribuid
     const distanciaBenchmark =
       b.pctForaDoPrazo !== null && benchmarkPctForaDoPrazo !== null ? b.pctForaDoPrazo - benchmarkPctForaDoPrazo : null;
 
+    // Penalidade máxima por dado ausente (30/07/2026) - ver "RESSALVA
+    // IMPORTANTE" na docstring do arquivo: penaliza o FATO (sem prazoConfiavel
+    // não dá pra medir cumprimento de prazo), nunca presume má-fé.
+    const indiceFriccaoRanking = !linha.prazoConfiavel ? 1 : (b.eixoTecnico ?? 1);
+
     return {
       distribuidora: linha.distribuidora,
       sigAgenteIndqual: linha.sigAgenteIndqual,
@@ -391,6 +429,8 @@ export async function calcularRankingDistribuidoras(): Promise<RankingDistribuid
       nMunicipiosComIvsh: linha.nMunicipiosComIvsh,
       ivshMedioPonderadoPorPopulacao: linha.ivshMedioPonderadoPorPopulacao,
       eixoTecnico: b.eixoTecnico,
+      penalizadoPorDadoAusente: !linha.prazoConfiavel,
+      indiceFriccaoRanking,
       eixoJustica: b.eixoJustica,
       scoreComposto: b.scoreComposto,
       scoreApenasTecnico: b.scoreApenasTecnico,
@@ -401,26 +441,24 @@ export async function calcularRankingDistribuidoras(): Promise<RankingDistribuid
     };
   });
 
-  // Segregação (30/07/2026, correção de escopo - accountability): único
-  // critério de entrada no ranking principal agora é ter prazo confiável -
-  // é o único requisito pra comparar "% fora do prazo" de forma justa, já
-  // que o IVSH não participa mais da posição. Ordenado do PIOR pro melhor
-  // (posição 1 = maior fricção) - ranking de accountability, não lista neutra.
-  const rankingPrincipal = distribuidoras
-    .filter((d) => d.prazoConfiavel)
-    .sort((a, b) => (b.eixoTecnico ?? -Infinity) - (a.eixoTecnico ?? -Infinity));
+  // Lista única (30/07/2026, correção de estratégia pedida pelo usuário):
+  // TODAS as distribuidoras, ordenadas do pior pro melhor por
+  // indiceFriccaoRanking (que já embute a penalidade máxima pra quem não tem
+  // prazoConfiavel). Desempate por volume de pedidos (maior primeiro) -
+  // dentro do grupo penalizado (todas empatadas em 1), destaca primeiro quem
+  // tem mais pedidos afetados, mais relevante pro objetivo de accountability.
+  const ranking = distribuidoras.sort(
+    (a, b) => b.indiceFriccaoRanking - a.indiceFriccaoRanking || b.nPedidos - a.nPedidos,
+  );
 
-  const distribuidorasComDadosIncompletos = distribuidoras
-    .filter((d) => !d.prazoConfiavel)
-    .sort((a, b) => (a.eixoTecnico ?? Infinity) - (b.eixoTecnico ?? Infinity));
-
-  // Passo 4: quanto os 5 primeiros do ranking (já ordenado) concentram do
-  // total nacional de pedidos fora do prazo - calculado sobre a MESMA ordem
-  // exibida na tela, não uma ordenação paralela por pctForaDoPrazo bruto.
+  // Passo 4: quanto os 5 piores desempenhos REAIS de prazo (entre
+  // distribuidoras com prazoConfiavel, independente da posição no ranking
+  // geral - que agora pode ter penalizadas por dado ausente no topo)
+  // concentram do total nacional de pedidos fora do prazo.
   if (resumoNacional) {
-    const top5 = rankingPrincipal.slice(0, 5);
-    const somaForaDoPrazoTop5 = top5.reduce(
-      (soma, d) => soma + (d.pctForaDoPrazo !== null ? (d.nPedidos * d.pctForaDoPrazo) / 100 : 0),
+    const top5PorAtrasoReal = [...comPrazo].sort((a, b) => b.pctForaDoPrazo - a.pctForaDoPrazo).slice(0, 5);
+    const somaForaDoPrazoTop5 = top5PorAtrasoReal.reduce(
+      (soma, b) => soma + (b.linha.nPedidos * b.pctForaDoPrazo) / 100,
       0,
     );
     const somaForaDoPrazoTotal = comPrazo.reduce((soma, b) => soma + (b.linha.nPedidos * b.pctForaDoPrazo) / 100, 0);
@@ -431,18 +469,17 @@ export async function calcularRankingDistribuidoras(): Promise<RankingDistribuid
   return {
     metodologia: {
       eixoTecnico:
-        'Índice Sintético de Fricção: média de (1 - % conectado) e (1 - % dentro do prazo), normalizados min-max entre distribuidoras (0 = melhor, 1 = pior/mais fricção). É o critério que define a posição no ranking. Distribuidoras sem prazo confiável não entram no ranking principal (ver distribuidorasComDadosIncompletos).',
+        'Índice de Fricção (indiceFriccaoRanking): média de (1 - % conectado) e (1 - % dentro do prazo), normalizados min-max entre distribuidoras (0 = melhor, 1 = pior/mais fricção). É o critério que define a posição no ranking. Distribuidoras sem prazo confiável recebem o valor máximo (1) como penalidade, em vez de ficarem fora do ranking.',
       eixoJustica:
         'IVSH médio dos municípios atendidos, ponderado por população estimada — mantido na API como dado de contexto socioeconômico, mas NÃO utilizado na posição deste ranking.',
       composicaoScore:
-        'scoreComposto (média de eixoTecnico e eixoJustica) é mantido na API por completude, mas não determina a posição no ranking — a posição usa exclusivamente eixoTecnico.',
+        'scoreComposto (média de eixoTecnico e eixoJustica) é mantido na API por completude, mas não determina a posição no ranking — a posição usa exclusivamente indiceFriccaoRanking.',
       limiarAmostraPequena: LIMIAR_AMOSTRA_PEQUENA,
     },
     notaMetodologicaJustica: NOTA_METODOLOGICA_JUSTICA,
-    notaMetodologicaDadosIncompletos: NOTA_METODOLOGICA_DADOS_INCOMPLETOS,
+    notaMetodologicaPenalidade: NOTA_METODOLOGICA_PENALIDADE,
     totalDistribuidoras: distribuidoras.length,
     resumoNacional,
-    rankingPrincipal,
-    distribuidorasComDadosIncompletos,
+    ranking,
   };
 }
