@@ -41,10 +41,69 @@ import { formatarValor } from '../utils/formatadores';
  * fila de conexão ANEEL não tem essas métricas) — ver nota de rodapé da
  * tabela.
  */
+
+type IdGrupoEconomico = 'energisa' | 'equatorial' | 'cpfl' | 'neoenergia' | 'enel';
+
+const GRUPOS_ECONOMICOS: { id: IdGrupoEconomico; nome: string }[] = [
+  { id: 'energisa', nome: 'Grupo Energisa' },
+  { id: 'equatorial', nome: 'Grupo Equatorial' },
+  { id: 'cpfl', nome: 'Grupo CPFL / State Grid' },
+  { id: 'neoenergia', nome: 'Grupo Neoenergia (Iberdrola)' },
+  { id: 'enel', nome: 'Grupo Enel' },
+];
+
+const PALAVRA_CHAVE_GRUPO: Record<IdGrupoEconomico, string> = {
+  energisa: 'energisa',
+  equatorial: 'equatorial',
+  cpfl: 'cpfl',
+  neoenergia: 'neoenergia',
+  enel: 'enel',
+};
+
+/**
+ * Overrides verificados (30/07/2026) — mesma pesquisa externa já registrada
+ * em `backend/src/etl/loaders/extrair_desempenho_conexao_mmgd.py`
+ * (`MAPEAMENTO_MANUAL_CONFIRMADO`): o nome de `distribuidora` vem direto do
+ * texto livre do dataset de fila de conexão da ANEEL, que pode estar
+ * desatualizado frente à identidade societária real. "Enel GO" é o caso
+ * confirmado mais notável — já foi vendida/rebatizada e hoje é EQUATORIAL GO
+ * (mesmo crosswalk usado no eixo de justiça/IVSH). Sem este override, um
+ * filtro por substring classificaria "Enel GO" como Grupo Enel, errado.
+ * Forcel/João Cesa/Nova Palma/Santa Maria são companhias pequenas e
+ * independentes (mesma pesquisa) — `null` documenta explicitamente que elas
+ * não pertencem a nenhum dos 5 grupos, embora nenhuma batesse por substring
+ * mesmo sem o override.
+ *
+ * Fora esta lista curta e verificada, a classificação é só por substring do
+ * nome (`PALAVRA_CHAVE_GRUPO`) — aproximada, não uma auditoria societária
+ * completa. Distribuidoras que hoje pertencem a um dos 5 grupos mas cujo
+ * nome de cadastro não denuncia isso (o mesmo padrão do caso Enel GO)
+ * ficariam de fora até serem pesquisadas e adicionadas aqui.
+ */
+const OVERRIDE_GRUPO_ECONOMICO: Record<string, IdGrupoEconomico | null> = {
+  'Enel GO': 'equatorial',
+  Forcel: null,
+  'João Cesa': null,
+  'Nova Palma': null,
+  'Santa Maria': null,
+};
+
+function identificarGrupoEconomico(nomeDistribuidora: string): IdGrupoEconomico | null {
+  if (nomeDistribuidora in OVERRIDE_GRUPO_ECONOMICO) {
+    return OVERRIDE_GRUPO_ECONOMICO[nomeDistribuidora];
+  }
+  const nomeMinusculo = nomeDistribuidora.toLowerCase();
+  const encontrado = (Object.entries(PALAVRA_CHAVE_GRUPO) as [IdGrupoEconomico, string][]).find(([, palavra]) =>
+    nomeMinusculo.includes(palavra),
+  );
+  return encontrado ? encontrado[0] : null;
+}
+
 export function PaginaRankingDistribuidoras() {
   const [dados, setDados] = useState<RankingDistribuidorasResultado | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [filtroRegiao, setFiltroRegiao] = useState('');
+  const [filtroGrupo, setFiltroGrupo] = useState<IdGrupoEconomico | ''>('');
   const [linhaExpandida, setLinhaExpandida] = useState<string | null>(null);
 
   useEffect(() => {
@@ -73,9 +132,22 @@ export function PaginaRankingDistribuidoras() {
     [rankingComPosicao],
   );
 
-  const rankingFiltrado = filtroRegiao
-    ? rankingComPosicao.filter((item) => item.regiaoPrincipal === filtroRegiao)
-    : rankingComPosicao;
+  // Só lista grupos que de fato têm alguma distribuidora presente nos dados
+  // carregados (mesmo princípio de regioesDisponiveis) — evita opção vazia.
+  const gruposDisponiveis = useMemo(() => {
+    const idsPresentes = new Set(
+      rankingComPosicao
+        .map((item) => identificarGrupoEconomico(item.distribuidora))
+        .filter((id): id is IdGrupoEconomico => id !== null),
+    );
+    return GRUPOS_ECONOMICOS.filter((grupo) => idsPresentes.has(grupo.id));
+  }, [rankingComPosicao]);
+
+  const rankingFiltrado = rankingComPosicao.filter((item) => {
+    if (filtroRegiao && item.regiaoPrincipal !== filtroRegiao) return false;
+    if (filtroGrupo && identificarGrupoEconomico(item.distribuidora) !== filtroGrupo) return false;
+    return true;
+  });
 
   // Agregados nacionais (30/07/2026, pedido do usuário) — calculados aqui, no
   // cliente, a partir da lista completa já carregada (dados.ranking), nunca
@@ -113,7 +185,12 @@ export function PaginaRankingDistribuidoras() {
         <>
           {agregadosNacionais && <CabecalhoBaseENacional agregados={agregadosNacionais} />}
 
-          {dados.resumoNacional && <CardAlertaNacional resumo={dados.resumoNacional} />}
+          {dados.resumoNacional && (
+            <CardAlertaNacional
+              resumo={dados.resumoNacional}
+              penalizadas={rankingComPosicao.filter((item) => item.penalizadoPorDadoAusente)}
+            />
+          )}
 
           {/* Metodologia — versão curta e direta (30/07/2026). Reescrita a pedido do
               usuário: o "+" da versão anterior lia como soma simples de métricas
@@ -159,16 +236,49 @@ export function PaginaRankingDistribuidoras() {
               </div>
             </div>
 
-            {filtroRegiao && (
+            <div className="min-w-[220px]">
+              <label
+                htmlFor="filtro-grupo-friccao"
+                className="mb-1.5 block text-[10px] font-bold tracking-widest text-stone-500 uppercase"
+              >
+                Grupo econômico
+              </label>
+              <div className="relative">
+                <select
+                  id="filtro-grupo-friccao"
+                  value={filtroGrupo}
+                  onChange={(evento) => setFiltroGrupo(evento.target.value as IdGrupoEconomico | '')}
+                  className={`${CLASSE_CAMPO} appearance-none pr-8`}
+                >
+                  <option value="">Todos os grupos</option>
+                  {gruposDisponiveis.map((grupo) => (
+                    <option key={grupo.id} value={grupo.id}>
+                      {grupo.nome}
+                    </option>
+                  ))}
+                </select>
+                <IconeChevron className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-stone-400" />
+              </div>
+            </div>
+
+            {(filtroRegiao || filtroGrupo) && (
               <button
                 type="button"
-                onClick={() => setFiltroRegiao('')}
+                onClick={() => {
+                  setFiltroRegiao('');
+                  setFiltroGrupo('');
+                }}
                 className="rounded-lg border border-stone-200/80 bg-white/50 px-3 py-2 text-sm font-semibold text-stone-700 shadow-sm backdrop-blur-sm transition-all hover:bg-white/80"
               >
-                Limpar filtro
+                Limpar filtros
               </button>
             )}
           </div>
+
+          <p className="mt-1.5 text-[10px] text-stone-400">
+            Grupo econômico é aproximado, baseado no nome da distribuidora e em casos de aquisição já
+            pesquisados neste projeto — não é uma auditoria societária completa.
+          </p>
 
           <SecaoRanking
             titulo="Ranking"
@@ -199,16 +309,33 @@ function formatarMultiplicador(valor: number): string {
 }
 
 /**
- * Janela temporal real do dataset ANEEL "Atendimento a pedidos de conexão de
- * MMGD (pós Lei 14.300)" (30/07/2026) — verificada direto na página do
- * dataset em dadosabertos.aneel.gov.br, não presumida: "realizadas no
+ * Nome curto do dataset (30/07/2026, pedido do usuário — desambiguar das duas
+ * fontes ANEEL usadas no projeto): "Fila de Conexão de MMGD" aqui, distinto
+ * de "Registro de Sistemas MMGD" na Base de Evidências (`basesDeDados.service.ts`)
+ * — são datasets diferentes, publicados separadamente pela ANEEL, com
+ * cadência de atualização diferente (ver nota abaixo).
+ */
+const NOME_DATASET_ANEEL_FILA_CONEXAO = 'ANEEL — Fila de Conexão de MMGD (pós Lei 14.300)';
+
+/**
+ * Janela temporal real do dataset (30/07/2026) — verificada direto na página
+ * do dataset em dadosabertos.aneel.gov.br, não presumida: "realizadas no
  * período entre 7 de janeiro de 2022 e 7 de janeiro de 2023". O pedido
  * original sugeria "Nov/2025 – Abr/2026", que na verdade é a janela de uma
  * fonte TOTALMENTE DIFERENTE já usada neste projeto (contratos do Reforma
  * Casa Brasil Solar, ver ARQUITETURA.md) — usar essa data aqui seria
  * publicar uma janela temporal errada numa peça pensada justamente para ser
- * auditável. O dataset em si foi publicado/atualizado em 2026, mas os
- * PEDIDOS DE CONEXÃO que ele registra são desse período de 2022-2023.
+ * auditável.
+ *
+ * PORQUE 2022-2023 (pergunta real do usuário, 30/07/2026): a página do
+ * dataset em si mostra atividade de publicação recente (criada em 2026,
+ * cadência mensal declarada), mas os PEDIDOS DE CONEXÃO que ele contém
+ * continuam sendo só os desse recorte de 2022-2023 — não encontramos, na
+ * mesma página, uma versão republicada com pedidos mais recentes. Ou seja,
+ * a ANEEL não estendeu a cobertura deste dataset específico, mesmo mantendo
+ * a página "atualizada" — daí a nota de ressalva abaixo, para o leitor não
+ * confundir com o registro de sistemas instalados (esse sim atualizado até
+ * meados de 2026, ver Base de Evidências).
  */
 const JANELA_TEMPORAL_DATASET_ANEEL = '7 jan/2022 – 7 jan/2023';
 
@@ -222,8 +349,7 @@ function CabecalhoBaseENacional({ agregados }: { agregados: AgregadosNacionais }
     <div className="mt-6 rounded-2xl border border-stone-200/50 bg-white/80 p-4 shadow-sm backdrop-blur-xl">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <p className="text-xs font-bold text-stone-500">
-          Base de dados oficial ANEEL — "Atendimento a pedidos de conexão de MMGD (pós Lei 14.300)" •
-          Janela temporal dos pedidos:{' '}
+          Base de dados oficial {NOME_DATASET_ANEEL_FILA_CONEXAO} • Janela temporal dos pedidos:{' '}
           <span className="font-black text-stone-900">{JANELA_TEMPORAL_DATASET_ANEEL}</span>
         </p>
 
@@ -247,16 +373,59 @@ function CabecalhoBaseENacional({ agregados }: { agregados: AgregadosNacionais }
           </div>
         </div>
       </div>
+
+      <p className="mt-2 border-t border-stone-100 pt-2 text-[11px] leading-relaxed text-stone-400">
+        Ressalva: este é um dataset ANEEL diferente do usado na Base de Evidências (registro de
+        sistemas MMGD instalados, esse sim atualizado mensalmente). A Fila de Conexão de MMGD é
+        publicada à parte, e a ANEEL não disponibilizou uma versão com pedidos mais recentes além
+        dessa janela de 2022-2023 — os números abaixo refletem esse período, não o cenário atual de
+        conexões no país.
+      </p>
     </div>
   );
 }
 
-function CardAlertaNacional({ resumo }: { resumo: ResumoNacionalFriccao }) {
+/** Junta uma lista em português com "e" antes do último item — "A, B e C". */
+function formatarListaComE(itens: string[]): string {
+  if (itens.length === 0) return '';
+  if (itens.length === 1) return itens[0];
+  return `${itens.slice(0, -1).join(', ')} e ${itens[itens.length - 1]}`;
+}
+
+/**
+ * (30/07/2026, correção pedida pelo usuário — o texto anterior dizia "a pior
+ * concessionária DO RANKING" referindo-se a `resumo.piorDesempenho`, mas
+ * desde a unificação do ranking com penalização por dado ausente,
+ * `resumo.piorDesempenho`/`percentualDosPedidosForaDoPrazoNoTop5` são
+ * calculados só entre `comPrazo` — quem de fato lidera o ranking hoje, no
+ * topo, são as distribuidoras penalizadas por dado ausente (empatadas no
+ * valor máximo), não a "pior por atraso real". A primeira frase agora cobre
+ * isso explicitamente, com exemplos reais tirados de `penalizadas` (as de
+ * maior volume, mesmo critério de desempate já usado no ranking) — nunca
+ * hardcoded, ao contrário do texto pedido originalmente. As demais frases
+ * seguem citando `resumo.piorDesempenho`/`top5`, mas com a ressalva textual
+ * "entre as com dado auditável de prazo", que é o que esses números
+ * realmente representam.
+ */
+function CardAlertaNacional({
+  resumo,
+  penalizadas,
+}: {
+  resumo: ResumoNacionalFriccao;
+  penalizadas: ItemComPosicao[];
+}) {
   const frases: string[] = [];
+
+  if (penalizadas.length > 0) {
+    const exemplos = formatarListaComE(penalizadas.slice(0, 3).map((item) => item.distribuidora));
+    frases.push(
+      `${penalizadas.length} concessionária${penalizadas.length > 1 ? 's' : ''} sem dado de prazo confiável na fonte da ANEEL (como ${exemplos}) recebem a penalidade máxima do Índice de Fricção e encabeçam o ranking.`,
+    );
+  }
 
   if (resumo.percentualDosPedidosForaDoPrazoNoTop5 !== null) {
     frases.push(
-      `As 5 piores concessionárias do ranking concentram ${formatarValor(resumo.percentualDosPedidosForaDoPrazoNoTop5, 'percentual')} dos pedidos de conexão solar fora do prazo regulatório entre as distribuidoras com dado confiável no Brasil.`,
+      `Entre as distribuidoras com dado auditável de prazo, as 5 piores concentram ${formatarValor(resumo.percentualDosPedidosForaDoPrazoNoTop5, 'percentual')} dos pedidos de conexão solar fora do prazo regulatório no Brasil.`,
     );
   }
 
@@ -270,8 +439,8 @@ function CardAlertaNacional({ resumo }: { resumo: ResumoNacionalFriccao }) {
 
   frases.push(
     resumo.multiplicadorPiorSobreBenchmark !== null
-      ? `A pior concessionária do ranking (${resumo.piorDesempenho.distribuidora}) acumula um índice de atraso ${formatarMultiplicador(resumo.multiplicadorPiorSobreBenchmark)} maior que a referência em eficiência do setor (${referenciaBenchmark}, ${formatarValor(resumo.benchmarkMelhorDesempenho.pctForaDoPrazo, 'percentual')} fora do prazo).`
-      : `A pior concessionária do ranking (${resumo.piorDesempenho.distribuidora}) tem ${formatarValor(resumo.piorDesempenho.pctForaDoPrazo, 'percentual')} dos pedidos fora do prazo regulatório, contra 0% da referência em eficiência do setor (${referenciaBenchmark}).`,
+      ? `Entre as distribuidoras com dado auditável de prazo, a pior (${resumo.piorDesempenho.distribuidora}) acumula um índice de atraso ${formatarMultiplicador(resumo.multiplicadorPiorSobreBenchmark)} maior que a referência em eficiência do setor (${referenciaBenchmark}, ${formatarValor(resumo.benchmarkMelhorDesempenho.pctForaDoPrazo, 'percentual')} fora do prazo).`
+      : `Entre as distribuidoras com dado auditável de prazo, a pior (${resumo.piorDesempenho.distribuidora}) tem ${formatarValor(resumo.piorDesempenho.pctForaDoPrazo, 'percentual')} dos pedidos fora do prazo regulatório, contra 0% da referência em eficiência do setor (${referenciaBenchmark}).`,
   );
 
   return (
@@ -561,9 +730,7 @@ function TrilhaAuditoriaDadoAusente() {
       <div className="grid grid-cols-1 gap-4 text-xs md:grid-cols-3">
         <div>
           <span className="block text-[9px] font-bold tracking-widest text-stone-400 uppercase">Fonte oficial</span>
-          <span className="font-semibold text-stone-800">
-            ANEEL — "Atendimento a pedidos de conexão de MMGD (pós Lei 14.300)"
-          </span>
+          <span className="font-semibold text-stone-800">{NOME_DATASET_ANEEL_FILA_CONEXAO}</span>
         </div>
         <div>
           <span className="block text-[9px] font-bold tracking-widest text-stone-400 uppercase">
