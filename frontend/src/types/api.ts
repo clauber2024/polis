@@ -654,3 +654,24 @@ export interface AnalisesEstatisticasResultado {
   totalResultados: number;
   resultados: ResultadoAnaliseEstatistica[];
 }
+
+/** RF-070 revisitado (30/07/2026) — disparo de ETL pela interface, só bases da whitelist. */
+export type StatusExecucaoEtl = 'em_execucao' | 'sucesso' | 'falha';
+
+export interface ExecucaoEtl {
+  id: number;
+  baseId: string;
+  status: StatusExecucaoEtl;
+  iniciadoEm: string;
+  finalizadoEm: string | null;
+  codigoSaida: number | null;
+  saidaLog: string | null;
+  iniciadoPorNome: string | null;
+}
+
+/** Espelho de listarStatusExtratores (GET /api/admin/bases-de-dados/status-execucao). */
+export interface StatusExtrator {
+  id: string;
+  rotulo: string;
+  ultimaExecucao: ExecucaoEtl | null;
+}

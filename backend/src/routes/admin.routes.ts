@@ -11,6 +11,7 @@ import {
   atualizarUsuarioParamsSchema,
   atualizarUsuarioBodySchema,
   removerUsuarioParamsSchema,
+  dispararAtualizacaoBaseParamsSchema,
 } from '../schemas/admin.schema.js';
 import {
   listarMetadadosBasesDadosController,
@@ -23,6 +24,8 @@ import {
   listarUsuariosController,
   atualizarUsuarioController,
   removerUsuarioController,
+  listarStatusExtratoresController,
+  dispararAtualizacaoBaseController,
 } from '../controllers/admin.controller.js';
 
 export const adminRouter = Router();
@@ -79,4 +82,14 @@ adminRouter.delete(
   ...requireAdmin,
   validateRequest({ params: removerUsuarioParamsSchema }),
   removerUsuarioController,
+);
+
+// RF-070 revisitado (30/07/2026) — disparo de ETL pela interface, só bases
+// da whitelist (ver utils/extractoresElegiveis.ts). Tudo Admin.
+adminRouter.get('/admin/bases-de-dados/status-execucao', ...requireAdmin, listarStatusExtratoresController);
+adminRouter.post(
+  '/admin/bases-de-dados/:baseId/atualizar',
+  ...requireAdmin,
+  validateRequest({ params: dispararAtualizacaoBaseParamsSchema }),
+  dispararAtualizacaoBaseController,
 );

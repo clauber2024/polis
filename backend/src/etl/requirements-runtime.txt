@@ -1,0 +1,16 @@
+# Dependências mínimas pra rodar em produção (Dockerfile do backend) os
+# extractors da whitelist de disparo via interface — ver
+# backend/src/utils/extractoresElegiveis.ts. NÃO é o requirements.txt
+# completo do ambiente de desenvolvimento (esse continua a fonte de verdade
+# pra rodar QUALQUER extractor localmente, geopandas/BigQuery incluídos) —
+# os 3 scripts elegíveis hoje (mmgd_aneel, tarifa_distribuidoras,
+# desempenho_conexao_mmgd) só precisam do que está abaixo, confirmado lendo
+# os imports de cada um (30/07/2026). Sem pin de versão de propósito, mesmo
+# critério já usado no venv de diagnóstico desta sessão — deixa o pip
+# resolver a versão compatível com o Python da imagem em vez de arrastar um
+# pin testado só no Windows local.
+pandas
+numpy
+sqlalchemy
+psycopg2-binary
+requests

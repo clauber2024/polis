@@ -88,9 +88,9 @@ Dentro do projeto:
 2. Nas **Settings** do novo serviço:
    - **Root Directory**: `backend` (o repo é um monorepo — sem isso o Railway tenta
      buildar a raiz, que não é um app Node).
-   - Build/start: o Railway detecta automaticamente via Nixpacks que existem os scripts
-     `build` e `start` no `package.json` (`tsc -p tsconfig.json` / `node dist/index.js`) —
-     não precisa de Dockerfile nem configuração extra.
+   - Build/start: até 30/07/2026 o Railway detectava automaticamente via Nixpacks (scripts
+     `build`/`start` do `package.json`), sem Dockerfile nenhum. **Isso mudou** — ver Seção 9
+     abaixo ("Trocar Nixpacks por Dockerfile"), necessário pra disparar ETL pela interface.
    - **Healthcheck Path** (opcional, mas recomendado): `/health` (já existe em
      `backend/src/app.ts:27`).
 3. Em **Variables** do serviço backend:
@@ -243,12 +243,77 @@ já documentado para `make migrate` local contra um banco já provisionado) e s�
 migrations realmente novas vão de fato criar algo. Confira a saída — qualquer erro que
 **não** seja "já existe" merece atenção antes de considerar a migração concluída.
 
-Nova carga de ETL (rodar um extractor de novo, por atualização de fonte) continua manual:
-rode o extractor localmente contra o banco local e repita o dump/restore da Seção 4, ou
-aponte a `DATABASE_URL` do ambiente Python local para o TCP Proxy do Railway
-temporariamente.
+Nova carga de ETL (rodar um extractor de novo, por atualização de fonte) continua manual
+**para a maioria das fontes**: rode o extractor localmente contra o banco local e repita o
+dump/restore da Seção 4, ou aponte a `DATABASE_URL` do ambiente Python local para o TCP
+Proxy do Railway temporariamente. **3 fontes são exceção** desde 30/07/2026 (RF-070
+revisitado) — MMGD, Tarifa Residencial e Ranking de Distribuidoras, todas ANEEL, têm botão
+de atualização direto no Painel Admin (`/admin`), que dispara o extractor no próprio
+container do backend em produção. Requer a Seção 9 abaixo (Dockerfile) já aplicada.
 
-## 9. Quando for oferecer ao Instituto Pólis
+## 9. Trocar Nixpacks por Dockerfile (Node + Python)
+
+Necessário só se você quiser usar o botão "Atualizar agora" do Painel Admin (Seção 8) — sem
+isso o backend sobe normalmente, só sem conseguir rodar extractor nenhum pela interface.
+
+1. No serviço do backend na Railway: **Settings → Build** → troque o **Builder** de
+   "Nixpacks" para **"Dockerfile"**.
+2. **Dockerfile Path**: `Dockerfile` (o arquivo já existe em `backend/Dockerfile` — como o
+   Root Directory do serviço já é `backend`, o caminho é relativo a essa pasta).
+3. Redeploy. O build agora inclui Python 3 + as dependências de
+   `backend/src/etl/requirements-runtime.txt` (só pandas/numpy/sqlalchemy/psycopg2/requests
+   — não o `requirements.txt` completo de desenvolvimento, que tem geopandas/BigQuery e
+   deixaria a imagem muito mais pesada sem necessidade).
+4. Teste: logue como Administrador em `/admin`, clique "Atualizar agora" numa das 3 bases do
+   card "Atualização de bases (ETL)", e acompanhe o status mudar de "Atualizando…" para
+   "Sucesso"/"Falha" (a tela atualiza sozinha).
+
+Só essas 3 fontes rodam neste container — as demais (RAIS/Mortalidade Infantil via
+BigQuery, Irradiação INPE, Reforma Casa Brasil Solar, ZEIS de SP/BH) continuam exigindo
+execução manual no ambiente de desenvolvimento (ver `backend/src/utils/
+extractoresElegiveis.ts` para a lista exata e o porquê de cada exclusão).
+
+## 10. Credencial do BigQuery (RAIS/Mortalidade Infantil)
+
+RAIS e Mortalidade Infantil usam BigQuery, autenticado localmente via
+`gcloud auth application-default login` — um fluxo interativo (abre navegador) que só
+funciona numa máquina com tela, nunca dentro de um servidor. Isso não muda com o
+Dockerfile da Seção 9: essas duas fontes **não** foram adicionadas à whitelist do botão de
+atualização (rodá-las exigiria também inflar a imagem com `google-cloud-bigquery` e
+`db-dtypes`, hoje de propósito fora do `requirements-runtime.txt`).
+
+O código já está preparado (`backend/src/etl/loaders/_autenticacao_bigquery.py`,
+importado por `extrair_renda_trabalho_rais.py` e
+`extrair_capital_humano_mortalidade_infantil.py`) para funcionar em qualquer ambiente sem
+`gcloud` interativo, incluindo depois de transferido para o Instituto Pólis — usando uma
+**Service Account** (a forma correta de autenticar um servidor no Google Cloud, diferente
+do login interativo de usuário). Passo a passo pra gerar essa credencial, sempre que for
+necessário rodar uma dessas duas fontes fora da sua própria máquina:
+
+1. No [Google Cloud Console](https://console.cloud.google.com), no projeto usado pelo
+   Atlas (`GCP_PROJECT_ID`, ver `backend/src/etl/loaders/extrair_renda_trabalho_rais.py`):
+   **IAM e administrador → Contas de serviço → Criar conta de serviço**.
+2. Dê um nome (ex.: `atlas-etl-bigquery`) e conceda os papéis **BigQuery Data Viewer** e
+   **BigQuery Job User** (só leitura — o Atlas nunca escreve no BigQuery).
+3. Na conta de serviço criada: aba **Chaves → Adicionar chave → Criar nova chave → JSON**.
+   Isso baixa um arquivo `.json` — **guarde com cuidado, é uma credencial** (nunca
+   compartilhe fora de um cofre de senhas/variável de ambiente).
+4. Abra o arquivo baixado num editor de texto, copie o conteúdo **inteiro** (é um objeto
+   JSON de uma linha ou poucas linhas).
+5. Na Railway, no serviço do backend → **Variables** → nova variável:
+   ```
+   GOOGLE_APPLICATION_CREDENTIALS_JSON=<cole o conteúdo do arquivo JSON aqui>
+   ```
+6. Redeploy. Ao rodar `extrair_renda_trabalho_rais.py` ou
+   `extrair_capital_humano_mortalidade_infantil.py` nesse ambiente (hoje só manualmente —
+   não estão na whitelist do botão), o script detecta a variável sozinho e autentica sem
+   nenhuma janela/login.
+
+Sem essa variável configurada, os dois scripts continuam funcionando normalmente **na sua
+própria máquina** (fluxo `gcloud` local, nada muda) — a Service Account só é necessária
+para rodar essas duas fontes fora dali.
+
+## 11. Quando for oferecer ao Instituto Pólis
 
 - **Railway**: Project Settings → "Transfer Project" — transfere posse (e cobrança) para
   a conta/organização do Pólis.

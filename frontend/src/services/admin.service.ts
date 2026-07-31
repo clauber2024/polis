@@ -5,6 +5,7 @@ import type {
   MetadadoBaseDados,
   Papel,
   StatusAprovacaoIndicador,
+  StatusExtrator,
   StatusMetadadoBaseDados,
   UsuarioAdmin,
   VersaoPublicada,
@@ -94,4 +95,21 @@ export function atualizarUsuario(
 /** Guard de "último administrador" e "não pode remover a própria conta" vêm do backend — ver admin.service.ts. */
 export function removerUsuario(id: number, token: string): Promise<void> {
   return enviarJson<void>('DELETE', `/api/admin/usuarios/${id}`, { token });
+}
+
+// -- RF-070 revisitado: disparo de ETL pela interface (tudo Admin) ----------
+
+export function listarStatusExtratores(token: string): Promise<StatusExtrator[]> {
+  return obterJson<StatusExtrator[]>('/api/admin/bases-de-dados/status-execucao', undefined, token);
+}
+
+export function dispararAtualizacaoBase(
+  baseId: string,
+  token: string,
+): Promise<{ execucaoId: number }> {
+  return enviarJson<{ execucaoId: number }>(
+    'POST',
+    `/api/admin/bases-de-dados/${baseId}/atualizar`,
+    { token },
+  );
 }

@@ -10,7 +10,9 @@
 import type { NextFunction, Request, Response } from 'express';
 import { AppError } from '../utils/AppError.js';
 import * as adminService from '../services/admin.service.js';
+import * as atualizacaoBasesService from '../services/atualizacaoBases.service.js';
 import type { IdMetadadoBaseDados } from '../utils/basesDeDadosCanonicas.js';
+import type { IdExtratorElegivel } from '../utils/extractoresElegiveis.js';
 import type {
   GranularidadeEspacial,
   StatusMetadadoBaseDados,
@@ -170,6 +172,34 @@ export async function removerUsuarioController(
     const { id: usuarioAlvoId } = req.params as unknown as { id: number };
     await adminService.removerUsuario(usuarioAlvoId, usuarioSolicitanteId);
     res.status(204).send();
+  } catch (erro) {
+    next(erro);
+  }
+}
+
+// -- disparo de ETL pela interface (RF-070 revisitado) ------------------------
+
+export async function listarStatusExtratoresController(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    res.json(await atualizacaoBasesService.listarStatusExtratores());
+  } catch (erro) {
+    next(erro);
+  }
+}
+
+export async function dispararAtualizacaoBaseController(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { id: usuarioId } = usuarioAutenticado(req);
+    const { baseId } = req.params as unknown as { baseId: IdExtratorElegivel };
+    res.status(202).json(await atualizacaoBasesService.dispararAtualizacao(baseId, usuarioId));
   } catch (erro) {
     next(erro);
   }

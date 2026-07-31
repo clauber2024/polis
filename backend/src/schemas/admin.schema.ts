@@ -10,6 +10,7 @@
 
 import { z } from 'zod';
 import { IDS_METADADOS_BASES_DADOS } from '../utils/basesDeDadosCanonicas.js';
+import { IDS_EXTRATORES_ELEGIVEIS } from '../utils/extractoresElegiveis.js';
 
 /** RF-071/072/073: PUT /api/admin/metadados-bases-dados/:baseDados */
 export const atualizarMetadadoParamsSchema = z.object({
@@ -58,4 +59,9 @@ export const atualizarUsuarioBodySchema = z
 /** RF-076: DELETE /api/admin/usuarios/:id */
 export const removerUsuarioParamsSchema = z.object({
   id: z.coerce.number().int().positive(),
+});
+
+/** RF-070 revisitado (30/07/2026): POST /api/admin/bases-de-dados/:baseId/atualizar */
+export const dispararAtualizacaoBaseParamsSchema = z.object({
+  baseId: z.enum(IDS_EXTRATORES_ELEGIVEIS),
 });

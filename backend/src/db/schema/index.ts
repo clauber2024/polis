@@ -16,3 +16,4 @@ export * from './versoes_publicadas.js';
 export * from './desempenho_conexao_distribuidoras.js';
 export * from './analises_estatisticas.js';
 export * from './indicadores_energia_nacional.js';
+export * from './execucoes_etl.js';

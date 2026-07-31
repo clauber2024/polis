@@ -57,6 +57,7 @@ import pandas as pd
 from google.cloud import bigquery
 from sqlalchemy import create_engine, text
 
+from _autenticacao_bigquery import preparar_credencial_gcp
 
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
@@ -64,6 +65,8 @@ DATABASE_URL = os.environ.get(
 )
 
 GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID", "project-550dc7a0-a1f2-45b6-9fc")
+
+preparar_credencial_gcp()
 
 ANOS_JANELA = [2022, 2023, 2024]
 PERIODO_REFERENCIA = f"{max(ANOS_JANELA)}-01-01"
