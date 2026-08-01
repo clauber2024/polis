@@ -77,34 +77,43 @@ nunca consolidado (mesma classe de bug já corrigida manualmente para
 RGE/RGE SUL e o grupo CPFL Santa Cruz, aqui detectado por INATIVIDADE em
 vez de evidência manual de fusão).
 
-Por isso a resolução usa DUAS regras, ambas calculadas a partir do dado
-real (nunca uma lista de nomes decorados — princípio já usado nos
-crosswalks acima, "nunca por semelhança de nome"):
+Por isso a resolução usa 3 regras, todas calculadas a partir do dado real
+(nunca uma lista de nomes decorados — princípio já usado nos crosswalks
+acima, "nunca por semelhança de nome"):
   1) OBSOLESCÊNCIA (sem aproximação): entre as distribuidoras registradas
      de um município, descarta qualquer uma que não homologou NENHUMA
      tarifa (qualquer subgrupo/classe) nos últimos
      ANOS_LIMIAR_DISTRIBUIDORA_ATIVA anos — se sobrar exatamente uma, essa
      é a distribuidora real hoje, sem flag de aproximação (resolve
      Roraima/CERR e qualquer caso análogo em outros estados, automaticamente).
-  2) DISTRIBUIDORA PRINCIPAL (com aproximação, tarifa_energia_residencial_
-     aproximada = true): se sobrar mais de uma distribuidora ativa, e
-     EXATAMENTE UMA delas for "grande" — definida por ESCALA REAL, não por
-     nome: atende sozinha (sem ambiguidade) pelo menos
-     LIMIAR_MUNICIPIOS_DISTRIBUIDORA_GRANDE municípios em todo o país —,
-     usa a tarifa dela como aproximação e marca a flag. Investigação
-     confirmou um corte nítido na distribuição real: distribuidoras
-     estaduais de verdade atendem sozinhas 13+ municípios (de SULGIPE=13 a
-     CEMIG-D=781), cooperativas locais pequenas no máximo 7 (CERTEL
-     ENERGIA=7 pra baixo) — nenhum caso ambíguo no meio, o que confirma que
-     o limiar de 10 é seguro.
-  3) Nos demais casos (nenhuma ativa, ou 2+ "grandes" ativas simultâneas —
-     ex.: {ENEL RJ, LIGHT SESA}, dois concessionárias reais sobrepostas sem
-     base pra escolher uma) o município continua SEM tarifa, como sempre.
+  2) DISTRIBUIDORA PRINCIPAL (com aproximação): revisão de 01/08/2026 —
+     desenho original só aplicava isto quando EXATAMENTE UMA distribuidora
+     cruzava um limiar fixo de "grande" (>= 10 municípios sozinha), deixando
+     casos como {ENEL RJ, LIGHT SESA} sem tarifa por serem as duas
+     "grandes". Usuário: "não pode existir municípios sem tarifa" — regra
+     revisada para SEMPRE escolher, entre as distribuidoras ativas (ou as
+     originais, se nenhuma estiver ativa), a que atende sozinha mais
+     municípios em todo o país (contagem_solo, mesmo critério de escala de
+     antes, agora usado como desempate em vez de limiar binário). Sempre
+     resolve, sempre marca a flag de aproximação — é mais fraco que o caso
+     CHESP quando as duas candidatas são de porte comparável, mas é a
+     decisão explícita do usuário priorizar SEMPRE ter um valor
+     (rotulado) a deixar em branco.
+  3) ADJACÊNCIA GEOGRÁFICA (com aproximação): município SEM NENHUM
+     registro de distribuidora no INDQUAL (não é ambiguidade, é ausência
+     total de dado na fonte — 33 casos, 01/08/2026) herda a distribuidora
+     mais comum entre os municípios VIZINHOS (ST_DWithin, não ST_Touches
+     exato — a malha simplificada pode ter microfrestas entre polígonos
+     administrativamente vizinhos) que já foram resolvidos pelas regras
+     1-2 acima. Único caso que ainda pode ficar sem tarifa: município
+     isolado sem nenhum vizinho resolvido (ex.: ilha) — aí não há dado
+     real nenhum, nem do próprio município nem de vizinho, pra basear
+     qualquer aproximação.
 
-Este valor é APROXIMADO por design quando a flag é true (ignora a
-cooperativa menor que também atende o município) — por isso a flag: o
-frontend deve sempre rotular visivelmente, nunca apresentar como tarifa
-exata de distribuidora única.
+Este valor é APROXIMADO por design sempre que a flag é true (ignora a(s)
+outra(s) distribuidora(s)/vizinho que também atende(m) o município ou a
+região) — por isso a flag: o frontend deve sempre rotular visivelmente,
+nunca apresentar como tarifa exata de distribuidora única.
 ================================================================================
 """
 
@@ -210,7 +219,7 @@ NORMALIZACAO_SIG_AGENTE_MESMA_EMPRESA_INDQUAL = {
 TAMANHO_CHUNK = 200_000
 
 # Ver docstring do módulo, seção "MÚLTIPLAS DISTRIBUIDORAS POR MUNICÍPIO",
-# para o achado completo que fundamenta os dois limiares abaixo (01/08/2026).
+# para o achado completo que fundamenta este limiar (01/08/2026).
 
 # Uma distribuidora só entra na regra de "obsolescência" como candidata a
 # ser descartada se NENHUMA tarifa dela (qualquer subgrupo/classe) tiver
@@ -218,14 +227,6 @@ TAMANHO_CHUNK = 200_000
 # recente do PRÓPRIO dataset (não datetime.now() — mantém o script correto
 # mesmo rodando anos depois sobre um CSV baixado antigo).
 ANOS_LIMIAR_DISTRIBUIDORA_ATIVA = 3
-
-# Uma distribuidora só é "grande/principal" (candidata a fallback quando o
-# município tem múltiplas distribuidoras ativas) se atender SOZINHA, sem
-# ambiguidade, pelo menos N municípios em todo o país — investigação
-# nacional confirmou corte nítido: distribuidoras estaduais reais atendem
-# 13+ municípios sozinhas (SULGIPE=13 até CEMIG-D=781), cooperativas
-# pequenas no máximo 7 (CERTEL ENERGIA=7 pra baixo).
-LIMIAR_MUNICIPIOS_DISTRIBUIDORA_GRANDE = 10
 
 
 # Achado 01/08/2026: baixar sem headers a partir do datacenter do Railway
@@ -397,17 +398,19 @@ def resolver_municipio_distribuidora(
     resultado = agrupado.reset_index()
     resultado.columns = ["codigo_ibge", "distribuidoras"]
 
-    # "grande/principal" = atende sozinha (sem ambiguidade) pelo menos
-    # LIMIAR_MUNICIPIOS_DISTRIBUIDORA_GRANDE municípios em todo o país —
-    # calculado do próprio dado carregado agora, não de uma lista fixa.
+    # contagem_solo = quantos municípios cada distribuidora atende SOZINHA
+    # (sem ambiguidade) em todo o país — usado agora como CRITÉRIO DE
+    # DESEMPATE, não mais como um limiar binário "grande/pequena". Decisão
+    # do usuário (01/08/2026, revisão do desenho original de mesma data):
+    # "não pode existir municípios sem tarifa" — a versão anterior deixava
+    # ambíguo-sem-limiar sem tarifa (ex.: ENEL RJ + LIGHT SESA, ambas
+    # "grandes"); agora SEMPRE escolhe, entre as candidatas, a que atende
+    # mais municípios sozinha no país. Critério objetivo (não é lista de
+    # nomes decorados), mas é uma aproximação mais fraca que o caso CHESP
+    # (grande real vs. cooperativa pequena) quando as duas candidatas são de
+    # porte comparável — por isso a flag de aproximação nunca é opcional.
     solo = resultado[resultado["distribuidoras"].apply(len) == 1]
     contagem_solo = solo["distribuidoras"].apply(lambda lst: lst[0]).value_counts()
-    distribuidoras_grandes = set(
-        contagem_solo[contagem_solo >= LIMIAR_MUNICIPIOS_DISTRIBUIDORA_GRANDE].index
-    )
-    print(f"      {len(distribuidoras_grandes)} distribuidora(s) classificada(s) como "
-          f"'grande/principal' (atendem sozinhas >= {LIMIAR_MUNICIPIOS_DISTRIBUIDORA_GRANDE} "
-          f"município(s) em todo o país).")
 
     data_corte_atividade = data_mais_recente - pd.DateOffset(years=ANOS_LIMIAR_DISTRIBUIDORA_ATIVA)
 
@@ -430,12 +433,13 @@ def resolver_municipio_distribuidora(
             # EDEVP, aqui detectada por inatividade — caso Roraima/CERR)
             return ativas[0], False
 
-        candidatas = ativas if len(ativas) > 1 else lst
-        grandes_presentes = [d for d in candidatas if d in distribuidoras_grandes]
-        if len(grandes_presentes) == 1:
-            return grandes_presentes[0], True
-
-        return None, False
+        # ambíguo mesmo entre ativas (ou nenhuma ativa — último recurso usa
+        # as registradas originais): nunca desiste, sempre escolhe a de
+        # maior contagem_solo; empate exato é raríssimo e cai no primeiro
+        # em ordem alfabética (lst já vem ordenado).
+        candidatas = ativas if ativas else lst
+        escolhida = max(candidatas, key=lambda d: contagem_solo.get(d, 0))
+        return escolhida, True
 
     resolvido = resultado["distribuidoras"].apply(resolver)
     resultado["distribuidora_unica"] = resolvido.apply(lambda t: t[0])
@@ -447,13 +451,81 @@ def resolver_municipio_distribuidora(
         (tem_multipla & resultado["distribuidora_unica"].notna() & ~resultado["distribuidora_aproximada"]).sum()
     )
     n_aproximada = int(resultado["distribuidora_aproximada"].sum())
-    n_sem_solucao = int(resultado["distribuidora_unica"].isna().sum())
     print(f"      {n_unica_direta} município(s) com distribuidora única direta | "
           f"{n_obsolescencia} resolvido(s) por obsolescência de registro (outra "
           f"distribuidora do conjunto sem tarifa homologada há mais de "
           f"{ANOS_LIMIAR_DISTRIBUIDORA_ATIVA} anos) | "
-          f"{n_aproximada} aproximado(s) (distribuidora principal escolhida entre "
-          f"múltiplas ativas) | {n_sem_solucao} sem solução (ficarão SEM tarifa).")
+          f"{n_aproximada} aproximado(s) (distribuidora escolhida por maior "
+          f"cobertura nacional entre as candidatas).")
+
+    # Municípios SEM NENHUM registro no INDQUAL (nem ambíguo: zero linhas em
+    # `pares`) — não há distribuidora nenhuma pra escolher a partir do
+    # próprio município. Único jeito de não deixar em branco sem inventar
+    # valor: geografia real. Herda a distribuidora mais comum entre os
+    # municípios VIZINHOS (ST_DWithin com folga pequena, não ST_Touches
+    # exato — a malha municipal usada no seed é simplificada a ~10m, o que
+    # pode abrir microfrestas entre polígonos administrativamente
+    # vizinhos; mesmo tipo de ajuste já necessário para o contorno de
+    # estado, ver ST_MakeValid em estados.service.ts) que JÁ foram
+    # resolvidos acima. Decisão do usuário (01/08/2026). Município isolado
+    # sem nenhum vizinho resolvido (ilha, ex. Fernando de Noronha) continua
+    # sem tarifa — não há nenhum dado real, nem vizinho, pra basear uma
+    # aproximação.
+    query_todos_municipios = text("SELECT codigo_ibge FROM municipios")
+    with engine.connect() as conexao:
+        todos_municipios = pd.read_sql(query_todos_municipios, conexao)["codigo_ibge"]
+
+    sem_registro = sorted(set(todos_municipios) - set(resultado["codigo_ibge"]))
+    print(f"      {len(sem_registro)} município(s) sem NENHUM registro de distribuidora no "
+          f"INDQUAL — resolvendo por adjacência geográfica com municípios vizinhos...")
+
+    linhas_vizinhanca = []
+    if sem_registro:
+        distribuidora_por_municipio = resultado.set_index("codigo_ibge")["distribuidora_unica"]
+
+        query_vizinhos = text("""
+            SELECT m1.codigo_ibge AS municipio, m2.codigo_ibge AS vizinho
+            FROM municipios m1
+            JOIN municipios m2
+              ON m2.codigo_ibge <> m1.codigo_ibge
+             AND ST_DWithin(m1.geom, m2.geom, 0.005)
+            WHERE m1.codigo_ibge = ANY(:lista)
+        """)
+        with engine.connect() as conexao:
+            vizinhos = pd.read_sql(query_vizinhos, conexao, params={"lista": list(sem_registro)})
+
+        vizinhos["distribuidora_vizinho"] = vizinhos["vizinho"].map(distribuidora_por_municipio)
+        vizinhos = vizinhos.dropna(subset=["distribuidora_vizinho"])
+
+        n_resolvidos_vizinhanca = 0
+        for codigo in sem_registro:
+            candidatos_vizinhos = vizinhos.loc[vizinhos["municipio"] == codigo, "distribuidora_vizinho"]
+            if len(candidatos_vizinhos) == 0:
+                linhas_vizinhanca.append(
+                    {"codigo_ibge": codigo, "distribuidora_unica": None, "distribuidora_aproximada": False}
+                )
+                continue
+            contagem_vizinhos = candidatos_vizinhos.value_counts()
+            maior_contagem = contagem_vizinhos.max()
+            empatados = sorted(contagem_vizinhos[contagem_vizinhos == maior_contagem].index)
+            escolhida = max(empatados, key=lambda d: contagem_solo.get(d, 0))
+            linhas_vizinhanca.append(
+                {"codigo_ibge": codigo, "distribuidora_unica": escolhida, "distribuidora_aproximada": True}
+            )
+            n_resolvidos_vizinhanca += 1
+
+        print(f"      {n_resolvidos_vizinhanca}/{len(sem_registro)} resolvido(s) por adjacência "
+              f"geográfica.")
+
+        resultado = pd.concat(
+            [resultado[["codigo_ibge", "distribuidora_unica", "distribuidora_aproximada"]],
+             pd.DataFrame(linhas_vizinhanca)],
+            ignore_index=True,
+        )
+
+    n_sem_solucao = int(resultado["distribuidora_unica"].isna().sum())
+    print(f"      {n_sem_solucao} município(s) permanecem sem solução (nenhum registro E "
+          f"nenhum vizinho resolvido — ficarão SEM tarifa).")
 
     return resultado[["codigo_ibge", "distribuidora_unica", "distribuidora_aproximada"]]
 
