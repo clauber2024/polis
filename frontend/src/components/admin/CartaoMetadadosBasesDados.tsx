@@ -92,42 +92,51 @@ export function CartaoMetadadosBasesDados() {
             const observacaoAtual = observacoes[base] ?? registro?.observacao ?? '';
             return (
               <div key={base} className="rounded border border-slate-100 p-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="w-56 font-medium text-slate-700">{base}</span>
-                  <select
-                    value={registro?.granularidadeEspacial ?? ''}
-                    disabled={salvando === base}
-                    onChange={(evento) =>
-                      aoSalvar(base, {
-                        granularidadeEspacial: evento.target.value as GranularidadeEspacial,
-                      })
-                    }
-                    className="rounded border border-slate-300 px-1.5 py-1 text-xs text-slate-700"
+                <div className="flex items-center gap-2">
+                  <span
+                    title={base}
+                    className="min-w-0 flex-1 truncate font-medium text-slate-700"
                   >
-                    <option value="" disabled>
-                      Granularidade
-                    </option>
-                    {Object.entries(ROTULOS_GRANULARIDADE).map(([valor, rotulo]) => (
-                      <option key={valor} value={valor}>
-                        {rotulo}
+                    {base}
+                  </span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <select
+                      value={registro?.granularidadeEspacial ?? ''}
+                      disabled={salvando === base}
+                      onChange={(evento) =>
+                        aoSalvar(base, {
+                          granularidadeEspacial: evento.target.value as GranularidadeEspacial,
+                        })
+                      }
+                      className="rounded border border-slate-300 px-1.5 py-1 text-xs text-slate-700"
+                    >
+                      <option value="" disabled>
+                        Granularidade
                       </option>
-                    ))}
-                  </select>
-                  <select
-                    value={registro?.status ?? 'pendente'}
-                    disabled={salvando === base}
-                    onChange={(evento) =>
-                      aoSalvar(base, { status: evento.target.value as StatusMetadadoBaseDados })
-                    }
-                    className="rounded border border-slate-300 px-1.5 py-1 text-xs text-slate-700"
-                  >
-                    {Object.entries(ROTULOS_STATUS).map(([valor, rotulo]) => (
-                      <option key={valor} value={valor}>
-                        {rotulo}
-                      </option>
-                    ))}
-                  </select>
-                  {salvando === base && <span className="text-xs text-slate-400">salvando…</span>}
+                      {Object.entries(ROTULOS_GRANULARIDADE).map(([valor, rotulo]) => (
+                        <option key={valor} value={valor}>
+                          {rotulo}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={registro?.status ?? 'pendente'}
+                      disabled={salvando === base}
+                      onChange={(evento) =>
+                        aoSalvar(base, { status: evento.target.value as StatusMetadadoBaseDados })
+                      }
+                      className="rounded border border-slate-300 px-1.5 py-1 text-xs text-slate-700"
+                    >
+                      {Object.entries(ROTULOS_STATUS).map(([valor, rotulo]) => (
+                        <option key={valor} value={valor}>
+                          {rotulo}
+                        </option>
+                      ))}
+                    </select>
+                    {salvando === base && (
+                      <span className="text-xs whitespace-nowrap text-slate-400">salvando…</span>
+                    )}
+                  </div>
                 </div>
                 <div className="mt-2 flex gap-2">
                   <input
