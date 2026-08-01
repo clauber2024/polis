@@ -57,8 +57,12 @@ SELECT
     MAX(renda_per_capita_rdpc) AS renda_per_capita_rdpc,
     MAX(percentual_baixa_renda_rdpc) AS percentual_baixa_renda_rdpc,
     MAX(tarifa_energia_residencial) AS tarifa_energia_residencial,
-    bool_or(tarifa_energia_residencial_aproximada) AS tarifa_energia_residencial_aproximada,
     MAX(numero_contratos_reforma_casa_brasil_solar) AS numero_contratos_reforma_casa_brasil_solar,
-    MAX(valor_liberado_reforma_casa_brasil_solar) AS valor_liberado_reforma_casa_brasil_solar
+    MAX(valor_liberado_reforma_casa_brasil_solar) AS valor_liberado_reforma_casa_brasil_solar,
+    -- Coluna nova precisa ficar no FINAL da lista: CREATE OR REPLACE VIEW no
+    -- Postgres não aceita inserir coluna no meio (desloca a posição das
+    -- colunas seguintes, que o Postgres trata como tentativa de renomear —
+    -- erro real encontrado ao aplicar esta migration em produção, 01/08/2026).
+    bool_or(tarifa_energia_residencial_aproximada) AS tarifa_energia_residencial_aproximada
 FROM indicadores_sociais
 GROUP BY unidade_espacial_id;

@@ -228,6 +228,19 @@ ANOS_LIMIAR_DISTRIBUIDORA_ATIVA = 3
 LIMIAR_MUNICIPIOS_DISTRIBUIDORA_GRANDE = 10
 
 
+# Achado 01/08/2026: baixar sem headers a partir do datacenter do Railway
+# derrubava a conexão logo no handshake TLS (SSLZeroReturnError, "connection
+# closed (EOF)") em todas as 4 tentativas — assinatura de bloqueio de WAF a
+# clientes sem User-Agent de navegador, não instabilidade de rede (o mesmo
+# download funciona normalmente de uma máquina de desenvolvimento comum).
+CABECALHOS_DOWNLOAD = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    ),
+}
+
+
 def baixar_se_necessario() -> None:
     if os.path.exists(CAMINHO_LOCAL):
         print(f"[1/6] Arquivo já existe localmente em {CAMINHO_LOCAL} — pulando download.")
@@ -241,7 +254,9 @@ def baixar_se_necessario() -> None:
     ultimo_erro = None
     for tentativa in range(1, max_tentativas + 1):
         try:
-            resposta = requests.get(URL_CSV_TARIFAS, timeout=300, stream=True)
+            resposta = requests.get(
+                URL_CSV_TARIFAS, timeout=300, stream=True, headers=CABECALHOS_DOWNLOAD
+            )
             resposta.raise_for_status()
             ultimo_erro = None
             break
