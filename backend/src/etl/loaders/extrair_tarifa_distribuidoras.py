@@ -503,8 +503,15 @@ def resolver_municipio_distribuidora(
 
     linhas_vizinhanca = []
     if sem_registro:
-        distribuidora_por_municipio = resultado.set_index("codigo_ibge")["distribuidora_unica"]
+        distribuidora_por_municipio = dict(
+            zip(resultado["codigo_ibge"], resultado["distribuidora_unica"])
+        )
 
+        # Busca vizinhos de TODOS os municípios sem registro — inclusive uns
+        # dos outros (m2 não é filtrado a "já resolvidos"), porque um
+        # município sem registro pode ter como vizinho OUTRO município
+        # também sem registro, que só fica resolvido numa rodada seguinte
+        # (ver resolução iterativa abaixo).
         query_vizinhos = text("""
             SELECT m1.codigo_ibge AS municipio, m2.codigo_ibge AS vizinho
             FROM municipios m1
@@ -515,29 +522,50 @@ def resolver_municipio_distribuidora(
         """)
         with engine.connect() as conexao:
             vizinhos = pd.read_sql(query_vizinhos, conexao, params={"lista": list(sem_registro)})
+        vizinhos_por_municipio = vizinhos.groupby("municipio")["vizinho"].apply(list).to_dict()
 
-        vizinhos["distribuidora_vizinho"] = vizinhos["vizinho"].map(distribuidora_por_municipio)
-        vizinhos = vizinhos.dropna(subset=["distribuidora_vizinho"])
+        # Resolução ITERATIVA (por rodadas): achado real (01/08/2026) — bolsa
+        # de 4 municípios contíguos sem NENHUM registro no INDQUAL na Zona da
+        # Mata mineira (Muriaé e entorno), cada um só com vizinhos que
+        # TAMBÉM não tinham registro — uma única rodada não resolvia nenhum
+        # dos 4. A cada rodada, um município recém-resolvido por vizinhança
+        # passa a valer como fonte pros seus próprios vizinhos ainda
+        # pendentes, até estabilizar (ou esgotar o limite de rodadas).
+        pendentes = set(sem_registro)
+        resolvidos_por_vizinhanca: dict[str, str] = {}
+        for _rodada in range(5):
+            if not pendentes:
+                break
+            progrediu = False
+            ainda_pendentes = set()
+            for codigo in pendentes:
+                candidatos = [
+                    distribuidora_por_municipio.get(v) or resolvidos_por_vizinhanca.get(v)
+                    for v in vizinhos_por_municipio.get(codigo, [])
+                ]
+                candidatos = [c for c in candidatos if c is not None]
+                if not candidatos:
+                    ainda_pendentes.add(codigo)
+                    continue
+                contagem_vizinhos = pd.Series(candidatos).value_counts()
+                maior_contagem = contagem_vizinhos.max()
+                empatados = sorted(contagem_vizinhos[contagem_vizinhos == maior_contagem].index)
+                resolvidos_por_vizinhanca[codigo] = max(empatados, key=lambda d: contagem_solo.get(d, 0))
+                progrediu = True
+            pendentes = ainda_pendentes
+            if not progrediu:
+                break
 
-        n_resolvidos_vizinhanca = 0
         for codigo in sem_registro:
-            candidatos_vizinhos = vizinhos.loc[vizinhos["municipio"] == codigo, "distribuidora_vizinho"]
-            if len(candidatos_vizinhos) == 0:
-                linhas_vizinhanca.append(
-                    {"codigo_ibge": codigo, "distribuidora_unica": None, "distribuidora_aproximada": False}
-                )
-                continue
-            contagem_vizinhos = candidatos_vizinhos.value_counts()
-            maior_contagem = contagem_vizinhos.max()
-            empatados = sorted(contagem_vizinhos[contagem_vizinhos == maior_contagem].index)
-            escolhida = max(empatados, key=lambda d: contagem_solo.get(d, 0))
-            linhas_vizinhanca.append(
-                {"codigo_ibge": codigo, "distribuidora_unica": escolhida, "distribuidora_aproximada": True}
-            )
-            n_resolvidos_vizinhanca += 1
+            escolhida = resolvidos_por_vizinhanca.get(codigo)
+            linhas_vizinhanca.append({
+                "codigo_ibge": codigo,
+                "distribuidora_unica": escolhida,
+                "distribuidora_aproximada": escolhida is not None,
+            })
 
-        print(f"      {n_resolvidos_vizinhanca}/{len(sem_registro)} resolvido(s) por adjacência "
-              f"geográfica.")
+        print(f"      {len(resolvidos_por_vizinhanca)}/{len(sem_registro)} resolvido(s) por "
+              f"adjacência geográfica (iterativo).")
 
         resultado = pd.concat(
             [resultado[["codigo_ibge", "distribuidora_unica", "distribuidora_aproximada"]],
