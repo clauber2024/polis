@@ -33,11 +33,20 @@ function classeAba({ isActive }: { isActive: boolean }) {
 function LayoutApp() {
   const navigate = useNavigate();
   const { sessao, sair } = useAuth();
-  // Busca de município escondida na "Base de Evidências" (30/07/2026, pedido
-  // do usuário) — é um painel de status macro de bases nacionais, a busca
-  // por município individual não se aplica ali. Continua nas demais rotas.
+  // Busca de município escondida nas telas de status/gestão macro (30-31/07/2026,
+  // pedido do usuário) — "Base de Evidências" é status de bases nacionais, e
+  // Login/Painel Colaborador/Painel Admin/Guia de Transição são
+  // administrativas, nenhuma delas trabalha em nível de município individual.
+  // Continua nas demais rotas (mapa, dossiê, visão setorial, vazios de acesso).
   const location = useLocation();
-  const exibirBuscaMunicipio = location.pathname !== '/base-de-evidencias';
+  const ROTAS_SEM_BUSCA_MUNICIPIO = [
+    '/base-de-evidencias',
+    '/login',
+    '/colaborador',
+    '/admin',
+    '/guia-transicao',
+  ];
+  const exibirBuscaMunicipio = !ROTAS_SEM_BUSCA_MUNICIPIO.includes(location.pathname);
 
   return (
     <div className="flex h-full flex-col font-sans">
