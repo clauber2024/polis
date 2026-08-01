@@ -92,13 +92,18 @@ acima, "nunca por semelhança de nome"):
      casos como {ENEL RJ, LIGHT SESA} sem tarifa por serem as duas
      "grandes". Usuário: "não pode existir municípios sem tarifa" — regra
      revisada para SEMPRE escolher, entre as distribuidoras ativas (ou as
-     originais, se nenhuma estiver ativa), a que atende sozinha mais
-     municípios em todo o país (contagem_solo, mesmo critério de escala de
-     antes, agora usado como desempate em vez de limiar binário). Sempre
-     resolve, sempre marca a flag de aproximação — é mais fraco que o caso
-     CHESP quando as duas candidatas são de porte comparável, mas é a
-     decisão explícita do usuário priorizar SEMPRE ter um valor
-     (rotulado) a deixar em branco.
+     originais, se nenhuma estiver ativa), alguma candidata. Critério de
+     desempate em 2 níveis, do mais específico ao mais geral: (a)
+     contagem_conjuntos_local — quantos CONJUNTOS (circuitos) distintos
+     cada distribuidora tem DENTRO deste município específico (usuário
+     confirmou ao vivo no painel "Desempenho das Distribuidoras por
+     Município" da própria ANEEL que municípios ambíguos de fato têm
+     conjuntos internos atendidos por distribuidoras diferentes — não é
+     ambiguidade artificial); (b) contagem_solo — cobertura nacional,
+     usada só se empatar em (a). Sempre resolve, sempre marca a flag de
+     aproximação — mesmo com o desempate local, ainda ignora o(s)
+     conjunto(s) da distribuidora minoritária, então nunca é o valor
+     exato de uma distribuidora única.
   3) ADJACÊNCIA GEOGRÁFICA (com aproximação): município SEM NENHUM
      registro de distribuidora no INDQUAL (não é ambiguidade, é ausência
      total de dado na fonte — 33 casos, 01/08/2026) herda a distribuidora
@@ -382,7 +387,7 @@ def resolver_municipio_distribuidora(
     print("\n[3/6] Resolvendo município -> distribuidora via schema já carregado do INDQUAL...")
 
     query = text("""
-        SELECT qcm.codigo_ibge, qc.sig_agente
+        SELECT qcm.codigo_ibge, qc.sig_agente, qc.ide_conjunto
         FROM qualidade_conjunto_municipio qcm
         JOIN qualidade_conjuntos qc ON qc.ide_conjunto = qcm.ide_conjunto
         WHERE qc.sig_agente IS NOT NULL
@@ -398,17 +403,28 @@ def resolver_municipio_distribuidora(
     resultado = agrupado.reset_index()
     resultado.columns = ["codigo_ibge", "distribuidoras"]
 
+    # contagem_conjuntos_local = quantos CONJUNTOS (circuitos) distintos cada
+    # distribuidora tem DENTRO de cada município — sugestão do usuário
+    # (01/08/2026), confirmando ao vivo no painel "Desempenho das
+    # Distribuidoras por Município" da própria ANEEL (mesma base INDQUAL que
+    # já carregamos) que municípios ambíguos de fato têm conjuntos distintos
+    # atendidos por distribuidoras diferentes — não é ambiguidade artificial,
+    # é o próprio município tendo mais de uma área de atendimento real.
+    # Evidência LOCAL (quantos circuitos dentro DESTE município) é mais
+    # direta que escala NACIONAL — vira o critério PRIMÁRIO de desempate;
+    # contagem_solo (nacional) passa a desempate SECUNDÁRIO, só para o caso
+    # raro de empate no número de conjuntos locais.
+    contagem_conjuntos_local = (
+        pares.drop_duplicates(subset=["codigo_ibge", "sig_agente", "ide_conjunto"])
+        .groupby(["codigo_ibge", "sig_agente"])
+        .size()
+    )
+
     # contagem_solo = quantos municípios cada distribuidora atende SOZINHA
-    # (sem ambiguidade) em todo o país — usado agora como CRITÉRIO DE
-    # DESEMPATE, não mais como um limiar binário "grande/pequena". Decisão
-    # do usuário (01/08/2026, revisão do desenho original de mesma data):
-    # "não pode existir municípios sem tarifa" — a versão anterior deixava
-    # ambíguo-sem-limiar sem tarifa (ex.: ENEL RJ + LIGHT SESA, ambas
-    # "grandes"); agora SEMPRE escolhe, entre as candidatas, a que atende
-    # mais municípios sozinha no país. Critério objetivo (não é lista de
-    # nomes decorados), mas é uma aproximação mais fraca que o caso CHESP
-    # (grande real vs. cooperativa pequena) quando as duas candidatas são de
-    # porte comparável — por isso a flag de aproximação nunca é opcional.
+    # (sem ambiguidade) em todo o país — desempate SECUNDÁRIO (ver acima).
+    # Decisão do usuário (01/08/2026): "não pode existir municípios sem
+    # tarifa" — SEMPRE escolhe, entre as candidatas, alguma distribuidora;
+    # nunca deixa em aberto por ambiguidade.
     solo = resultado[resultado["distribuidoras"].apply(len) == 1]
     contagem_solo = solo["distribuidoras"].apply(lambda lst: lst[0]).value_counts()
 
@@ -421,7 +437,7 @@ def resolver_municipio_distribuidora(
         ultima = ultima_vigencia_por_distribuidora.get(nome_no_dataset_tarifas)
         return ultima is not None and pd.notna(ultima) and ultima >= data_corte_atividade
 
-    def resolver(lst):
+    def resolver(codigo_ibge: str, lst: list[str]):
         if len(lst) == 1:
             return lst[0], False
 
@@ -434,14 +450,20 @@ def resolver_municipio_distribuidora(
             return ativas[0], False
 
         # ambíguo mesmo entre ativas (ou nenhuma ativa — último recurso usa
-        # as registradas originais): nunca desiste, sempre escolhe a de
-        # maior contagem_solo; empate exato é raríssimo e cai no primeiro
-        # em ordem alfabética (lst já vem ordenado).
+        # as registradas originais): nunca desiste, sempre escolhe a com
+        # mais conjuntos DENTRO deste município; empate no local cai pra
+        # cobertura nacional; empate exato nos dois cai no primeiro em
+        # ordem alfabética (lst já vem ordenado).
         candidatas = ativas if ativas else lst
-        escolhida = max(candidatas, key=lambda d: contagem_solo.get(d, 0))
+        escolhida = max(
+            candidatas,
+            key=lambda d: (contagem_conjuntos_local.get((codigo_ibge, d), 0), contagem_solo.get(d, 0)),
+        )
         return escolhida, True
 
-    resolvido = resultado["distribuidoras"].apply(resolver)
+    resolvido = resultado.apply(
+        lambda linha: resolver(linha["codigo_ibge"], linha["distribuidoras"]), axis=1
+    )
     resultado["distribuidora_unica"] = resolvido.apply(lambda t: t[0])
     resultado["distribuidora_aproximada"] = resolvido.apply(lambda t: t[1])
 
