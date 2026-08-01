@@ -333,27 +333,34 @@ export function TourAchados({
           <IconeMapaTour className="h-6 w-6 shrink-0 text-red-400" />
           <div>
             <h4 className="text-sm font-bold">Estes achados estão vivos no Atlas</h4>
-            <p className="text-xs text-stone-400">Explore os microdados cruzados nas telas abaixo.</p>
+            <p className="text-xs text-stone-400">
+              Explore os microdados cruzados diretamente nas abas principais da plataforma.
+            </p>
           </div>
         </div>
+        {/* Taxonomia atualizada (31/07/2026) para bater com as abas reais do
+            header (App.tsx) — antes apontava pro Gráfico de Quadrantes e pro
+            Detalhamento de Vazios de Acesso, duas telas que saíram da
+            navegação principal desde a reorganização em Dossiê
+            Executivo/Visão Setorial/Mapa. */}
         <div className="flex shrink-0 flex-wrap items-center justify-center gap-2">
           <Link
-            to="/mapa"
-            className="rounded-lg bg-white px-4 py-2 text-center text-xs font-mono font-bold uppercase tracking-wider text-stone-950 transition-colors hover:bg-stone-100"
-          >
-            Explorar o mapa
-          </Link>
-          <Link
             to="/dossie-executivo"
-            className="rounded-lg border border-stone-600 px-4 py-2 text-center text-xs font-bold text-white transition-colors hover:bg-stone-800"
+            className="rounded-lg bg-white px-4 py-2 text-center text-xs font-mono font-bold tracking-wider text-stone-950 transition-colors hover:bg-stone-100"
           >
-            Gráfico de Quadrantes
+            Dossiê Executivo
           </Link>
           <Link
-            to="/vazios-de-acesso"
+            to="/visao-setorial"
             className="rounded-lg border border-stone-600 px-4 py-2 text-center text-xs font-bold text-white transition-colors hover:bg-stone-800"
           >
-            Detalhamento de Vazios de Acesso
+            Visão Setorial
+          </Link>
+          <Link
+            to="/mapa"
+            className="rounded-lg border border-stone-600 px-4 py-2 text-center text-xs font-bold text-white transition-colors hover:bg-stone-800"
+          >
+            Mapa Interativo
           </Link>
         </div>
       </div>
