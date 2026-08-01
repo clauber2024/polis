@@ -56,6 +56,55 @@ consumidor de fato paga, não a Base Econômica). Não é uma média histórica 
 outros indicadores de "estado atual" deste projeto. A relevância para
 adoção ACUMULADA de MMGD (que reflete anos de decisões) é uma limitação
 conhecida, documentada em ARQUITETURA.md.
+
+MÚLTIPLAS DISTRIBUIDORAS POR MUNICÍPIO — resolução em 2 camadas (01/08/2026,
+migration 0032, tarifa_energia_residencial_aproximada). Motivação: usuário
+apontou um agrupamento de municípios em Goiás (microrregião Ceres/São
+Patrício) sem tarifa gravada — investigado e CONFIRMADO como área de
+concessão dividida legítima entre CHESP (cooperativa ativa, CNPJ
+01377555000110, homologando tarifa até 2026) e EQUATORIAL GO. Usuário: "mas
+não pode existir municípios sem tarifa" + pedido explícito para generalizar
+a solução para o resto do país (não só Goiás), incluindo Roraima como
+exemplo. Investigação nacional (query agregada em qualidade_conjuntos)
+revelou 158 combinações de distribuidoras conflitantes em todo o país — a
+maioria (RS/SC/PR) é o mesmo padrão CHESP: 1 concessionária estadual real +
+1 cooperativa rural pequena genuinamente distinta. MAS Roraima revelou um
+padrão DIFERENTE: "CERR" aparece junto de "BOA VISTA" em 14 dos 15
+municípios de Roraima no INDQUAL, mas seu CNPJ (05938444000196) para de
+homologar tarifa em 2014-11-01 e nunca mais volta — não é uma segunda
+empresa ativa (como CHESP), é um registro de conjunto morto no INDQUAL
+nunca consolidado (mesma classe de bug já corrigida manualmente para
+RGE/RGE SUL e o grupo CPFL Santa Cruz, aqui detectado por INATIVIDADE em
+vez de evidência manual de fusão).
+
+Por isso a resolução usa DUAS regras, ambas calculadas a partir do dado
+real (nunca uma lista de nomes decorados — princípio já usado nos
+crosswalks acima, "nunca por semelhança de nome"):
+  1) OBSOLESCÊNCIA (sem aproximação): entre as distribuidoras registradas
+     de um município, descarta qualquer uma que não homologou NENHUMA
+     tarifa (qualquer subgrupo/classe) nos últimos
+     ANOS_LIMIAR_DISTRIBUIDORA_ATIVA anos — se sobrar exatamente uma, essa
+     é a distribuidora real hoje, sem flag de aproximação (resolve
+     Roraima/CERR e qualquer caso análogo em outros estados, automaticamente).
+  2) DISTRIBUIDORA PRINCIPAL (com aproximação, tarifa_energia_residencial_
+     aproximada = true): se sobrar mais de uma distribuidora ativa, e
+     EXATAMENTE UMA delas for "grande" — definida por ESCALA REAL, não por
+     nome: atende sozinha (sem ambiguidade) pelo menos
+     LIMIAR_MUNICIPIOS_DISTRIBUIDORA_GRANDE municípios em todo o país —,
+     usa a tarifa dela como aproximação e marca a flag. Investigação
+     confirmou um corte nítido na distribuição real: distribuidoras
+     estaduais de verdade atendem sozinhas 13+ municípios (de SULGIPE=13 a
+     CEMIG-D=781), cooperativas locais pequenas no máximo 7 (CERTEL
+     ENERGIA=7 pra baixo) — nenhum caso ambíguo no meio, o que confirma que
+     o limiar de 10 é seguro.
+  3) Nos demais casos (nenhuma ativa, ou 2+ "grandes" ativas simultâneas —
+     ex.: {ENEL RJ, LIGHT SESA}, dois concessionárias reais sobrepostas sem
+     base pra escolher uma) o município continua SEM tarifa, como sempre.
+
+Este valor é APROXIMADO por design quando a flag é true (ignora a
+cooperativa menor que também atende o município) — por isso a flag: o
+frontend deve sempre rotular visivelmente, nunca apresentar como tarifa
+exata de distribuidora única.
 ================================================================================
 """
 
@@ -160,6 +209,24 @@ NORMALIZACAO_SIG_AGENTE_MESMA_EMPRESA_INDQUAL = {
 
 TAMANHO_CHUNK = 200_000
 
+# Ver docstring do módulo, seção "MÚLTIPLAS DISTRIBUIDORAS POR MUNICÍPIO",
+# para o achado completo que fundamenta os dois limiares abaixo (01/08/2026).
+
+# Uma distribuidora só entra na regra de "obsolescência" como candidata a
+# ser descartada se NENHUMA tarifa dela (qualquer subgrupo/classe) tiver
+# vigência iniciada nos últimos N anos, contados a partir da data mais
+# recente do PRÓPRIO dataset (não datetime.now() — mantém o script correto
+# mesmo rodando anos depois sobre um CSV baixado antigo).
+ANOS_LIMIAR_DISTRIBUIDORA_ATIVA = 3
+
+# Uma distribuidora só é "grande/principal" (candidata a fallback quando o
+# município tem múltiplas distribuidoras ativas) se atender SOZINHA, sem
+# ambiguidade, pelo menos N municípios em todo o país — investigação
+# nacional confirmou corte nítido: distribuidoras estaduais reais atendem
+# 13+ municípios sozinhas (SULGIPE=13 até CEMIG-D=781), cooperativas
+# pequenas no máximo 7 (CERTEL ENERGIA=7 pra baixo).
+LIMIAR_MUNICIPIOS_DISTRIBUIDORA_GRANDE = 10
+
 
 def baixar_se_necessario() -> None:
     if os.path.exists(CAMINHO_LOCAL):
@@ -209,20 +276,43 @@ def detectar_codificacao() -> str:
         return "latin-1"
 
 
-def carregar_tarifa_mais_recente_por_distribuidora(codificacao: str) -> pd.DataFrame:
-    """Lê o CSV inteiro em chunks (todas as distribuidoras, não só 3),
-    filtra B1/Residencial/Convencional/Tarifa de Aplicação, e retorna a
-    tarifa (TUSD+TE) da vigência mais recente por SigAgente."""
-    print("\n[2/6] Lendo CSV completo em chunks, filtrando B1/Residencial/Convencional/"
-          "Tarifa de Aplicação (todas as distribuidoras)...")
+def carregar_situacao_distribuidoras(codificacao: str):
+    """Lê o CSV inteiro em chunks (UMA ÚNICA passada) e retorna:
+    - tarifa_por_distribuidora: tarifa B1/Residencial/Convencional/Tarifa de
+      Aplicação (TUSD+TE) mais recente por SigAgente — mesmo cálculo de
+      sempre, usado para o VALOR da tarifa gravada.
+    - ultima_vigencia_por_distribuidora: data de início de vigência mais
+      recente homologada por SigAgente, em QUALQUER subgrupo/classe/base
+      tarifária (não só B1/Residencial) — sinal de "esta empresa ainda
+      homologa tarifa hoje", usado só para decidir se um registro do
+      INDQUAL é uma distribuidora que ainda opera de fato ou um registro
+      obsoleto nunca limpo (ver docstring do módulo, achado Roraima/CERR).
+    - data_mais_recente: a maior DatInicioVigencia do dataset inteiro,
+      usada como referência de "hoje" no lugar de datetime.now() (mantém o
+      corte de atividade correto mesmo rodando anos depois sobre um CSV
+      baixado antigo)."""
+    print("\n[2/6] Lendo CSV completo em chunks (tarifa B1/Residencial + situação de "
+          "atividade de todas as distribuidoras, todos os subgrupos/classes)...")
 
-    pedacos_filtrados = []
+    pedacos_b1_residencial = []
+    ultima_vigencia_geral: dict[str, pd.Timestamp] = {}
     total_linhas_lidas = 0
     for chunk in pd.read_csv(
         CAMINHO_LOCAL, sep=";", encoding=codificacao,
         chunksize=TAMANHO_CHUNK, dtype=str, on_bad_lines="skip",
     ):
         total_linhas_lidas += len(chunk)
+
+        vigencia_chunk = pd.to_datetime(chunk["DatInicioVigencia"], errors="coerce")
+        vigencia_por_agente_no_chunk = (
+            pd.DataFrame({"SigAgente": chunk["SigAgente"], "vigencia": vigencia_chunk})
+            .dropna(subset=["SigAgente", "vigencia"])
+            .groupby("SigAgente")["vigencia"].max()
+        )
+        for agente, data in vigencia_por_agente_no_chunk.items():
+            if agente not in ultima_vigencia_geral or data > ultima_vigencia_geral[agente]:
+                ultima_vigencia_geral[agente] = data
+
         filtro = (
             (chunk["DscSubGrupo"] == "B1")
             & (chunk["DscBaseTarifaria"] == "Tarifa de Aplicação")
@@ -230,11 +320,12 @@ def carregar_tarifa_mais_recente_por_distribuidora(codificacao: str) -> pd.DataF
             & (chunk["DscClasse"] == "Residencial")
         )
         if filtro.any():
-            pedacos_filtrados.append(chunk[filtro].copy())
+            pedacos_b1_residencial.append(chunk[filtro].copy())
 
     print(f"      {total_linhas_lidas} linha(s) lidas no total do arquivo.")
-    df = pd.concat(pedacos_filtrados, ignore_index=True)
-    print(f"      {len(df)} linha(s) após filtro (todas as distribuidoras).")
+
+    df = pd.concat(pedacos_b1_residencial, ignore_index=True)
+    print(f"      {len(df)} linha(s) após filtro B1/Residencial/Convencional/Tarifa de Aplicação.")
 
     df["DatInicioVigencia"] = pd.to_datetime(df["DatInicioVigencia"], errors="coerce")
     df["VlrTUSD"] = pd.to_numeric(df["VlrTUSD"].str.replace(",", "."), errors="coerce")
@@ -245,19 +336,33 @@ def carregar_tarifa_mais_recente_por_distribuidora(codificacao: str) -> pd.DataF
     print(f"      {n_distribuidoras} distribuidora(s) distinta(s) com tarifa residencial "
           f"convencional homologada.")
 
-    mais_recente = (
+    tarifa_por_distribuidora = (
         df.dropna(subset=["DatInicioVigencia", "tarifa_total"])
         .sort_values("DatInicioVigencia")
         .groupby("SigAgente")
         .tail(1)
         .set_index("SigAgente")["tarifa_total"]
     )
-    return mais_recente
+
+    ultima_vigencia_por_distribuidora = pd.Series(ultima_vigencia_geral)
+    data_mais_recente = ultima_vigencia_por_distribuidora.max()
+    print(f"      Data de homologação mais recente do dataset (todas as distribuidoras/"
+          f"subgrupos, referência de \"hoje\" para o corte de atividade): "
+          f"{data_mais_recente.date()}.")
+
+    return tarifa_por_distribuidora, ultima_vigencia_por_distribuidora, data_mais_recente
 
 
-def resolver_municipio_distribuidora(engine) -> pd.DataFrame:
+def resolver_municipio_distribuidora(
+    engine,
+    ultima_vigencia_por_distribuidora: pd.Series,
+    data_mais_recente: pd.Timestamp,
+) -> pd.DataFrame:
     """Reaproveita o schema já carregado do INDQUAL — nenhuma fonte nova
-    necessária (mesmo padrão de investigar_distribuidora_regioes_problema.py)."""
+    necessária (mesmo padrão de investigar_distribuidora_regioes_problema.py).
+    Para município com múltiplas distribuidoras registradas, tenta resolver
+    em 2 camadas antes de desistir — ver docstring do módulo, seção
+    "MÚLTIPLAS DISTRIBUIDORAS POR MUNICÍPIO", para o raciocínio completo."""
     print("\n[3/6] Resolvendo município -> distribuidora via schema já carregado do INDQUAL...")
 
     query = text("""
@@ -274,16 +379,68 @@ def resolver_municipio_distribuidora(engine) -> pd.DataFrame:
     )
 
     agrupado = pares.groupby("codigo_ibge")["sig_agente"].agg(lambda s: sorted(set(s)))
-    n_unica = int((agrupado.apply(len) == 1).sum())
-    n_multipla = int((agrupado.apply(len) > 1).sum())
-    print(f"      {n_unica} município(s) com distribuidora única | "
-          f"{n_multipla} município(s) com múltiplas distribuidoras (ficarão SEM tarifa).")
-
     resultado = agrupado.reset_index()
-    resultado["distribuidora_unica"] = resultado["sig_agente"].apply(
-        lambda lst: lst[0] if len(lst) == 1 else None
+    resultado.columns = ["codigo_ibge", "distribuidoras"]
+
+    # "grande/principal" = atende sozinha (sem ambiguidade) pelo menos
+    # LIMIAR_MUNICIPIOS_DISTRIBUIDORA_GRANDE municípios em todo o país —
+    # calculado do próprio dado carregado agora, não de uma lista fixa.
+    solo = resultado[resultado["distribuidoras"].apply(len) == 1]
+    contagem_solo = solo["distribuidoras"].apply(lambda lst: lst[0]).value_counts()
+    distribuidoras_grandes = set(
+        contagem_solo[contagem_solo >= LIMIAR_MUNICIPIOS_DISTRIBUIDORA_GRANDE].index
     )
-    return resultado[["codigo_ibge", "distribuidora_unica"]]
+    print(f"      {len(distribuidoras_grandes)} distribuidora(s) classificada(s) como "
+          f"'grande/principal' (atendem sozinhas >= {LIMIAR_MUNICIPIOS_DISTRIBUIDORA_GRANDE} "
+          f"município(s) em todo o país).")
+
+    data_corte_atividade = data_mais_recente - pd.DateOffset(years=ANOS_LIMIAR_DISTRIBUIDORA_ATIVA)
+
+    def esta_ativa(sig_agente: str) -> bool:
+        nome_no_dataset_tarifas = CROSSWALK_SIG_AGENTE_INDQUAL_PARA_TARIFA.get(
+            sig_agente, sig_agente
+        )
+        ultima = ultima_vigencia_por_distribuidora.get(nome_no_dataset_tarifas)
+        return ultima is not None and pd.notna(ultima) and ultima >= data_corte_atividade
+
+    def resolver(lst):
+        if len(lst) == 1:
+            return lst[0], False
+
+        ativas = [d for d in lst if esta_ativa(d)]
+        if len(ativas) == 1:
+            # só uma das distribuidoras registradas ainda homologa tarifa —
+            # as demais são registros obsoletos do INDQUAL nunca limpos
+            # (mesma classe de bug já corrigida manualmente para RGE/CPFL/
+            # EDEVP, aqui detectada por inatividade — caso Roraima/CERR)
+            return ativas[0], False
+
+        candidatas = ativas if len(ativas) > 1 else lst
+        grandes_presentes = [d for d in candidatas if d in distribuidoras_grandes]
+        if len(grandes_presentes) == 1:
+            return grandes_presentes[0], True
+
+        return None, False
+
+    resolvido = resultado["distribuidoras"].apply(resolver)
+    resultado["distribuidora_unica"] = resolvido.apply(lambda t: t[0])
+    resultado["distribuidora_aproximada"] = resolvido.apply(lambda t: t[1])
+
+    tem_multipla = resultado["distribuidoras"].apply(len) > 1
+    n_unica_direta = int((~tem_multipla).sum())
+    n_obsolescencia = int(
+        (tem_multipla & resultado["distribuidora_unica"].notna() & ~resultado["distribuidora_aproximada"]).sum()
+    )
+    n_aproximada = int(resultado["distribuidora_aproximada"].sum())
+    n_sem_solucao = int(resultado["distribuidora_unica"].isna().sum())
+    print(f"      {n_unica_direta} município(s) com distribuidora única direta | "
+          f"{n_obsolescencia} resolvido(s) por obsolescência de registro (outra "
+          f"distribuidora do conjunto sem tarifa homologada há mais de "
+          f"{ANOS_LIMIAR_DISTRIBUIDORA_ATIVA} anos) | "
+          f"{n_aproximada} aproximado(s) (distribuidora principal escolhida entre "
+          f"múltiplas ativas) | {n_sem_solucao} sem solução (ficarão SEM tarifa).")
+
+    return resultado[["codigo_ibge", "distribuidora_unica", "distribuidora_aproximada"]]
 
 
 def montar_tarifa_por_municipio(
@@ -296,6 +453,14 @@ def montar_tarifa_por_municipio(
         CROSSWALK_SIG_AGENTE_INDQUAL_PARA_TARIFA
     )
     df["tarifa_energia_residencial"] = sig_agente_para_busca.map(tarifa_por_distribuidora)
+
+    # aproximada só faz sentido quando a tarifa foi de fato encontrada — se
+    # a distribuidora "principal" escolhida não tiver tarifa B1/Residencial
+    # homologada, o município fica sem tarifa (mesmo tratamento de sempre),
+    # não com a flag ligada à toa.
+    df["tarifa_energia_residencial_aproximada"] = (
+        df["distribuidora_aproximada"] & df["tarifa_energia_residencial"].notna()
+    )
 
     sem_distribuidora_unica = df["distribuidora_unica"].isna().sum()
     tem_distribuidora_sem_tarifa = (
@@ -314,11 +479,13 @@ def montar_tarifa_por_municipio(
               f"nesse formato específico). Primeiras 10: {distribuidoras_sem_match[:10]}")
 
     n_com_tarifa = df["tarifa_energia_residencial"].notna().sum()
+    n_aproximada = int(df["tarifa_energia_residencial_aproximada"].sum())
     print(f"      {n_com_tarifa} município(s) terão tarifa gravada "
           f"({sem_distribuidora_unica} sem distribuidora única, {tem_distribuidora_sem_tarifa} "
-          f"com distribuidora sem tarifa homologada encontrada).")
+          f"com distribuidora sem tarifa homologada encontrada) — {n_aproximada} deles com "
+          f"tarifa APROXIMADA (distribuidora principal, rotulado no frontend).")
 
-    return df[["codigo_ibge", "tarifa_energia_residencial"]]
+    return df[["codigo_ibge", "tarifa_energia_residencial", "tarifa_energia_residencial_aproximada"]]
 
 
 def executar_upsert(engine, df: pd.DataFrame):
@@ -326,11 +493,14 @@ def executar_upsert(engine, df: pd.DataFrame):
 
     sql_upsert = text("""
         INSERT INTO indicadores_sociais
-            (unidade_espacial_id, periodo_referencia, tarifa_energia_residencial)
+            (unidade_espacial_id, periodo_referencia, tarifa_energia_residencial,
+             tarifa_energia_residencial_aproximada)
         VALUES
-            (:unidade_espacial_id, :periodo_referencia, :tarifa_energia_residencial)
+            (:unidade_espacial_id, :periodo_referencia, :tarifa_energia_residencial,
+             :tarifa_energia_residencial_aproximada)
         ON CONFLICT (unidade_espacial_id, periodo_referencia) DO UPDATE SET
-            tarifa_energia_residencial = EXCLUDED.tarifa_energia_residencial;
+            tarifa_energia_residencial = EXCLUDED.tarifa_energia_residencial,
+            tarifa_energia_residencial_aproximada = EXCLUDED.tarifa_energia_residencial_aproximada;
     """)
 
     total = len(df)
@@ -348,6 +518,9 @@ def executar_upsert(engine, df: pd.DataFrame):
                     "unidade_espacial_id": unidade_espacial_id,
                     "periodo_referencia": PERIODO_REFERENCIA,
                     "tarifa_energia_residencial": valor_ou_none(linha.get("tarifa_energia_residencial")),
+                    "tarifa_energia_residencial_aproximada": bool(
+                        linha.get("tarifa_energia_residencial_aproximada", False)
+                    ),
                 })
             inseridos += 1
         except Exception as e:
@@ -366,15 +539,20 @@ def executar_upsert(engine, df: pd.DataFrame):
 def main():
     print("Construindo indicador de Tarifa Residencial (TUSD+TE) — ANEEL, todas as distribuidoras")
     print("=" * 70)
-    print("ATENÇÃO: requer a migration 0018_indicadores_sociais_tarifa_residencial.sql já aplicada.")
+    print("ATENÇÃO: requer as migrations 0018_indicadores_sociais_tarifa_residencial.sql e "
+          "0032_indicadores_sociais_tarifa_aproximada.sql já aplicadas.")
     print()
 
     engine = create_engine(DATABASE_URL)
 
     baixar_se_necessario()
     codificacao = detectar_codificacao()
-    tarifa_por_distribuidora = carregar_tarifa_mais_recente_por_distribuidora(codificacao)
-    municipio_distribuidora = resolver_municipio_distribuidora(engine)
+    tarifa_por_distribuidora, ultima_vigencia_por_distribuidora, data_mais_recente = (
+        carregar_situacao_distribuidoras(codificacao)
+    )
+    municipio_distribuidora = resolver_municipio_distribuidora(
+        engine, ultima_vigencia_por_distribuidora, data_mais_recente
+    )
     df_final = montar_tarifa_por_municipio(tarifa_por_distribuidora, municipio_distribuidora)
 
     print("\n[6/6] Resumo da tarifa residencial (R$/MWh):")

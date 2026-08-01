@@ -60,6 +60,14 @@ export interface MunicipioComIndicadores {
   taxaAlfabetizacao: number | null;
   taxaMortalidadeInfantil: number | null;
   tarifaEnergiaResidencial: number | null;
+  /**
+   * true quando `tarifaEnergiaResidencial` veio da distribuidora PRINCIPAL
+   * de um município com área de concessão dividida (ignora a cooperativa
+   * menor que também atende) — ver migration 0032 e
+   * extrair_tarifa_distribuidoras.py. O frontend deve sempre rotular
+   * visivelmente quando true.
+   */
+  tarifaEnergiaResidencialAproximada: boolean;
   irradiacaoMediaKwhM2Dia: number | null;
   potenciaInstaladaKw: number | null;
   potenciaResidencialKw: number | null;
@@ -117,6 +125,7 @@ interface LinhaBruta {
   taxaAlfabetizacao: number | null;
   taxaMortalidadeInfantil: number | null;
   tarifaEnergiaResidencial: number | null;
+  tarifaEnergiaResidencialAproximada: boolean;
   irradiacaoMediaKwhM2Dia: number | null;
   potenciaInstaladaKw: number | null;
   potenciaResidencialKw: number | null;
@@ -172,6 +181,7 @@ const SELECT_BASE = sql`
       vsc.taxa_alfabetizacao              AS "taxaAlfabetizacao",
       vsc.taxa_mortalidade_infantil       AS "taxaMortalidadeInfantil",
       vsc.tarifa_energia_residencial      AS "tarifaEnergiaResidencial",
+      vsc.tarifa_energia_residencial_aproximada AS "tarifaEnergiaResidencialAproximada",
       vsc.numero_contratos_reforma_casa_brasil_solar AS "numeroContratosReformaCasaBrasilSolar",
       vsc.valor_liberado_reforma_casa_brasil_solar AS "valorLiberadoReformaCasaBrasilSolar",
       vsc.percentual_apartamento          AS "percentualApartamento",

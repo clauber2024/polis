@@ -21,6 +21,7 @@ import {
   timestamp,
   uniqueIndex,
   integer,
+  boolean,
 } from 'drizzle-orm/pg-core';
 import { unidadesEspaciais } from './unidades_espaciais.js';
 
@@ -226,6 +227,21 @@ export const indicadoresSociais = pgTable(
      * a interpretação de sentido é responsabilidade da camada de análise.
      */
     tarifaEnergiaResidencial: doublePrecision("tarifa_energia_residencial"),
+
+    /**
+     * true quando `tarifaEnergiaResidencial` veio da distribuidora
+     * PRINCIPAL de um município com área de concessão dividida (ignora a
+     * cooperativa menor que também atende o município) — ver migration
+     * 0032 e `extrair_tarifa_distribuidoras.py`
+     * (GRANDES/ANOS_LIMIAR_DISTRIBUIDORA_ATIVA) para a metodologia
+     * completa. false para os demais casos (distribuidora única sem
+     * ambiguidade, resolução por obsolescência de registro no INDQUAL, ou
+     * município sem tarifa nenhuma). O frontend deve sempre rotular
+     * visivelmente quando true — nunca apresentar como tarifa exata.
+     */
+    tarifaEnergiaResidencialAproximada: boolean("tarifa_energia_residencial_aproximada")
+      .notNull()
+      .default(false),
 
     /**
      * Número de contratos da modalidade SOLAR do programa Reforma Casa

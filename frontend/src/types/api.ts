@@ -41,6 +41,13 @@ export interface MunicipioComIndicadores {
   taxaAlfabetizacao: number | null;
   taxaMortalidadeInfantil: number | null;
   tarifaEnergiaResidencial: number | null;
+  /**
+   * true quando `tarifaEnergiaResidencial` veio da distribuidora PRINCIPAL
+   * de um município com área de concessão dividida (ignora a cooperativa
+   * menor que também atende) — ver migration 0032 no backend. Sempre
+   * rotular visivelmente quando true, nunca apresentar como tarifa exata.
+   */
+  tarifaEnergiaResidencialAproximada: boolean;
   irradiacaoMediaKwhM2Dia: number | null;
   potenciaInstaladaKw: number | null;
   potenciaResidencialKw: number | null;

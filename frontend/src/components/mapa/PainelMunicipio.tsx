@@ -214,10 +214,15 @@ export function PainelMunicipio({
         { campo: 'numeroUcsComMmgd', rotulo: 'UCs com MMGD', formato: 'inteiro' },
         {
           campo: 'tarifaEnergiaResidencial',
-          rotulo: 'Tarifa residencial (TUSD+TE)',
+          rotulo: municipio.tarifaEnergiaResidencialAproximada
+            ? 'Tarifa residencial (TUSD+TE) (aproximada)'
+            : 'Tarifa residencial (TUSD+TE)',
           formato: 'numero',
           unidade: 'R$/kWh',
           semantica: 'menorMelhor',
+          descricao: municipio.tarifaEnergiaResidencialAproximada
+            ? 'Este município tem mais de uma distribuidora de energia (área de concessão dividida). O valor exibido é da distribuidora principal — a cooperativa local menor que também atende o município foi ignorada. Trate como aproximação, não como tarifa exata de uma distribuidora única.'
+            : undefined,
         },
       ],
     },
