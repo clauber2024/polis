@@ -5,6 +5,8 @@ import {
   type FocoMapa,
   type PontosHeatmap,
 } from '../components/mapa/MapaMunicipios';
+import { BarraFerramentasMobile } from '../components/mapa/BarraFerramentasMobile';
+import { BottomSheetMobile } from '../components/mapa/BottomSheetMobile';
 import { Legenda } from '../components/mapa/Legenda';
 import { PainelFiltrosDashboard } from '../components/mapa/PainelFiltrosDashboard';
 import { PainelHeatmapVazios } from '../components/mapa/PainelHeatmapVazios';
@@ -136,6 +138,11 @@ export function PaginaMapa() {
   // lazy dos badges de vazio (RF-032) migrou de "abrir o ranking" para
   // "escolher uma UF" (prop aoEscolherUf do PainelRanking).
   const [abaSidebar, setAbaSidebar] = useState<'ranking' | 'filtros'>('ranking');
+  // Bottom sheet ativo no mobile (31/07/2026, refatoração de UX mobile) —
+  // versão mobile do painel esquerdo/legenda, que são `absolute`/`w-80` sem
+  // breakpoint responsivo (cobriam quase toda a tela em celular). Só um
+  // sheet aberto por vez, mesmo padrão de `abaSidebar` acima no desktop.
+  const [sheetMobile, setSheetMobile] = useState<'camadas' | 'filtros' | 'ranking' | null>(null);
   // UF selecionada no ranking — prop controlada do PainelRanking (RF-027:
   // o clique num estado no mapa também precisa atualizar o dropdown do ranking,
   // o que exige que o estado viva aqui e não dentro do PainelRanking).
@@ -509,13 +516,17 @@ export function PaginaMapa() {
       {/* Painel de controle tático flutuante (esquerda): Camada Base +
           Lentes de Priorização + abas Ranking/Filtros. top-4/bottom-4 (em
           vez de vh) para a altura acompanhar o <main> do LayoutApp sem
-          contas de viewport. */}
+          contas de viewport. `hidden md:flex` (31/07/2026) — este painel é
+          `w-80` fixo do topo à base da tela, sem breakpoint responsivo:
+          cobria quase toda a largura em celular. Abaixo de `md`, o mesmo
+          conteúdo vira 3 bottom sheets (BarraFerramentasMobile mais abaixo
+          no JSX). */}
       {/* z-30 (não z-10): este wrapper compete por empilhamento contra os
           irmãos dele no nível raiz da página (legenda, painel de município)
           — como o SeletorIndicador aqui dentro precisa abrir por cima de
           TUDO, o wrapper precisa vencer essa disputa, não só a interna entre
           os 3 cards (ver comentário no card do indicador, abaixo). */}
-      <div className="absolute top-4 bottom-4 left-4 z-30 flex w-80 flex-col gap-3 sm:top-6 sm:bottom-6 sm:left-6">
+      <div className="absolute top-4 bottom-4 left-4 z-30 hidden w-80 flex-col gap-3 sm:top-6 sm:bottom-6 sm:left-6 md:flex">
         {/* z-20/z-10/z-0 nos 3 blocos abaixo (25/07/2026, bug real de
             stacking context): backdrop-blur força cada card a virar seu
             próprio stacking context, então o z-30 do dropdown de
@@ -678,8 +689,11 @@ export function PaginaMapa() {
 
       {/* Legenda/heatmap flutuante — no modo heatmap (RF-057) o painel do
           heatmap substitui a legenda do choropleth (modo exclusivo: o
-          choropleth está esmaecido). */}
-      <div className="absolute bottom-6 left-4 z-10 sm:left-6">
+          choropleth está esmaecido). `hidden md:block` (31/07/2026) — no
+          mobile, o mesmo conteúdo mora dentro do bottom sheet "Camadas"
+          (mais abaixo no JSX), pra não flutuar em cima da barra de
+          ferramentas inferior. */}
+      <div className="absolute bottom-6 left-4 z-10 hidden sm:left-6 md:block">
         {heatmapLigado && vazios ? (
           <PainelHeatmapVazios
             totalVazios={vazios.municipios.length}
@@ -717,9 +731,13 @@ export function PaginaMapa() {
         </div>
       )}
 
-      {/* Painel de detalhe do município — flutuante à direita. */}
+      {/* Painel de detalhe do município — flutuante à direita. left-4
+          (31/07/2026) além de right-4 no mobile, pra ocupar a largura toda
+          da tela (PainelMunicipio.tsx ganhou w-full sm:w-80 na mesma
+          sessão) — antes tinha só right-4 com w-80 fixo, sobrando uma faixa
+          estreita à direita em celular. */}
       {municipioSelecionado && (
-        <div className="absolute top-4 bottom-4 right-4 z-10 sm:top-6 sm:right-6 sm:bottom-6">
+        <div className="absolute top-4 right-4 bottom-4 left-4 z-10 sm:left-auto sm:top-6 sm:right-6 sm:bottom-6">
           <PainelMunicipio
             municipio={municipioSelecionado}
             aoFechar={() => setMunicipioSelecionado(null)}
@@ -735,6 +753,146 @@ export function PaginaMapa() {
           />
         </div>
       )}
+
+      {/* Mobile (31/07/2026): barra de ferramentas + 3 bottom sheets, versão
+          responsiva do painel esquerdo/legenda escondidos acima (md:hidden
+          nos dois). Escondida enquanto o painel de município está aberto —
+          já ocupa a tela toda no mobile, não faz sentido flutuar a barra por
+          cima dele. */}
+      {!municipioSelecionado && (
+        <BarraFerramentasMobile
+          aoAbrirCamadas={() => setSheetMobile('camadas')}
+          aoAbrirFiltros={() => setSheetMobile('filtros')}
+          aoAbrirRanking={() => setSheetMobile('ranking')}
+          filtrosAtivos={filtrosDashboardAtivos}
+        />
+      )}
+
+      <BottomSheetMobile
+        aberto={sheetMobile === 'camadas'}
+        aoFechar={() => setSheetMobile(null)}
+        titulo="Camadas do mapa"
+      >
+        <div className="space-y-3">
+          <div>
+            <SeletorIndicador indicadores={INDICADORES_MAPA} valor={indicador.id} aoMudar={setIndicadorId} />
+            {indicador.descricao && (
+              <div className="mt-3 border-t border-stone-200/70 pt-3">
+                <span className="block text-[10px] font-bold tracking-widest text-stone-500 uppercase">
+                  Nota científica
+                </span>
+                <p className="mt-0.5 text-xs leading-normal text-stone-600">{indicador.descricao}</p>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-red-200/60 bg-red-50/60 p-4">
+            <div className="mb-3 flex items-center gap-2 border-b border-red-200/70 pb-2">
+              <span className="text-[10px] font-bold tracking-widest text-red-900 uppercase">
+                Lentes de priorização
+              </span>
+            </div>
+            <div className="flex flex-col gap-2">
+              <InterruptorLente
+                rotulo="Destacar Vazios de Acesso"
+                ligado={destaqueLigado}
+                aoAlternar={aoAlternarDestaque}
+                nota={carregandoVazios ? 'carregando…' : undefined}
+              />
+              <InterruptorLente
+                rotulo="Descompasso Morfológico"
+                ligado={descompassoLigado}
+                aoAlternar={aoAlternarDescompasso}
+                nota={vazios ? `(${vazios.municipios.filter((m) => m.descompassoMorfologico).length})` : undefined}
+              />
+              <InterruptorLente
+                rotulo="Déficit de Crédito Crítico"
+                ligado={deficitCreditoLigado}
+                aoAlternar={aoAlternarDeficitCredito}
+                nota={
+                  vazios
+                    ? `(${vazios.municipios.filter((m) => m.alertaDeficitCredito).length})`
+                    : undefined
+                }
+              />
+              <button
+                type="button"
+                onClick={() => aoAlternarHeatmap(!heatmapLigado)}
+                className={`mt-1 w-full rounded-lg px-4 py-2 text-xs font-bold shadow-sm transition-all ${
+                  heatmapLigado
+                    ? 'bg-red-700 text-white hover:bg-red-800'
+                    : 'border border-red-200 bg-white/70 text-red-800 hover:bg-white'
+                }`}
+              >
+                {heatmapLigado ? 'Ver mapa normal' : 'Gerar heatmap de exclusão'}
+              </button>
+            </div>
+            {erroVazios && <p className="mt-2 text-xs text-red-600">{erroVazios}</p>}
+          </div>
+
+          {heatmapLigado && vazios ? (
+            <PainelHeatmapVazios
+              totalVazios={vazios.municipios.length}
+              medianaNacional={vazios.medianaNacional}
+              notaMetodologica={vazios.notaMetodologica}
+            />
+          ) : (
+            <Legenda
+              indicador={indicador}
+              quebras={quebras}
+              destaqueLigado={destaqueLigado && !!vazios}
+              totalDestacados={vazios?.municipios.length ?? 0}
+              descompassoLigado={descompassoLigado && !!vazios}
+              totalDescompasso={codigosDescompasso?.length ?? 0}
+            />
+          )}
+        </div>
+      </BottomSheetMobile>
+
+      <BottomSheetMobile
+        aberto={sheetMobile === 'filtros'}
+        aoFechar={() => setSheetMobile(null)}
+        titulo="Filtros do mapa"
+      >
+        <PainelFiltrosDashboard
+          ufs={ufsDisponiveis}
+          regioes={regioesDisponiveis}
+          uf={filtroUf}
+          regiao={filtroRegiao}
+          potenciaMin={filtroPotenciaMin}
+          potenciaMax={filtroPotenciaMax}
+          totalVisiveis={codigosVisiveis?.length ?? listaMunicipios.length}
+          totalMunicipios={listaMunicipios.length}
+          aoMudarUf={(uf) => {
+            setFiltroUf(uf);
+            setUfDestacada(uf);
+            if (uf) setFoco({ uf });
+          }}
+          aoMudarRegiao={setFiltroRegiao}
+          aoMudarPotenciaMin={setFiltroPotenciaMin}
+          aoMudarPotenciaMax={setFiltroPotenciaMax}
+          aoLimparFiltros={limparFiltrosDashboard}
+        />
+      </BottomSheetMobile>
+
+      <BottomSheetMobile
+        aberto={sheetMobile === 'ranking'}
+        aoFechar={() => setSheetMobile(null)}
+        titulo="Ranking estadual"
+      >
+        <PainelRanking
+          municipios={listaMunicipios}
+          indicador={indicador}
+          codigosVazios={codigosVazios}
+          carregandoVazios={carregandoVazios}
+          aoSelecionarMunicipio={(codigoIbge) => {
+            aoSelecionarDoRanking(codigoIbge);
+            setSheetMobile(null);
+          }}
+          ufSelecionada={ufRanking}
+          aoEscolherUf={aoEscolherUfRanking}
+        />
+      </BottomSheetMobile>
     </div>
   );
 }

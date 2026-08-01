@@ -337,7 +337,7 @@ export function PainelMunicipio({
   }
 
   return (
-    <aside className="flex h-full w-80 flex-col overflow-hidden rounded-3xl border border-white/90 bg-white/85 shadow-[0_12px_40px_rgb(0,0,0,0.12)] backdrop-blur-2xl">
+    <aside className="flex h-full w-full flex-col overflow-hidden rounded-3xl border border-white/90 bg-white/85 shadow-[0_12px_40px_rgb(0,0,0,0.12)] backdrop-blur-2xl sm:w-80">
       {/* Cabeçalho fixo: identificação + PDF sempre visíveis, mesmo com a lista rolada. */}
       <div className="sticky top-0 z-10 border-b border-stone-200/70 bg-white/90 p-5 backdrop-blur-md">
         <div className="flex items-start justify-between gap-2">
