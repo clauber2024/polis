@@ -13,6 +13,7 @@ import { CartaoVazioDeAcesso } from './CartaoVazioDeAcesso';
 import { CartaoDeficitCredito } from './CartaoDeficitCredito';
 import { IndicadorComparativo, type SemanticaIndicador } from './IndicadorComparativo';
 import { CardDadoNeutro, IconeMapa, IconeMoeda, IconeUsuarios, type IconeCard } from './CardDadoNeutro';
+import { BotaoReportarProblema } from './BotaoReportarProblema';
 
 interface PainelMunicipioProps {
   municipio: MunicipioComIndicadores;
@@ -378,6 +379,8 @@ export function PainelMunicipio({
           {gerandoRelatorio ? 'Gerando relatório…' : 'Baixar relatório-resumo (PDF)'}
         </button>
         {erroRelatorio && <p className="mt-1.5 text-xs text-red-600">{erroRelatorio}</p>}
+
+        <BotaoReportarProblema nomeMunicipio={municipio.nome} ufMunicipio={municipio.uf} />
       </div>
 
       {/* Área de rolagem: só o corpo de dados rola por baixo do cabeçalho fixo. */}
