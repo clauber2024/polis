@@ -244,6 +244,20 @@ export const indicadoresSociais = pgTable(
       .default(false),
 
     /**
+     * Sigla da distribuidora (sig_agente do INDQUAL/ANEEL, ex.: "RGE",
+     * "COOPERSUL") cuja tarifa foi gravada em `tarifaEnergiaResidencial` —
+     * ver migration 0033 e `extrair_tarifa_distribuidoras.py`. É o código
+     * bruto da fonte, não um nome comercial traduzido (não existe
+     * dicionário confiável de nomes legíveis para todas as distribuidoras
+     * do país — alguns códigos só foram identificados manualmente
+     * consultando o portal da própria ANEEL, ex.: "EMR" = Energisa Minas
+     * Rio).
+     */
+    tarifaEnergiaResidencialDistribuidora: varchar("tarifa_energia_residencial_distribuidora", {
+      length: 80,
+    }),
+
+    /**
      * Número de contratos da modalidade SOLAR do programa Reforma Casa
      * Brasil (Caixa/Ministério das Cidades), somado nov/2025-abr/2026
      * (Faixa 1 + Faixa 2, renda familiar bruta mensal até R$9.600).

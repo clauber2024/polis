@@ -220,8 +220,11 @@ export function PainelMunicipio({
           formato: 'numero',
           unidade: 'R$/kWh',
           semantica: 'menorMelhor',
-          descricao: municipio.tarifaEnergiaResidencialAproximada
-            ? 'Este município tem mais de uma distribuidora de energia (área de concessão dividida). O valor exibido é da distribuidora principal — a cooperativa local menor que também atende o município foi ignorada. Trate como aproximação, não como tarifa exata de uma distribuidora única.'
+          descricao: municipio.tarifaEnergiaResidencialDistribuidora
+            ? `Distribuidora: ${municipio.tarifaEnergiaResidencialDistribuidora}.` +
+              (municipio.tarifaEnergiaResidencialAproximada
+                ? ' Este município tem mais de uma distribuidora de energia (área de concessão dividida) — o valor exibido é da distribuidora principal, a cooperativa local menor que também atende o município foi ignorada. Trate como aproximação, não como tarifa exata de uma distribuidora única.'
+                : '')
             : undefined,
         },
       ],

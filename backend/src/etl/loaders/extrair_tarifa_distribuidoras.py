@@ -622,7 +622,10 @@ def montar_tarifa_por_municipio(
           f"com distribuidora sem tarifa homologada encontrada) — {n_aproximada} deles com "
           f"tarifa APROXIMADA (distribuidora principal, rotulado no frontend).")
 
-    return df[["codigo_ibge", "tarifa_energia_residencial", "tarifa_energia_residencial_aproximada"]]
+    return df[[
+        "codigo_ibge", "tarifa_energia_residencial", "tarifa_energia_residencial_aproximada",
+        "distribuidora_unica",
+    ]]
 
 
 def executar_upsert(engine, df: pd.DataFrame):
@@ -631,13 +634,14 @@ def executar_upsert(engine, df: pd.DataFrame):
     sql_upsert = text("""
         INSERT INTO indicadores_sociais
             (unidade_espacial_id, periodo_referencia, tarifa_energia_residencial,
-             tarifa_energia_residencial_aproximada)
+             tarifa_energia_residencial_aproximada, tarifa_energia_residencial_distribuidora)
         VALUES
             (:unidade_espacial_id, :periodo_referencia, :tarifa_energia_residencial,
-             :tarifa_energia_residencial_aproximada)
+             :tarifa_energia_residencial_aproximada, :tarifa_energia_residencial_distribuidora)
         ON CONFLICT (unidade_espacial_id, periodo_referencia) DO UPDATE SET
             tarifa_energia_residencial = EXCLUDED.tarifa_energia_residencial,
-            tarifa_energia_residencial_aproximada = EXCLUDED.tarifa_energia_residencial_aproximada;
+            tarifa_energia_residencial_aproximada = EXCLUDED.tarifa_energia_residencial_aproximada,
+            tarifa_energia_residencial_distribuidora = EXCLUDED.tarifa_energia_residencial_distribuidora;
     """)
 
     total = len(df)
@@ -647,6 +651,9 @@ def executar_upsert(engine, df: pd.DataFrame):
     def valor_ou_none(x):
         return None if pd.isna(x) else float(x)
 
+    def texto_ou_none(x):
+        return None if pd.isna(x) else str(x)
+
     for i, linha in df.iterrows():
         unidade_espacial_id = f"municipio:{linha['codigo_ibge']}"
         try:
@@ -655,6 +662,9 @@ def executar_upsert(engine, df: pd.DataFrame):
                     "unidade_espacial_id": unidade_espacial_id,
                     "periodo_referencia": PERIODO_REFERENCIA,
                     "tarifa_energia_residencial": valor_ou_none(linha.get("tarifa_energia_residencial")),
+                    "tarifa_energia_residencial_distribuidora": texto_ou_none(
+                        linha.get("distribuidora_unica")
+                    ),
                     "tarifa_energia_residencial_aproximada": bool(
                         linha.get("tarifa_energia_residencial_aproximada", False)
                     ),

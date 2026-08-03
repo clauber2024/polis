@@ -48,6 +48,8 @@ export interface MunicipioComIndicadores {
    * rotular visivelmente quando true, nunca apresentar como tarifa exata.
    */
   tarifaEnergiaResidencialAproximada: boolean;
+  /** Sigla da distribuidora (código bruto do INDQUAL/ANEEL, ex.: "RGE", "COOPERSUL"). */
+  tarifaEnergiaResidencialDistribuidora: string | null;
   irradiacaoMediaKwhM2Dia: number | null;
   potenciaInstaladaKw: number | null;
   potenciaResidencialKw: number | null;

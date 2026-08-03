@@ -68,6 +68,11 @@ export interface MunicipioComIndicadores {
    * visivelmente quando true.
    */
   tarifaEnergiaResidencialAproximada: boolean;
+  /**
+   * Sigla da distribuidora (código bruto do INDQUAL/ANEEL, ex.: "RGE",
+   * "COOPERSUL") cuja tarifa foi gravada acima — ver migration 0033.
+   */
+  tarifaEnergiaResidencialDistribuidora: string | null;
   irradiacaoMediaKwhM2Dia: number | null;
   potenciaInstaladaKw: number | null;
   potenciaResidencialKw: number | null;
@@ -126,6 +131,7 @@ interface LinhaBruta {
   taxaMortalidadeInfantil: number | null;
   tarifaEnergiaResidencial: number | null;
   tarifaEnergiaResidencialAproximada: boolean;
+  tarifaEnergiaResidencialDistribuidora: string | null;
   irradiacaoMediaKwhM2Dia: number | null;
   potenciaInstaladaKw: number | null;
   potenciaResidencialKw: number | null;
@@ -182,6 +188,7 @@ const SELECT_BASE = sql`
       vsc.taxa_mortalidade_infantil       AS "taxaMortalidadeInfantil",
       vsc.tarifa_energia_residencial      AS "tarifaEnergiaResidencial",
       vsc.tarifa_energia_residencial_aproximada AS "tarifaEnergiaResidencialAproximada",
+      vsc.tarifa_energia_residencial_distribuidora AS "tarifaEnergiaResidencialDistribuidora",
       vsc.numero_contratos_reforma_casa_brasil_solar AS "numeroContratosReformaCasaBrasilSolar",
       vsc.valor_liberado_reforma_casa_brasil_solar AS "valorLiberadoReformaCasaBrasilSolar",
       vsc.percentual_apartamento          AS "percentualApartamento",

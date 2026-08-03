@@ -931,6 +931,19 @@ export function MapaMunicipios({
               )}
             </div>
 
+            {/* Distribuidora responsável pela tarifa exibida — só existe
+                para o indicador de tarifa (municipioHover.tarifaEnergia
+                ResidencialDistribuidora é null pra qualquer outro
+                indicador). Sigla bruta do INDQUAL/ANEEL, ver migration
+                0033. */}
+            {indicador.id === 'tarifaEnergiaResidencial' &&
+              municipioHover.tarifaEnergiaResidencialDistribuidora && (
+                <p className="text-[10px] font-semibold text-stone-500">
+                  Distribuidora: {municipioHover.tarifaEnergiaResidencialDistribuidora}
+                  {municipioHover.tarifaEnergiaResidencialAproximada && ' (aproximada)'}
+                </p>
+              )}
+
             {typeof valorIndicadorHover === 'number' && typeof mediaNacionalIndicadorAtivo === 'number' && (
               <TermometroComparativo
                 valor={valorIndicadorHover}
